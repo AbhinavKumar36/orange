@@ -1,8 +1,8 @@
 # Moody Orange — Database Architecture & Schema Specification
 
-**Document Version:** 1.3.0 (Phase 0.3 Final Consistency Pass)  
+**Document Version:** 1.4.1 (Phase 0.4.1 Final Blocker Resolution)  
 **Phase:** Phase 0 (Requirements & Architecture)  
-**Status:** Pending Client Review & Sign-Off  
+**Status:** Ready for Phase 0 Approval Review  
 **Database Engine:** PostgreSQL 15+ (Hosted on Supabase)  
 **Repository:** [https://github.com/AbhinavKumar36/orange](https://github.com/AbhinavKumar36/orange)  
 
@@ -15,7 +15,9 @@
 | **1.0.0** | 2026-10-30 | Lead Architect | Initial schema definitions, tables, and RLS policies. |
 | **1.1.0** | 2026-10-30 | Lead Architect | Phase 0.1 Revision: Decoupled Backend API and added initial late webhook handling. |
 | **1.2.0** | 2026-10-30 | Lead Architect | Phase 0.2 Revision: Standardized `physical_stock` and multi-product deterministic row locks. |
-| **1.3.0** | 2026-10-30 | Lead Architect | **Phase 0.3 Final Consistency Pass:**<br>• Hardened `rpc_reserve_order_stock`: aggregated duplicate product IDs, enforced positive quantities, rejected empty carts and inactive products.<br>• Scoped checkout idempotency keys strictly to authenticated customers with payload hash verification.<br>• Separated cash-at-pickup (`unpaid` state) from online payment gateway states; blocked cash order completion without verified cash payment.<br>• Enforced deterministic `ORDER BY product_id ASC FOR UPDATE` locking across ALL inventory-modifying procedures (checkout, cancellation, handover, late payment).<br>• Hardened `SECURITY DEFINER` functions with explicit `search_path = public, pg_temp` and restricted `EXECUTE` privileges.<br>• Defined complete RLS policies across all 10 database tables. |
+| **1.3.0** | 2026-10-30 | Lead Architect | Phase 0.3 Revision: Added duplicate aggregation, customer-scoped idempotency, and cash unpaid state. |
+| **1.4.0** | 2026-10-30 | Lead Architect | Phase 0.4 Consistency Pass: Dual-layer security, raw-body HMAC, and evidence-based refunds. |
+| **1.4.1** | 2026-10-30 | Lead Architect | **Phase 0.4.1 Final Blocker Resolution:**<br>• Fully separated Cash-at-Pickup (`confirmed`, `unpaid`, `expires_at = NULL`) from Online Checkout (`draft`, `pending`, `expires_at = NOW() + 10min`).<br>• Hardened `rpc_release_expired_reservations` to strictly target online checkouts, ensuring cash orders cannot be accidentally expired by the reservation worker.<br>• Authored `rpc_write_off_inventory` protecting `physical_stock >= reserved_stock`: prevents blind write-offs when stock is reserved, requiring explicit order cancellation and customer refund.<br>• Enhanced `rpc_reconcile_late_payment` with an explicit atomic recovery decision tree, order locking, and automated refund trigger.<br>• Hardened `rpc_complete_order_handover` with duplicate handover prevention, mandatory cash receipt assertion, and online capture verification.<br>• Authored `rpc_issue_refund` with payment row locking, partial refund ledger accounting, and cumulative cap verification.<br>• Added DB constraint `chk_cash_no_online_expiry CHECK (payment_method != 'cash_at_pickup' OR expires_at IS NULL)`. |
 
 ---
 
@@ -31,7 +33,7 @@ To eliminate any ambiguity in stock accounting, the platform enforces three exac
 +───────────────────────────────────────────────────────────────────────────────+
 | DEFINITION 2: reserved_stock (INTEGER)                                        |
 | The count of units committed to active transactions:                          |
-| 1. Active checkout sessions awaiting payment (locked under a 10-minute TTL).  |
+| 1. Active online checkout sessions awaiting payment (under reservation TTL).  |
 | 2. Confirmed orders (paid online or confirmed cash) awaiting customer pickup. |
 +───────────────────────────────────────────────────────────────────────────────+
 | DEFINITION 3: available_stock (COMPUTED FORMULA)                              |
@@ -40,77 +42,157 @@ To eliminate any ambiguity in stock accounting, the platform enforces three exac
 +───────────────────────────────────────────────────────────────────────────────+
 ```
 
-### 1.1 Authoritative Stock Accounting Example
+### 1.1 Authoritative Stock Accounting Lifecycle
 
-| Operational Event | `physical_stock` | `reserved_stock` | `available_stock` | Rule & Lifecycle Note |
+| Operational Event | `physical_stock` | `reserved_stock` | `available_stock` | Rule & Lifecycle Invariant |
 | :--- | :---: | :---: | :---: | :--- |
 | **Initial Stock** | 10 | 0 | 10 | 10 sellable units present in store |
-| **Customer Reserves 2 Units** | 10 | 2 | 8 | Reserved during checkout transaction |
-| **Payment Captured Successfully** | 10 | 2 | 8 | **Reservation NOT released!** Confirmed order holds reserved stock |
-| **Customer Collects 2 Units** | 8 | 0 | 8 | **Physical stock decreases on counter handover!** Reserved stock drops to 0 |
+| **Customer Reserves 2 Units (Online or Cash)** | 10 | 2 | 8 | Reserved during checkout transaction |
+| **Online Payment Captured Successfully** | 10 | 2 | 8 | **Reservation NOT released!** Confirmed order holds reserved stock |
+| **Customer Collects 2 Units (Online or Cash)** | 8 | 0 | 8 | **Physical stock decreases on counter handover!** Reserved stock drops to 0 |
 | **Another Checkout Reserves 1**| 8 | 1 | 7 | New pending checkout |
-| **Reservation Expires** | 8 | 0 | 8 | Unpaid checkout timed out; reserved stock drops to 0 |
-| **Damaged / Spoilage Deduction** (1 unit) | 7 | 0 | 7 | Physical write-off decrements `physical_stock` via audit log |
+| **Online Reservation Expires** | 8 | 0 | 8 | Unpaid checkout timed out; reserved stock drops to 0 exactly once |
+| **Order Cancelled Before Prep** | 8 | 0 | 8 | Reserved stock released exactly once; physical stock unchanged |
+| **Damaged / Spoilage Deduction** (1 unit unreserved) | 7 | 0 | 7 | Physical write-off decrements `physical_stock` via audit log |
+
+### 1.2 Table-Level Invariants & Check Constraints
+```sql
+CONSTRAINT chk_stock_balance CHECK (physical_stock >= reserved_stock),
+CONSTRAINT chk_reserved_non_negative CHECK (reserved_stock >= 0),
+CONSTRAINT chk_physical_non_negative CHECK (physical_stock >= 0)
+```
+
+### 1.3 Inventory Write-Offs, Spoilage, and Damage Invariant Protection
+When store staff reports damaged, spoiled, or dropped items (e.g. a dropped cake or fermented juice), the database constraint `physical_stock >= reserved_stock` is actively defended:
+
+1. **Damage $\le$ Unreserved Stock (`p_damaged_qty <= (physical_stock - reserved_stock)`):**
+   - The loss is completely absorbed by available, unreserved stock.
+   - `physical_stock` is decremented by `p_damaged_qty`.
+   - `reserved_stock` is untouched.
+   - An immutable audit log entry is recorded with reason and actor ID.
+   - Active customer reservations remain 100% valid.
+2. **Damage $>$ Unreserved Stock (`p_damaged_qty > (physical_stock - reserved_stock)`):**
+   - The physical items damaged are committed to active customer orders!
+   - Blindly reducing `physical_stock` would violate `chk_stock_balance` (causing an abort) or create a phantom order with no physical product.
+   - The system **MUST NOT** silently invalidate customer reservations.
+   - **Resolution Protocol:** `rpc_write_off_inventory` explicitly blocks direct write-offs when reserved units are impacted. A store manager must review the dispatch queue and explicitly cancel the impacted order(s) via `rpc_cancel_order` with reason `'cancelled_damaged_stock'`. This cancellation atomically decrements `reserved_stock`, marks online orders for automated gateway refund, and notifies the customer. Once `reserved_stock` is reduced, the physical damage write-off succeeds safely.
 
 ---
 
 ## 2. Order & Payment Lifecycle State Machines
 
-### 2.1 Complete State Transition Pipelines
+Order status and payment status are **strictly separated** in the database to prevent conflating operational fulfillment with financial settlement. Furthermore, **Online Checkout** and **Cash-at-Pickup Checkout** follow two distinct lifecycles:
 
-Order status and payment status are **strictly separated** in the database:
+### 2.1 Distinct Checkout Lifecycles
 
 ```
-ORDER STATUS PIPELINE:
-draft -> payment_pending -> confirmed -> preparing -> ready_for_pickup -> completed
-           │                   │
-           ├─► expired         ├─► cancelled_by_customer (if permitted)
-           │                   └─► cancelled_by_staff
-           └─► cancelled_inventory_depleted (late payment when stock is sold out)
+================================================================================
+A. ONLINE PAYMENT CHECKOUT LIFECYCLE (Razorpay)
+================================================================================
+[Customer Checkout] 
+       │
+       ▼
+  order_status = 'draft'
+  payment_status = 'pending'
+  expires_at = NOW() + 10 min [PROPOSED TTL]
+  reserved_stock += qty
+       │
+       ├─────────────────────────────────┬─────────────────────────────────┐
+       │ (Payment Success within TTL)    │ (TTL Expires without Payment)   │ (User Aborts / Fails)
+       ▼                                 ▼                                 ▼
+  order_status = 'confirmed'        order_status = 'cancelled_expired' order_status = 'draft'
+  payment_status = 'captured'       payment_status = 'expired'         payment_status = 'failed'
+  expires_at = NULL                 reserved_stock -= qty              (Customer can retry)
+  (Reservation REMAINS HELD)        (Released exactly once)
+       │
+       ▼ (Store Kitchen Operations)
+  order_status = 'preparing'
+       │
+       ▼ (Counter Staging)
+  order_status = 'ready_for_pickup'
+       │
+       ▼ (Counter Handover: Customer verified)
+  order_status = 'completed'
+  payment_status = 'captured' (already captured)
+  physical_stock -= qty, reserved_stock -= qty atomically!
 
-PAYMENT STATUS PIPELINE:
-Online:  pending ──► captured (or paid) ──► refund_pending ──► refund_processing ──► refunded
-            │                                                               │
-            └─► failed                                                      └─► refund_failed
-
-Cash:    unpaid ──────────────────────────────────────────────────────────────► paid (upon counter collection)
-            │
-            └─► cancelled (if order cancelled before collection)
+================================================================================
+B. CASH-AT-PICKUP CHECKOUT LIFECYCLE
+================================================================================
+[Customer Checkout]
+       │
+       ▼
+  order_status = 'confirmed' (ACCEPTED IMMEDIATELY)
+  payment_status = 'unpaid'
+  expires_at = NULL (NO ONLINE TTL APPLIES!)
+  reserved_stock += qty
+       │
+       ▼ (Store Kitchen Operations)
+  order_status = 'preparing'
+       │
+       ▼ (Counter Staging)
+  order_status = 'ready_for_pickup'
+       │
+       ▼ (At Shop Counter)
+  [Staff Verifies Collection Token]
+  [Staff Collects Physical Cash & Checks Confirmation Box]
+  CALL rpc_complete_order_handover(order_id, staff_id, cash_collected=true)
+       │
+       ▼
+  order_status = 'completed'
+  payment_status = 'captured' (CASH PAYMENT RECORDED)
+  physical_stock -= qty, reserved_stock -= qty atomically!
 ```
 
-### 2.2 Payment & Refund Lifecycle States Detailed
-1. `unpaid`: Specific to Cash-at-Pickup orders prior to physical counter collection.
-2. `pending`: Initial state when an online payment session is created with Razorpay.
-3. `authorized`: Gateway authorized funds; pending auto-capture (if manual capture configured).
-4. `captured`: Gateway confirmed funds captured via verified webhook (`payment.captured`). **Does NOT release stock reservation.**
-5. `failed`: Customer payment declined or aborted.
-6. `refund_pending`: Server initiated a refund request (e.g., late webhook arrival or staff cancellation). Recorded in `refunds` table.
-7. `refund_processing`: Gateway accepted refund request (`HTTP 200` to Razorpay Refunds API). **Funds are in transit; NOT yet confirmed refunded!**
-8. `partially_refunded`: Partial amount refunded.
-9. `refunded`: Authoritatively confirmed via Razorpay webhook `refund.processed`.
-10. `refund_failed`: Gateway reported refund failure via webhook `refund.failed`. Alerts store manager for manual intervention.
+### 2.2 State Definitions & Transition Rules
+
+1. **`order_status_enum`:**
+   - `draft`: Online order awaiting gateway payment initiation and capture. Stock is temporarily reserved under a TTL.
+   - `confirmed`: Order accepted and scheduled for fulfillment. Holds active `reserved_stock`. (Online orders reach this on payment capture; cash orders reach this immediately upon placement).
+   - `preparing`: Kitchen/staff actively assembling, baking, or packing items. Customer cancellation is blocked.
+   - `ready_for_pickup`: Order packaged and staged on pickup counter shelf. Customer notified.
+   - `completed`: Order handed over at counter. Physical stock and reserved stock decremented atomically.
+   - `cancelled_expired`: Online reservation TTL lapsed without payment capture. Reserved stock released.
+   - `cancelled_by_customer`: Customer cancelled prior to kitchen preparation. Reserved stock released.
+   - `cancelled_by_staff`: Staff cancelled order (e.g. ingredient outage). Reserved stock released; refund triggered if paid.
+   - `cancelled_damaged_stock`: Staff manager cancelled order due to physical item damage. Reserved stock released; refund triggered.
+   - `cancelled_inventory_depleted`: Late payment arrived for an expired order whose stock was already claimed. Automated refund triggered.
+   - `cancelled_uncollected`: Cash customer failed to collect order past operational closing or grace period `[CLIENT DECISION REQUIRED]`. Stock written off or discarded.
+
+2. **`payment_status_enum`:**
+   - `unpaid`: Specific to Cash-at-Pickup orders prior to physical counter cash collection.
+   - `pending`: Initial state when an online payment session is created with Razorpay.
+   - `authorized`: Gateway authorized funds; pending capture.
+   - `captured`: Verified payment confirmed (online via webhook `payment.captured`, cash via staff confirmation).
+   - `failed`: Payment declined or customer aborted gateway sheet.
+   - `refund_pending`: Server initiated a refund request. Recorded in `refunds` table.
+   - `refund_processing`: Gateway accepted refund request (`HTTP 200` from Razorpay Refunds API). Funds in transit.
+   - `partially_refunded`: Partial amount refunded. (Multiple refund records supported; cumulative cap enforced).
+   - `refunded`: Authoritatively confirmed via Razorpay webhook `refund.processed`.
+   - `refund_failed`: Gateway reported refund failure via webhook `refund.failed`. Alerts store manager for manual intervention.
 
 ---
 
 ## 3. Database Schema Definitions (DDL)
 
 ```sql
--- Custom Enumerated Types
+-- Enumerated Types
 CREATE TYPE order_status_enum AS ENUM (
     'draft',
-    'payment_pending',
     'confirmed',
     'preparing',
     'ready_for_pickup',
     'completed',
-    'expired',
+    'cancelled_expired',
     'cancelled_by_customer',
     'cancelled_by_staff',
-    'cancelled_inventory_depleted'
+    'cancelled_damaged_stock',
+    'cancelled_inventory_depleted',
+    'cancelled_uncollected'
 );
 
 CREATE TYPE payment_status_enum AS ENUM (
-    'unpaid',             -- Cash at Pickup prior to collection
+    'unpaid',             -- Cash at Pickup prior to counter collection
     'pending',            -- Online payment awaiting capture
     'authorized',
     'captured',
@@ -134,7 +216,7 @@ CREATE TYPE staff_role_enum AS ENUM (
 );
 
 CREATE TYPE refund_status_enum AS ENUM (
-    'pending',
+    'refund_pending',
     'refund_processing',
     'refunded',
     'refund_failed'
@@ -162,13 +244,13 @@ CREATE TABLE public.staff_roles (
 -- 3. CATEGORIES
 CREATE TABLE public.categories (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    name VARCHAR(50) NOT NULL,
-    slug VARCHAR(60) NOT NULL UNIQUE,
+    name VARCHAR(80) NOT NULL UNIQUE,
+    slug VARCHAR(80) NOT NULL UNIQUE,
     description TEXT,
-    image_url TEXT,
     display_order INT NOT NULL DEFAULT 0,
     is_active BOOLEAN NOT NULL DEFAULT true,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT TIMEZONE('utc', NOW())
+    created_at TIMESTAMPTZ NOT NULL DEFAULT TIMEZONE('utc', NOW()),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT TIMEZONE('utc', NOW())
 );
 
 -- 4. PRODUCTS
@@ -197,7 +279,7 @@ CREATE TABLE public.inventory (
     low_stock_threshold INT NOT NULL DEFAULT 3 CHECK (low_stock_threshold >= 0),
     last_restocked_at TIMESTAMPTZ,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT TIMEZONE('utc', NOW()),
-    -- Ensures reserved stock can never exceed total physical stock on hand
+    -- Invariants: reserved stock cannot exceed physical stock; physical stock cannot be negative
     CONSTRAINT chk_stock_balance CHECK (physical_stock >= reserved_stock)
 );
 
@@ -233,15 +315,19 @@ CREATE TABLE public.orders (
 
     -- Idempotency scoped strictly to the customer
     CONSTRAINT uq_customer_idempotency UNIQUE (customer_id, client_idempotency_key),
-    -- Cash orders must have payment_status 'unpaid' or 'captured'/'paid'
+    -- Cash orders must have payment_status 'unpaid' or 'captured'/'failed'
     CONSTRAINT chk_cash_order_state CHECK (
         payment_method != 'cash_at_pickup' OR payment_status IN ('unpaid', 'captured', 'failed')
+    ),
+    -- Cash orders must NOT have an online payment reservation expiration timestamp
+    CONSTRAINT chk_cash_no_online_expiry CHECK (
+        payment_method != 'cash_at_pickup' OR expires_at IS NULL
     )
 );
 
 CREATE INDEX idx_orders_customer ON public.orders(customer_id, created_at DESC);
 CREATE INDEX idx_orders_status ON public.orders(order_status, scheduled_pickup_at);
-CREATE INDEX idx_orders_expires_at ON public.orders(expires_at) WHERE order_status IN ('draft', 'payment_pending');
+CREATE INDEX idx_orders_expires_at ON public.orders(expires_at) WHERE order_status = 'draft';
 
 -- 7. ORDER ITEMS (Immutable Financial Snapshot)
 CREATE TABLE public.order_items (
@@ -283,7 +369,7 @@ CREATE TABLE public.refunds (
     provider_refund_id VARCHAR(100) UNIQUE,
     amount NUMERIC(10, 2) NOT NULL CHECK (amount > 0),
     currency VARCHAR(3) NOT NULL DEFAULT 'INR',
-    status refund_status_enum NOT NULL DEFAULT 'pending',
+    status refund_status_enum NOT NULL DEFAULT 'refund_pending',
     idempotency_key VARCHAR(100) NOT NULL UNIQUE,
     reason TEXT NOT NULL,
     raw_payload JSONB,
@@ -310,10 +396,10 @@ CREATE TABLE public.audit_logs (
 
 ## 4. Complete Row Level Security (RLS) Policy Specifications
 
-Every table has Row Level Security enabled (`ALTER TABLE ... ENABLE ROW LEVEL SECURITY;`).
+Row Level Security is enabled on every table.
 
 > [!IMPORTANT]
-> **No client application—neither Customer Web, Android App, nor Admin Web—receives direct privileged database access.**  
+> **No client application receives direct privileged database access.**  
 > • Public catalog read access uses the Supabase Anon Key guarded by RLS.  
 > • All mutations to `orders`, `inventory`, `payments`, and `refunds` are blocked from direct client execution and must route through `apps/backend-api`, which connects using the isolated Service Role key to execute secured stored procedures.
 
@@ -418,7 +504,9 @@ RETURNS TABLE (
     out_order_id UUID,
     out_order_number VARCHAR,
     out_total_amount NUMERIC,
-    out_expires_at TIMESTAMPTZ
+    out_expires_at TIMESTAMPTZ,
+    out_order_status order_status_enum,
+    out_payment_status payment_status_enum
 )
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -437,7 +525,8 @@ DECLARE
     v_grand_total NUMERIC(10, 2) := 0;
     v_max_prep_time INT := 15;
     v_estimated_pickup TIMESTAMPTZ;
-    v_expires_at TIMESTAMPTZ := TIMEZONE('utc', NOW()) + INTERVAL '10 minutes';
+    v_expires_at TIMESTAMPTZ;
+    v_order_status order_status_enum;
     v_payment_status payment_status_enum;
 BEGIN
     -- 1. Input Validation: Reject empty carts
@@ -447,7 +536,7 @@ BEGIN
 
     -- 2. Customer-Scoped Idempotency Check with Payload Hash Verification
     IF p_idempotency_key IS NOT NULL THEN
-        SELECT id, order_number, total_amount, expires_at, client_payload_hash 
+        SELECT id, order_number, total_amount, expires_at, client_payload_hash, order_status, payment_status
         INTO v_existing_order 
         FROM public.orders 
         WHERE customer_id = p_customer_id AND client_idempotency_key = p_idempotency_key;
@@ -462,6 +551,8 @@ BEGIN
             out_order_number := v_existing_order.order_number;
             out_total_amount := v_existing_order.total_amount;
             out_expires_at := v_existing_order.expires_at;
+            out_order_status := v_existing_order.order_status;
+            out_payment_status := v_existing_order.payment_status;
             RETURN NEXT;
             RETURN;
         END IF;
@@ -534,16 +625,22 @@ BEGIN
         v_estimated_pickup := p_scheduled_pickup;
     END IF;
 
-    -- Set initial payment status based on payment method
+    -- 5. Delineate Lifecycles Based on Payment Method
     IF p_payment_method = 'cash_at_pickup' THEN
+        -- Cash orders are accepted and confirmed immediately. No online gateway TTL applies!
+        v_order_status := 'confirmed';
         v_payment_status := 'unpaid';
+        v_expires_at := NULL;
     ELSE
+        -- Online orders start in draft awaiting payment within the reservation window
+        v_order_status := 'draft';
         v_payment_status := 'pending';
+        v_expires_at := TIMEZONE('utc', NOW()) + INTERVAL '10 minutes'; -- [PROPOSED TTL]
     END IF;
 
     v_order_number := 'MO-' || TO_CHAR(NOW(), 'YYYYMMDD') || '-' || LPAD(FLOOR(RANDOM() * 10000)::TEXT, 4, '0');
 
-    -- 5. Create Draft Order
+    -- 6. Insert Order Record
     INSERT INTO public.orders (
         order_number, customer_id, customer_phone, customer_name,
         fulfillment_type, scheduled_pickup_at, estimated_pickup_at,
@@ -553,12 +650,12 @@ BEGIN
     ) VALUES (
         v_order_number, p_customer_id, p_customer_phone, p_customer_name,
         p_fulfillment, p_scheduled_pickup, v_estimated_pickup,
-        'draft', v_payment_status, p_payment_method,
+        v_order_status, v_payment_status, p_payment_method,
         v_subtotal, v_tax_total, v_packaging, v_grand_total,
         p_idempotency_key, p_payload_hash, p_special_notes, v_expires_at
     ) RETURNING id INTO v_order_id;
 
-    -- 6. Insert Snapshot Order Items
+    -- 7. Insert Snapshot Order Items (Aggregated)
     FOR v_item IN 
         SELECT (x->>'product_id')::UUID AS product_id, SUM((x->>'quantity')::INT)::INT AS quantity
         FROM jsonb_array_elements(p_items) AS x
@@ -581,18 +678,76 @@ BEGIN
     out_order_number := v_order_number;
     out_total_amount := v_grand_total;
     out_expires_at := v_expires_at;
+    out_order_status := v_order_status;
+    out_payment_status := v_payment_status;
     RETURN NEXT;
 END;
 $$;
 
--- Restrict execution strictly to service_role (Backend API)
 REVOKE EXECUTE ON FUNCTION public.rpc_reserve_order_stock FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.rpc_reserve_order_stock TO service_role;
 ```
 
 ---
 
-### 5.2 Deterministic Late Payment Reconciliation (`rpc_reconcile_late_payment`)
+### 5.2 Safe Expiration Worker for Online Reservations (`rpc_release_expired_reservations`)
+
+```sql
+CREATE OR REPLACE FUNCTION public.rpc_release_expired_reservations()
+RETURNS INT
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+    v_order RECORD;
+    v_item RECORD;
+    v_count INT := 0;
+BEGIN
+    -- Select ONLY online draft orders where the reservation TTL has expired
+    -- Cash orders have payment_method = 'cash_at_pickup' and expires_at IS NULL, so they are never touched!
+    FOR v_order IN 
+        SELECT id FROM public.orders 
+        WHERE order_status = 'draft' 
+          AND payment_method = 'online_razorpay'
+          AND expires_at IS NOT NULL 
+          AND expires_at < TIMEZONE('utc', NOW())
+        FOR UPDATE SKIP LOCKED
+    LOOP
+        -- Release reserved stock in deterministic ascending order
+        FOR v_item IN 
+            SELECT product_id, quantity 
+            FROM public.order_items 
+            WHERE order_id = v_order.id 
+            ORDER BY product_id ASC
+        LOOP
+            UPDATE public.inventory
+            SET reserved_stock = GREATEST(0, reserved_stock - v_item.quantity),
+                updated_at = TIMEZONE('utc', NOW())
+            WHERE product_id = v_item.product_id;
+        END LOOP;
+
+        UPDATE public.orders
+        SET order_status = 'cancelled_expired',
+            payment_status = 'expired',
+            cancellation_reason = 'Online checkout reservation TTL expired before payment capture.',
+            updated_at = TIMEZONE('utc', NOW())
+        WHERE id = v_order.id;
+
+        v_count := v_count + 1;
+    END LOOP;
+
+    RETURN v_count;
+END;
+$$;
+
+REVOKE EXECUTE ON FUNCTION public.rpc_release_expired_reservations FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.rpc_release_expired_reservations TO service_role;
+```
+
+---
+
+### 5.3 Deterministic Late Payment Reconciliation (`rpc_reconcile_late_payment`)
 
 ```sql
 CREATE OR REPLACE FUNCTION public.rpc_reconcile_late_payment(
@@ -617,13 +772,14 @@ DECLARE
     v_inv RECORD;
     v_can_allocate BOOLEAN := true;
 BEGIN
+    -- Lock order row FOR UPDATE
     SELECT * INTO v_order FROM public.orders WHERE id = p_order_id FOR UPDATE;
     
     IF NOT FOUND THEN
         RAISE EXCEPTION 'Order % not found', p_order_id;
     END IF;
 
-    -- Authoritative Payment Verification: Amount and Provider Order ID MUST match
+    -- Authoritative Payment Verification
     IF p_amount <> v_order.total_amount THEN
         RAISE EXCEPTION 'Payment amount mismatch. Expected %, received %', v_order.total_amount, p_amount;
     END IF;
@@ -632,7 +788,38 @@ BEGIN
         RAISE EXCEPTION 'Provider order ID mismatch. Expected %, received %', v_order.provider_order_id, p_provider_order_id;
     END IF;
 
-    -- 1. Check if all items can be re-allocated in deterministic ascending order
+    -- If order is already confirmed or completed, deduplicate payment idempotently
+    IF v_order.order_status IN ('confirmed', 'preparing', 'ready_for_pickup', 'completed') THEN
+        INSERT INTO public.payments (order_id, provider, provider_order_id, provider_payment_id, amount, status, raw_payload)
+        VALUES (p_order_id, 'razorpay', p_provider_order_id, p_provider_payment_id, p_amount, 'captured', p_raw_payload)
+        ON CONFLICT (provider_payment_id) DO NOTHING;
+
+        out_action := 'ALREADY_CAPTURED';
+        out_order_status := v_order.order_status;
+        out_payment_status := v_order.payment_status;
+        RETURN NEXT;
+        RETURN;
+    END IF;
+
+    -- If order was explicitly cancelled by customer or staff, DO NOT revive even if stock is available
+    IF v_order.order_status IN ('cancelled_by_customer', 'cancelled_by_staff', 'cancelled_damaged_stock') THEN
+        INSERT INTO public.payments (order_id, provider, provider_order_id, provider_payment_id, amount, status, raw_payload)
+        VALUES (p_order_id, 'razorpay', p_provider_order_id, p_provider_payment_id, p_amount, 'refund_pending', p_raw_payload)
+        ON CONFLICT (provider_payment_id) DO NOTHING;
+
+        UPDATE public.orders 
+        SET payment_status = 'refund_pending', updated_at = NOW() 
+        WHERE id = p_order_id;
+
+        out_action := 'TRIGGER_REFUND_MANUAL_CANCEL';
+        out_order_status := v_order.order_status;
+        out_payment_status := 'refund_pending';
+        RETURN NEXT;
+        RETURN;
+    END IF;
+
+    -- Late payment path: Only orders with order_status = 'cancelled_expired' reach here
+    -- Evaluate atomic recovery decision: lock inventory rows deterministically
     FOR v_item IN 
         SELECT product_id, quantity 
         FROM public.order_items 
@@ -650,12 +837,14 @@ BEGIN
         END IF;
     END LOOP;
 
-    -- 2. Branch: Reallocate OR Mark for Evidence-Based Refund
+    -- Branch: Perform valid explicit recovery transition OR route to evidence-based refund
     IF v_can_allocate THEN
+        -- Re-reserve stock atomically
         FOR v_item IN SELECT product_id, quantity FROM public.order_items WHERE order_id = p_order_id ORDER BY product_id ASC
         LOOP
             UPDATE public.inventory 
-            SET reserved_stock = reserved_stock + v_item.quantity 
+            SET reserved_stock = reserved_stock + v_item.quantity,
+                updated_at = TIMEZONE('utc', NOW())
             WHERE product_id = v_item.product_id;
         END LOOP;
 
@@ -664,14 +853,18 @@ BEGIN
         ON CONFLICT (provider_payment_id) DO NOTHING;
 
         UPDATE public.orders 
-        SET order_status = 'confirmed', payment_status = 'captured', updated_at = NOW() 
+        SET order_status = 'confirmed', 
+            payment_status = 'captured', 
+            expires_at = NULL, 
+            cancellation_reason = NULL,
+            updated_at = NOW() 
         WHERE id = p_order_id;
 
         out_action := 'CONFIRMED_REALLOCATED';
         out_order_status := 'confirmed';
         out_payment_status := 'captured';
     ELSE
-        -- Inventory depleted; record payment as refund_pending
+        -- Inventory depleted by another customer; DO NOT oversell. Record payment as refund_pending
         INSERT INTO public.payments (order_id, provider, provider_order_id, provider_payment_id, amount, status, raw_payload)
         VALUES (p_order_id, 'razorpay', p_provider_order_id, p_provider_payment_id, p_amount, 'refund_pending', p_raw_payload)
         ON CONFLICT (provider_payment_id) DO NOTHING;
@@ -679,7 +872,7 @@ BEGIN
         UPDATE public.orders 
         SET order_status = 'cancelled_inventory_depleted', 
             payment_status = 'refund_pending', 
-            cancellation_reason = 'Payment received after reservation expired; stock depleted by another order.',
+            cancellation_reason = 'Late payment received after reservation expired; stock claimed by another order.',
             updated_at = NOW() 
         WHERE id = p_order_id;
 
@@ -698,7 +891,7 @@ GRANT EXECUTE ON FUNCTION public.rpc_reconcile_late_payment TO service_role;
 
 ---
 
-### 5.3 Deterministic Order Handover & Cash Verification (`rpc_complete_order_handover`)
+### 5.4 Deterministic Order Handover & Cash Verification (`rpc_complete_order_handover`)
 
 ```sql
 CREATE OR REPLACE FUNCTION public.rpc_complete_order_handover(
@@ -721,6 +914,11 @@ BEGIN
         RAISE EXCEPTION 'Order % not found', p_order_id;
     END IF;
 
+    -- Prevent completing an already completed order
+    IF v_order.order_status = 'completed' THEN
+        RAISE EXCEPTION 'Order % is already completed.', p_order_id;
+    END IF;
+
     IF v_order.order_status != 'ready_for_pickup' THEN
         RAISE EXCEPTION 'Order is not ready for pickup. Current status: %', v_order.order_status;
     END IF;
@@ -736,14 +934,19 @@ BEGIN
         VALUES (p_order_id, 'cash_register', v_order.total_amount, 'captured', jsonb_build_object('collected_by', p_staff_id));
 
         UPDATE public.orders SET payment_status = 'captured' WHERE id = p_order_id;
+    ELSE
+        -- Online order: Must already have payment_status = 'captured'
+        IF v_order.payment_status != 'captured' THEN
+            RAISE EXCEPTION 'Cannot complete online order: payment is not captured. Current payment status: %', v_order.payment_status;
+        END IF;
     END IF;
 
-    -- Decrement physical_stock and reserved_stock in deterministic order
+    -- Decrement physical_stock and reserved_stock in deterministic ascending order
     FOR v_item IN SELECT product_id, quantity FROM public.order_items WHERE order_id = p_order_id ORDER BY product_id ASC
     LOOP
         UPDATE public.inventory
         SET physical_stock = physical_stock - v_item.quantity,
-            reserved_stock = reserved_stock - v_item.quantity,
+            reserved_stock = GREATEST(0, reserved_stock - v_item.quantity),
             updated_at = TIMEZONE('utc', NOW())
         WHERE product_id = v_item.product_id;
     END LOOP;
@@ -766,7 +969,83 @@ GRANT EXECUTE ON FUNCTION public.rpc_complete_order_handover TO service_role;
 
 ---
 
-### 5.4 Deterministic Order Cancellation (`rpc_cancel_order`)
+### 5.5 Protected Inventory Write-Off (`rpc_write_off_inventory`)
+
+```sql
+CREATE OR REPLACE FUNCTION public.rpc_write_off_inventory(
+    p_product_id UUID,
+    p_damaged_quantity INT,
+    p_staff_id UUID,
+    p_reason TEXT
+)
+RETURNS TABLE (
+    out_physical_stock INT,
+    out_reserved_stock INT,
+    out_available_stock INT
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+    v_inv RECORD;
+    v_available INT;
+BEGIN
+    IF p_damaged_quantity <= 0 THEN
+        RAISE EXCEPTION 'Damaged quantity must be greater than zero. Received: %', p_damaged_quantity;
+    END IF;
+
+    -- Lock the inventory row
+    SELECT * INTO v_inv 
+    FROM public.inventory 
+    WHERE product_id = p_product_id 
+    FOR UPDATE;
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Inventory record for product % not found', p_product_id;
+    END IF;
+
+    v_available := v_inv.physical_stock - v_inv.reserved_stock;
+
+    -- Case 1: Damage can be absorbed by unreserved available stock
+    IF p_damaged_quantity <= v_available THEN
+        UPDATE public.inventory
+        SET physical_stock = physical_stock - p_damaged_quantity,
+            updated_at = TIMEZONE('utc', NOW())
+        WHERE product_id = p_product_id;
+
+        -- Record audit log
+        INSERT INTO public.audit_logs (
+            actor_id, actor_role, action, entity_type, entity_id,
+            old_values, new_values
+        ) VALUES (
+            p_staff_id, 'staff', 'INVENTORY_WRITE_OFF', 'inventory', p_product_id::TEXT,
+            jsonb_build_object('physical_stock', v_inv.physical_stock, 'reserved_stock', v_inv.reserved_stock),
+            jsonb_build_object('physical_stock', v_inv.physical_stock - p_damaged_quantity, 'reserved_stock', v_inv.reserved_stock, 'reason', p_reason)
+        );
+
+        out_physical_stock := v_inv.physical_stock - p_damaged_quantity;
+        out_reserved_stock := v_inv.reserved_stock;
+        out_available_stock := out_physical_stock - out_reserved_stock;
+        RETURN NEXT;
+        RETURN;
+    ELSE
+        -- Case 2: Damage exceeds unreserved stock! 
+        -- Physical items committed to active customer reservations are affected.
+        -- Prohibit silent invalidation or constraint violation.
+        RAISE EXCEPTION 'INVENTORY_WRITE_OFF_BLOCKED: Damaged quantity (%) exceeds unreserved stock (%). % active reserved unit(s) are impacted. Manager must explicitly cancel and refund affected customer order(s) via rpc_cancel_order before this physical stock can be written off.',
+            p_damaged_quantity, v_available, (p_damaged_quantity - v_available);
+    END IF;
+END;
+$$;
+
+REVOKE EXECUTE ON FUNCTION public.rpc_write_off_inventory FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.rpc_write_off_inventory TO service_role;
+```
+
+---
+
+### 5.6 Deterministic Order Cancellation (`rpc_cancel_order`)
 
 ```sql
 CREATE OR REPLACE FUNCTION public.rpc_cancel_order(
@@ -797,12 +1076,16 @@ BEGIN
     END IF;
 
     IF p_is_staff THEN
-        v_new_status := 'cancelled_by_staff';
+        IF p_reason = 'damaged_stock' THEN
+            v_new_status := 'cancelled_damaged_stock';
+        ELSE
+            v_new_status := 'cancelled_by_staff';
+        END IF;
     ELSE
         v_new_status := 'cancelled_by_customer';
     END IF;
 
-    -- Release reserved_stock in deterministic order
+    -- Release reserved_stock in deterministic order exactly once
     FOR v_item IN SELECT product_id, quantity FROM public.order_items WHERE order_id = p_order_id ORDER BY product_id ASC
     LOOP
         UPDATE public.inventory
@@ -829,4 +1112,104 @@ $$;
 
 REVOKE EXECUTE ON FUNCTION public.rpc_cancel_order FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.rpc_cancel_order TO service_role;
+```
+
+---
+
+### 5.7 Authoritative Partial/Full Refund Initiation (`rpc_issue_refund`)
+
+```sql
+CREATE OR REPLACE FUNCTION public.rpc_issue_refund(
+    p_order_id UUID,
+    p_refund_amount NUMERIC,
+    p_staff_id UUID,
+    p_reason TEXT,
+    p_idempotency_key VARCHAR
+)
+RETURNS TABLE (
+    out_refund_id UUID,
+    out_status refund_status_enum,
+    out_remaining_refundable NUMERIC
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+    v_order RECORD;
+    v_payment RECORD;
+    v_existing_refund RECORD;
+    v_total_refunded NUMERIC := 0;
+    v_remaining NUMERIC;
+    v_refund_id UUID;
+BEGIN
+    IF p_refund_amount <= 0 THEN
+        RAISE EXCEPTION 'Refund amount must be greater than zero. Received: %', p_refund_amount;
+    END IF;
+
+    -- Lock the order row
+    SELECT * INTO v_order FROM public.orders WHERE id = p_order_id FOR UPDATE;
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Order % not found', p_order_id;
+    END IF;
+
+    -- Lock the payment row
+    SELECT * INTO v_payment 
+    FROM public.payments 
+    WHERE order_id = p_order_id AND status = 'captured' 
+    ORDER BY created_at DESC LIMIT 1 
+    FOR UPDATE;
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'No captured payment found for order %', p_order_id;
+    END IF;
+
+    -- Check idempotency key for refund
+    IF p_idempotency_key IS NOT NULL THEN
+        SELECT id, status INTO v_existing_refund 
+        FROM public.refunds 
+        WHERE idempotency_key = p_idempotency_key;
+
+        IF FOUND THEN
+            out_refund_id := v_existing_refund.id;
+            out_status := v_existing_refund.status;
+            out_remaining_refundable := 0;
+            RETURN NEXT;
+            RETURN;
+        END IF;
+    END IF;
+
+    -- Calculate existing active refunds
+    SELECT COALESCE(SUM(amount), 0) INTO v_total_refunded
+    FROM public.refunds
+    WHERE payment_id = v_payment.id AND status IN ('refund_pending', 'refund_processing', 'refunded');
+
+    v_remaining := v_payment.amount - v_total_refunded;
+
+    IF p_refund_amount > v_remaining THEN
+        RAISE EXCEPTION 'REFUND_EXCEEDS_REMAINING_AMOUNT: Requested % exceeds remaining refundable amount (%). Captured: %, Previously refunded/processing: %',
+            p_refund_amount, v_remaining, v_payment.amount, v_total_refunded;
+    END IF;
+
+    -- Insert new refund record in refund_pending status
+    INSERT INTO public.refunds (
+        order_id, payment_id, amount, status, reason, idempotency_key
+    ) VALUES (
+        p_order_id, v_payment.id, p_refund_amount, 'refund_pending', p_reason, p_idempotency_key
+    ) RETURNING id INTO v_refund_id;
+
+    -- Update order payment status to reflect ongoing refund
+    UPDATE public.orders 
+    SET payment_status = 'refund_pending', updated_at = NOW() 
+    WHERE id = p_order_id;
+
+    out_refund_id := v_refund_id;
+    out_status := 'refund_pending';
+    out_remaining_refundable := v_remaining - p_refund_amount;
+    RETURN NEXT;
+END;
+$$;
+
+REVOKE EXECUTE ON FUNCTION public.rpc_issue_refund FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.rpc_issue_refund TO service_role;
 ```

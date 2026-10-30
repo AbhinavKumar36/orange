@@ -1,8 +1,8 @@
 # Moody Orange — Architectural Decisions & Open Business Questions
 
-**Document Version:** 1.3.0 (Phase 0.3 Final Consistency Pass)  
+**Document Version:** 1.4.1 (Phase 0.4.1 Final Blocker Resolution)  
 **Phase:** Phase 0 (Requirements & Architecture)  
-**Status:** Pending Client Review & Sign-Off  
+**Status:** Ready for Phase 0 Approval Review  
 **Target System:** Moody Orange Unified Ordering Platform  
 **Repository:** [https://github.com/AbhinavKumar36/orange](https://github.com/AbhinavKumar36/orange)  
 
@@ -15,7 +15,9 @@
 | **1.0.0** | 2026-10-30 | Lead Architect | Initial ADRs and open business questions. |
 | **1.1.0** | 2026-10-30 | Lead Architect | Phase 0.1 Revision: Revised ADR-002 (standalone backend) and added ADR-005. |
 | **1.2.0** | 2026-10-30 | Lead Architect | Phase 0.2 Revision: Standardized `physical_stock` and evidence-based refunds. |
-| **1.3.0** | 2026-10-30 | Lead Architect | **Phase 0.3 Final Consistency Pass:**<br>• Updated ADR-004: Enforced cart duplicate aggregation, positive quantity validation, and customer-scoped idempotency keys.<br>• Updated ADR-006: Defined separate Cash-at-Pickup lifecycle (`unpaid` state) and authoritative Razorpay verification protocols.<br>• Re-audited all client decisions, keeping operational and financial policies strictly open pending client approval. |
+| **1.3.0** | 2026-10-30 | Lead Architect | Phase 0.3 Consistency Pass: Scoped idempotency, cash state separation, hardened DB RPCs. |
+| **1.4.0** | 2026-10-30 | Lead Architect | Phase 0.4 Consistency Pass: Dual-layer security, raw-body HMAC, and evidence-based refunds. |
+| **1.4.1** | 2026-10-30 | Lead Architect | **Phase 0.4.1 Final Blocker Resolution:**<br>• Enhanced ADR-004 with inventory write-off protection preventing stock reduction below active reservations.<br>• Enhanced ADR-006 with separated checkout lifecycles (cash orders immune to online reservation TTL), atomic late payment recovery decisions, and partial refund concurrency.<br>• Reaffirmed Central Decision Register governance: architect recommendations are proposed baselines and do NOT constitute client approval. |
 
 ---
 
@@ -50,18 +52,21 @@
 
 ---
 
-### ADR-004: Authoritative Inventory Accounting, Deterministic Row-Locking & Input Validation
-- **Context:** The inventory model must prevent deadlocks across multi-product checkouts, eliminate race conditions, maintain stock reservations through payment success until physical collection, and reject malformed checkout inputs.
+### ADR-004: Authoritative Inventory Accounting, Protected Write-Offs & Row-Locking
+- **Context:** The inventory model must prevent deadlocks across multi-product checkouts, eliminate race conditions, maintain stock reservations through payment success until physical collection, protect `physical_stock >= reserved_stock` during staff write-offs, and reject malformed checkout inputs.
 - **Decision:**
   1. *Authoritative Stock Ledger:*
      - `physical_stock`: Total physical sellable units present in the shop.
-     - `reserved_stock`: Units allocated to pending checkout reservations AND confirmed orders awaiting collection.
+     - `reserved_stock`: Units allocated to active online checkouts AND confirmed orders awaiting collection.
      - `available_stock = physical_stock - reserved_stock`.
-     - Successful payment does NOT release the reservation. Physical stock decreases only at customer collection.
-  2. *Deterministic Multi-Product Locking:* All multi-product inventory procedures (checkout reservation, late payment reconciliation, order cancellation, staff handover) sort product IDs in ascending order (`ORDER BY product_id ASC FOR UPDATE`).
-  3. *Checkout Validation:* `rpc_reserve_order_stock` safely aggregates duplicate product IDs, enforces positive integer quantities, rejects empty carts and inactive products, and pre-validates availability for all items before allocating any stock.
-  4. *Customer-Scoped Idempotency:* Scoped strictly to `(customer_id, client_idempotency_key)` with payload hash verification.
-- **Consequences:** Eliminates inventory overselling and deadlocks, ensures accounting consistency across store operations, and prevents cross-customer idempotency data leaks.
+     - Successful online payment does NOT release the reservation. Physical stock decreases only at customer counter handover.
+  2. *Protected Inventory Write-Offs (`rpc_write_off_inventory`):*
+     - If damage $\le$ unreserved stock (`available_stock`), physical stock is decremented safely via audit log.
+     - If damage exceeds unreserved stock, direct write-off is blocked. Active customer reservations are never silently invalidated. A manager must explicitly cancel the affected order(s) via `rpc_cancel_order` with reason `'cancelled_damaged_stock'` (freeing reserved stock and triggering a refund) before physical write-off is permitted.
+  3. *Deterministic Multi-Product Locking:* All multi-product inventory procedures (checkout reservation, late payment reconciliation, order cancellation, staff handover) sort product IDs in ascending order (`ORDER BY product_id ASC FOR UPDATE`).
+  4. *Checkout Validation:* `rpc_reserve_order_stock` safely aggregates duplicate product IDs, enforces positive integer quantities, rejects empty carts and inactive products, and pre-validates availability for all items before allocating any stock.
+  5. *Customer-Scoped Idempotency:* Scoped strictly to `(customer_id, client_idempotency_key)` with canonical payload hash verification.
+- **Consequences:** Eliminates inventory overselling and deadlocks, guarantees `physical_stock >= reserved_stock` at all times, and prevents cross-customer idempotency data leaks.
 
 ---
 
@@ -74,15 +79,23 @@
 
 ---
 
-### ADR-006: Asynchronous Webhook Settlement, Evidence-Based Refunds & Cash State Separation
-- **Context:** Client-side redirects cannot be trusted. Cash orders cannot be forced into an online gateway payment state. Refunds cannot be assumed complete upon gateway request acceptance.
+### ADR-006: Asynchronous Webhook Settlement, Separated Lifecycles & Refund Controls
+- **Context:** Client-side redirects cannot be trusted. Cash orders cannot share an online gateway timeout. Late payments after reservation expiry must not automatically revive orders without a valid atomic decision. Refunds must support partial accounting without race conditions.
 - **Decision:**
-  1. *Payment State Separation:*
-     - Online orders: `pending` -> `captured` -> `refund_processing` -> `refunded`.
-     - Cash orders: Initialized as `unpaid`. Transitions to `captured` only upon staff cash receipt confirmation at counter handover.
-  2. *Authoritative Payment Verification:* Backend API validates payment ID, order ID, amount in paise, currency, and HMAC signature before invoking database procedures. Database procedures also verify expected order totals.
-  3. *Evidence-Based Refunds:* Gateway acceptance (`HTTP 200`) sets `refund_processing`. Status becomes `refunded` only upon verified receipt of the gateway webhook `refund.processed`. Cumulative refunds cannot exceed captured order amount.
-- **Consequences:** Eliminates fake payment confirmation attacks, prevents uncollected cash orders from being completed, and guarantees refund accounting integrity.
+  1. *Separated Checkout Lifecycles:*
+     - Online orders: `draft` $\rightarrow$ `pending` (under proposed 10-min TTL) $\rightarrow$ `confirmed` / `captured` upon verified webhook.
+     - Cash orders: Accepted immediately as `confirmed`, `payment_status = 'unpaid'`, `expires_at = NULL`. The online payment reservation TTL **does not apply** to cash orders.
+  2. *Authoritative Payment Verification:* Backend API validates raw-body HMAC signature, provider payment ID, provider order ID, amount in paise, and currency before invoking database procedures.
+  3. *Atomic Late-Payment Recovery Decision Tree (`rpc_reconcile_late_payment`):*
+     - Locks order and inventory rows deterministically.
+     - If stock remains available and pickup time is valid: performs explicit atomic recovery (`reserved_stock += qty`, `order_status = 'confirmed'`, `payment_status = 'captured'`, `expires_at = NULL`).
+     - If stock was claimed by another customer: does NOT revive order or oversell stock; records payment as `refund_pending` and dispatches automated refund.
+  4. *Evidence-Based Partial Refunds & Concurrency (`rpc_issue_refund`):*
+     - Locks payment row `FOR UPDATE`.
+     - Enforces cumulative cap: $\sum \text{refunds} \le \text{captured payment amount}$.
+     - Gateway acceptance (`HTTP 200`) sets `refund_processing`. Status becomes `refunded` only upon verified webhook `refund.processed`.
+     - Network timeouts do NOT trigger blind retries; stable idempotency key (`rfnd_<payment_id>_<refund_uuid>`) enables provider reconciliation.
+- **Consequences:** Eliminates fake payment confirmation attacks, prevents uncollected cash orders from being completed without cash receipt, and guarantees refund accounting integrity.
 
 ---
 
@@ -99,93 +112,98 @@
 
 ---
 
-## 2. Open Business Decisions Requiring Client Approval
+### ADR-008: Dual-Layer Security Model & Credential Isolation
+- **Context:** Supabase service-role keys bypass PostgreSQL RLS. Privileged credentials must never leak into client apps.
+- **Decision:**
+  1. *Dual-Layer Security:* Layer 1 enforces authorization in `apps/backend-api` (validating JWT signatures and verifying caller permissions from DB before calling RPCs). Layer 2 enforces PostgreSQL defense-in-depth (RLS, explicit search_path, revoked public execute).
+  2. *Action-Level Role Separation:* Counter staff can view dispatch queues and confirm cash collections, but are strictly blocked from price edits, catalog changes, and inventory write-offs (manager only).
+  3. *Strict Credential Isolation:* `SUPABASE_SERVICE_ROLE_KEY`, `RAZORPAY_KEY_SECRET`, and `RAZORPAY_WEBHOOK_SECRET` reside solely in `apps/backend-api/.env`. Client apps only possess public anon keys and public gateway key IDs.
+- **Consequences:** Protects against privilege escalation, search path hijacking, and credential leakage.
 
-The following business rules and operational policies directly impact system logic and cannot be assumed. They require explicit client review and sign-off prior to implementing Phase 5 (Cart & Stock Engine) and Phase 7 (Payments):
+---
+
+## 2. Central Register of Open Decisions Requiring Client Approval
+
+> [!IMPORTANT]
+> **GOVERNANCE RULE: Recommendations Are Not Client Approvals!**  
+> The 10 items below represent core business, financial, and operational policies that require explicit client sign-off. Architect recommendations are proposed baselines to assist evaluation, but **they remain strictly unapproved until the client signs off**. They must not be converted into confirmed requirements during development without written client authorization.
 
 ### Category A: Operational & In-Store Policies
-1. **Perishable Order Cancellation Window:**
+1. **Perishable Order Cancellation Window:** `[CLIENT DECISION REQUIRED]`
    - *Question:* Can a customer cancel an order once placed?
    - *Options for Client:*
-     - A: No cancellations permitted once payment is confirmed (standard for fresh baked goods and pressed juices).
-     - B: Cancellations permitted only while status is `Confirmed` (prior to kitchen transitioning status to `Preparing`).
-     - C: Cancellations permitted up to 2 hours prior to scheduled pickup time.
-   - *Architect Recommendation:* **Option B**. Once the kitchen begins assembling or slicing, ingredients are consumed.
+     - Option A: No cancellations permitted once payment is confirmed.
+     - Option B (Recommended Default): Cancellations permitted only while status is `Confirmed` (prior to kitchen transitioning status to `Preparing`).
+     - Option C: Cancellations permitted up to 2 hours prior to scheduled pickup time.
+   - *Architect Recommendation:* **Option B**. Prevents ingredient waste once preparation commences.
 
-2. **Uncollected / Abandoned Order Policy:**
+2. **Uncollected / Abandoned Order Policy:** `[CLIENT DECISION REQUIRED]`
    - *Question:* What happens if a customer does not arrive to collect their order?
    - *Options for Client:*
-     - A: Order held until end of day (store close). At closing, status flips to `Uncollected / Abandoned`, food is discarded, and no refund is issued.
-     - B: Order held for a maximum grace period of 90 minutes past scheduled pickup time.
-   - *Architect Recommendation:* **Option A**. Perishable food prepared specifically for a customer cannot be restocked once handled and staged.
+     - Option A (Recommended Default): Order held until store closing. At closing, status flips to `cancelled_uncollected`, food is discarded, and no refund is issued.
+     - Option B: Order held for a maximum grace period of 90 minutes past scheduled pickup time.
+   - *Architect Recommendation:* **Option A**. Perishable customized items cannot be restocked once staged.
 
-3. **Advance Notice for Celebration Cakes:**
-   - *Question:* Do large celebration cakes (e.g., 1kg or multi-tier cakes) require mandatory advance notice (e.g., minimum 24 hours prior)?
+3. **Advance Notice for Celebration Cakes:** `[CLIENT DECISION REQUIRED]`
+   - *Question:* Do large celebration cakes (e.g., 1kg or multi-tier cakes) require mandatory advance notice?
    - *Options for Client:*
-     - A: All items in catalog are pre-stocked or ready within standard prep time (15–30 mins).
-     - B: Specific items have a "Pre-order Lead Time" attribute (e.g., "Must order 24 hours in advance"), restricting available pickup slots.
+     - Option A: All items in catalog are pre-stocked or ready within standard prep time (15–30 mins).
+     - Option B (Recommended Default): Specific items have a "Pre-order Lead Time" attribute (e.g., 24 hours in advance), restricting selectable pickup slots.
+   - *Architect Recommendation:* **Option B**. Allows fresh baking while preventing impossible on-demand orders.
+
+4. **Preparation Time per Product:** `[CLIENT DECISION REQUIRED]`
+   - *Question:* What standard prep time buffers should be configured for cakes vs. juices vs. chocolates?
+   - *Recommended Default:* 10 minutes for juices/chocolates; 30 minutes for standard cakes; 24 hours for custom celebration cakes.
 
 ---
 
 ### Category B: Cash-at-Pickup Financial Risk Controls
-4. **Maximum Permissible Cash Order Threshold:**
+5. **Maximum Permissible Cash Order Threshold:** `[CLIENT DECISION REQUIRED]`
    - *Question:* What is the maximum order total permitted for "Cash at Pickup"?
-   - *Context:* Allowing unrestricted cash orders creates a risk of malicious or fake orders where high-value custom cakes are prepared but never collected, resulting in total financial loss.
    - *Options for Client:*
-     - A: Hard cap of ₹1,000 for Cash at Pickup. Orders above ₹1,000 require online payment (Razorpay).
-     - B: Hard cap of ₹2,500.
-     - C: No cap (client accepts operational risk).
-   - *Architect Recommendation:* **Option A (₹1,000 max cap)** for Cash at Pickup to mitigate spoilage loss.
+     - Option A (Recommended Default): Hard cap of ₹1,000 for Cash at Pickup. Orders above ₹1,000 require online payment (Razorpay).
+     - Option B: Hard cap of ₹2,500.
+     - Option C: No cap (client accepts financial risk of uncollected food).
+   - *Architect Recommendation:* **Option A (₹1,000 max cap)** to mitigate spoilage loss.
 
-5. **Repeat No-Show Penalties:**
+6. **Repeat No-Show Penalties:** `[CLIENT DECISION REQUIRED]`
    - *Question:* If a customer places a Cash at Pickup order and fails to collect it, should their account be penalized?
    - *Options for Client:*
-     - A: After 1 uncollected cash order, the "Cash at Pickup" option is permanently disabled for their phone number (they may only order via online prepaid).
-     - B: Manual blacklisting by store manager in admin portal.
-   - *Architect Recommendation:* **Option A (Automated restriction after 1 uncollected cash order)**.
+     - Option A (Recommended Default): After 1 uncollected cash order, "Cash at Pickup" is disabled for their phone number (prepaid online only).
+     - Option B: Manual blacklisting by store manager in admin portal.
+   - *Architect Recommendation:* **Option A**. Automated protection against repeated bad-faith orders.
 
 ---
 
 ### Category C: Tax, Pricing & Packaging Configuration
-6. **GST (Goods & Services Tax) Display Norms:**
+7. **GST (Goods & Services Tax) Display Norms:** `[CLIENT DECISION REQUIRED]`
    - *Question:* Are catalog menu prices inclusive of GST or exclusive?
    - *Options for Client:*
-     - A: **Tax Inclusive (Recommended):** Menu displays ₹500; customer pays exactly ₹500 at checkout. Invoice indicates *"Includes 5% GST (₹23.81)"*.
-     - B: **Tax Exclusive:** Menu displays ₹500; cart adds 5% GST (₹25); customer pays ₹525.
-   - *Architect Recommendation:* **Option A**. Retail bakery consumers expect the shelf price to equal the checkout total.
+     - Option A (Recommended Default): **Tax Inclusive:** Menu displays ₹500; customer pays exactly ₹500 at checkout. Invoice indicates *"Includes 5% GST (₹23.81)"*.
+     - Option B: **Tax Exclusive:** Menu displays ₹500; cart adds 5% GST (₹25); customer pays ₹525.
+   - *Architect Recommendation:* **Option A**. Retail bakery customers expect the advertised price to equal checkout total.
 
-7. **Packaging & Carry Bag Fees:**
-   - *Question:* Should an automated packaging charge be added for delicate items (e.g., insulated cold-boxes for celebration cakes or tamper-proof juice carriers)?
+8. **Packaging & Carry Bag Fees:** `[CLIENT DECISION REQUIRED]`
+   - *Question:* Should an automated packaging charge be added for delicate items (e.g., insulated cold-boxes or carry bags)?
    - *Options for Client:*
-     - A: Flat packaging fee (e.g., ₹20 per order).
-     - B: Item-specific packaging fee (e.g., ₹30 for 1kg Cake box, ₹0 for chocolate bars).
-     - C: Free packaging absorbed in menu price.
+     - Option A: Flat packaging fee (e.g., ₹20 per order).
+     - Option B: Item-specific packaging fee (e.g., ₹30 for cake box, ₹0 for chocolate bars).
+     - Option C (Recommended Default): Free packaging absorbed in menu price.
+   - *Architect Recommendation:* **Option C**. Reduces checkout friction for retail customers.
 
 ---
 
-### Category D: Indian Regulatory & SMS Gateway Requirements
-8. **TRAI DLT Registration for SMS OTP:**
-   - *Question:* Does Moody Orange possess an active Indian Principal Entity DLT Registration (via Jio, Airtel, Vodafone, or BSNL) with registered SMS Headers (Sender ID) and approved content templates?
-   - *Context:* In India, commercial SMS delivery without TRAI DLT template approval is blocked by telecom carriers.
-   - *Fallback Option:* If DLT registration is pending, should we enable WhatsApp Business API (via Msg91 / Gupshup) as an immediate OTP delivery bridge?
-   - *Action Required:* Client must confirm DLT registration status or authorize WhatsApp OTP provider.
-
----
-
-### Category E: Counter Pickup Verification Mechanism
-9. **Pickup Handover Verification Mechanism:**
+### Category D: Counter Pickup Verification & Scheduling
+9. **Pickup Handover Verification Mechanism:** `[CLIENT DECISION REQUIRED]`
    - *Question:* What physical mechanism should counter staff use to verify customer pickup?
    - *Options for Client:*
-     - A: **4-Digit Collection PIN + QR Code:** Customer displays PIN or QR on mobile screen; staff types PIN or scans QR.
-     - B: **Customer Mobile Number + Order Number:** Staff looks up order by phone number; customer verbally confirms name.
-   - *Architect Recommendation:* **Option A**. Fast, error-free, and prevents verbal miscommunication at a busy counter.
+     - Option A (Recommended Default): **4-Digit Collection PIN + QR Code:** Customer displays PIN or QR on mobile screen; staff types PIN or scans QR.
+     - Option B: **Customer Mobile Number + Order Number:** Staff looks up order by phone number; customer verbally confirms name.
+   - *Architect Recommendation:* **Option A**. Fast, secure, and eliminates verbal miscommunication at a busy counter.
 
----
-
-### Category F: Reservation Timeout & Slot Durations
-10. **Stock Reservation Window & Pickup Slot Duration:**
+10. **Stock Reservation Window & Pickup Slot Duration:** `[CLIENT DECISION REQUIRED]`
     - *Question:* What is the acceptable stock reservation timeout during checkout? What is the duration of scheduled pickup slots?
-    - *Proposals:*
-      - Reservation Timeout: 10 minutes (standard for payment window completion).
-      - Pickup Slot Interval: 15 minutes (e.g. 5:00 PM – 5:15 PM).
-    - *Action Required:* Client must confirm or adjust these operational values.
+    - *Recommended Defaults:*
+      - Reservation Timeout: **10 minutes** (standard payment window before releasing stock for online orders; cash orders do not expire).
+      - Pickup Slot Interval: **15 minutes** (e.g., 5:00 PM – 5:15 PM).
+      - Slot Capacity Throttle: **10 orders per 15-minute slot** (prevents counter congestion).

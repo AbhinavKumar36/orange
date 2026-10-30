@@ -1,8 +1,8 @@
 # Moody Orange — Project Brief & Product Specification
 
-**Document Version:** 1.3.0 (Phase 0.3 Final Consistency Pass)  
+**Document Version:** 1.4.1 (Phase 0.4.1 Final Blocker Resolution)  
 **Phase:** Phase 0 (Requirements & Architecture)  
-**Status:** Pending Client Review & Sign-Off  
+**Status:** Ready for Phase 0 Approval Review  
 **Target Brand:** Moody Orange  
 **Lead Architect:** Senior Software Architect & Technical Lead  
 **Repository:** [https://github.com/AbhinavKumar36/orange](https://github.com/AbhinavKumar36/orange)  
@@ -16,7 +16,9 @@
 | **1.0.0** | 2026-10-30 | Lead Architect | Initial Phase 0 draft covering product scope, three platforms, and baseline architecture. |
 | **1.1.0** | 2026-10-30 | Lead Architect | Phase 0.1 Revision: Decoupled Backend API into standalone modular monolith (`apps/backend-api`). |
 | **1.2.0** | 2026-10-30 | Lead Architect | Phase 0.2 Revision: Standardized `physical_stock` accounting and realigned 10-phase roadmap. |
-| **1.3.0** | 2026-10-30 | Lead Architect | **Phase 0.3 Final Consistency Pass:**<br>• Formalized customer-scoped checkout idempotency and cart input validation rules.<br>• Separated Cash-at-Pickup (`unpaid` state) from online payment gateway states.<br>• Enforced deterministic row-locking and evidence-based refund lifecycle across physical shop operations.<br>• Re-audited requirement classifications. |
+| **1.3.0** | 2026-10-30 | Lead Architect | Phase 0.3 Consistency Pass: Cart validation, customer-scoped idempotency, cash state separation. |
+| **1.4.0** | 2026-10-30 | Lead Architect | Phase 0.4 Consistency Pass: State transition matrix, race condition resolution, refund recovery. |
+| **1.4.1** | 2026-10-30 | Lead Architect | **Phase 0.4.1 Final Blocker Resolution:**<br>• Delineated distinct Online vs. Cash checkout operational workflows.<br>• Clarified that cash orders are accepted immediately without online payment TTL expiration.<br>• Documented inventory write-off protections preserving `physical_stock >= reserved_stock`. |
 
 ---
 
@@ -126,12 +128,12 @@ Moody Orange consists of **three distinct client interfaces** powered by **one a
 - `[CONFIRMED]` Secure staff authentication with role-based access control (RBAC).
 - `[CONFIRMED]` Atomic inventory reservation and deduction engine preventing race conditions and overselling.
 - `[CONFIRMED]` Dual pickup fulfillment options: Immediate Pickup vs. Scheduled Pickup.
-- `[CONFIRMED]` Dual payment options: Online Payment (Razorpay) and Cash at Pickup.
-- `[CONFIRMED]` Server-side payment validation, HMAC webhook signature verification, and duplicate payment prevention.
+- `[CONFIRMED]` Dual payment options: Online Payment (Razorpay) and Cash at Pickup with distinct state pipelines.
+- `[CONFIRMED]` Server-side payment validation, raw-body HMAC webhook signature verification, and duplicate payment prevention.
 - `[CONFIRMED]` Pickup confirmation workflow when goods are collected at the counter.
 - `[CONFIRMED]` Real-time order state updates across all platforms.
 - `[PROPOSED / CLIENT DECISION REQUIRED]` Visual collection token: 4-digit numeric PIN and QR code for rapid counter handover.
-- `[PROPOSED / CLIENT DECISION REQUIRED]` 10-minute Time-To-Live (TTL) on stock reservations for pending online payments.
+- `[PROPOSED / CLIENT DECISION REQUIRED]` 10-minute Time-To-Live (TTL) on stock reservations for pending online payments (does not apply to cash).
 - `[PROPOSED / CLIENT DECISION REQUIRED]` Scheduled pickup time slots in 15-minute intervals.
 - `[PROPOSED / CLIENT DECISION REQUIRED]` Cash at pickup maximum order total cap (e.g., ₹1,000).
 - `[PROPOSED / CLIENT DECISION REQUIRED]` Uncollected order grace period and end-of-day food disposal policy.
@@ -149,7 +151,7 @@ Moody Orange consists of **three distinct client interfaces** powered by **one a
 
 All components adhere to the following strict stock accounting definitions:
 - **`physical_stock`:** Total physical sellable units currently present in the shop.
-- **`reserved_stock`:** Units allocated to pending checkout reservations AND confirmed orders awaiting collection.
+- **`reserved_stock`:** Units allocated to pending online checkout reservations AND confirmed orders awaiting collection.
 - **`available_stock`:** Defined as `physical_stock - reserved_stock`.
 
 ### 5.1 Authoritative Stock Accounting Example
@@ -158,32 +160,31 @@ All components adhere to the following strict stock accounting definitions:
 | :--- | :---: | :---: | :---: | :--- |
 | **Initial Stock** | 10 | 0 | 10 | 10 sellable units in display/chiller |
 | **Customer Reserves 2 Units** | 10 | 2 | 8 | Reserved during checkout |
-| **Payment Succeeds** | 10 | 2 | 8 | **Reservation NOT released!** Confirmed order holds reserved stock |
+| **Online Payment Captured** | 10 | 2 | 8 | **Reservation NOT released!** Confirmed order holds reserved stock |
 | **Customer Collects 2 Units** | 8 | 0 | 8 | **Physical stock decreases on counter handover!** Reserved stock drops to 0 |
 | **Another Checkout Reserves 1**| 8 | 1 | 7 | New pending checkout |
-| **Reservation Expires** | 8 | 0 | 8 | Unpaid checkout timed out; reserved stock drops to 0 |
+| **Online Reservation Expires** | 8 | 0 | 8 | Unpaid checkout timed out; reserved stock drops to 0 |
+| **Damaged Stock Write-Off (1 unit)** | 7 | 0 | 7 | Decrements `physical_stock` (permitted when damage $\le$ unreserved stock) |
 
 ---
 
 ## 6. Physical Store Operations & Fulfillment Workflow
 
 ```
-[Customer Places Order] 
+================================================================================
+A. ONLINE CHECKOUT WORKFLOW
+================================================================================
+[Customer Places Order Online] 
        │
        ▼
-[Stock Reserved Atomically (Deterministic Row Lock: ORDER BY product_id ASC)]
+[Stock Reserved Atomically: order_status = 'draft', payment_status = 'pending', expires_at = NOW()+10m]
        │
-       ├─────────────────────────────────┐
-       ▼                                 ▼
-[Online Payment (Razorpay)]       [Cash at Pickup]
-       │                                 │
-       │ (Webhook Confirmed)             │ (Confirmed with payment_status = 'unpaid')
-       ▼                                 ▼
-[Order Status: CONFIRMED] ───────────────┘
-  (Stock remains reserved)
-       │
-       ▼
-[Admin Live Queue Notification]
+       ├─────────────────────────────────────────┐
+       ▼ (Payment Captured via Webhook)          ▼ (TTL Lapses without Payment)
+[order_status = 'confirmed']              [order_status = 'cancelled_expired']
+[payment_status = 'captured']             [reserved_stock -= qty]
+[expires_at = NULL]                       [Checkout Timed Out]
+  (Stock remains reserved!)
        │
        ▼
 [Store Preparation: PREPARING]
@@ -192,23 +193,42 @@ All components adhere to the following strict stock accounting definitions:
 [Order Staged on Counter: READY FOR PICKUP]
        │
        ▼
-[Customer Arrives at Shop Counter]
+[Customer Arrives at Counter -> Staff Verifies PIN/QR]
        │
        ▼
-[Staff Verifies Order]
+[Staff Clicks: COMPLETE (asserts payment_status = 'captured')]
        │
-       ├─────────────────────────────────┐
-       ▼                                 ▼
-[If Cash: Collect Cash & Confirm]    [If Online: Already Paid]
-       │                                 │
-       └────────────────┬────────────────┘
-                        │
-                        ▼
-            [Staff Clicks: COMPLETE]
-                        │
-                        ▼
-          [Order Status: COMPLETED]
-          [physical_stock -= qty, reserved_stock -= qty]
+       ▼
+[order_status = 'completed']
+[physical_stock -= qty, reserved_stock -= qty atomically!]
+
+================================================================================
+B. CASH-AT-PICKUP WORKFLOW
+================================================================================
+[Customer Places Cash Order]
+       │
+       ▼
+[Stock Reserved Atomically: order_status = 'confirmed', payment_status = 'unpaid', expires_at = NULL]
+  (ACCEPTED IMMEDIATELY! Online payment TTL does NOT apply!)
+       │
+       ▼
+[Store Preparation: PREPARING]
+       │
+       ▼
+[Order Staged on Counter: READY FOR PICKUP]
+       │
+       ▼
+[Customer Arrives at Counter -> Staff Verifies Order]
+       │
+       ▼
+[Staff Collects Physical Cash & Checks Box: [x] "Cash Received in Register"]
+       │
+       ▼
+[Staff Clicks: COMPLETE (asserts p_cash_collected IS TRUE)]
+       │
+       ▼
+[order_status = 'completed', payment_status = 'captured']
+[physical_stock -= qty, reserved_stock -= qty atomically!]
 ```
 
 ---
@@ -218,6 +238,6 @@ All components adhere to the following strict stock accounting definitions:
 | Role | Classification | Core Responsibilities in Moody Orange |
 | :--- | :--- | :--- |
 | **Retail Customer** | `[CONFIRMED]` | Browses catalog, adds items to cart, authenticates via mobile OTP, selects pickup time, pays online or selects cash at pickup, tracks order, collects items at shop counter. |
-| **Counter Staff** | `[CONFIRMED]` | Front-of-house staff operating the counter interface; verifies customer collection token; collects physical cash for cash orders; hands over packages; marks orders completed. |
-| **Store Manager** | `[CONFIRMED]` | Oversees daily operations, adjusts physical stock counts, triggers out-of-stock toggles, configures operating hours, reviews daily sales/cash reconciliation, and processes authorized refunds. |
+| **Counter Staff** | `[CONFIRMED]` | Front-of-house staff operating the counter interface; verifies customer collection token; collects physical cash for cash orders; hands over packages; marks orders completed. Cannot modify prices or perform inventory write-offs. |
+| **Store Manager** | `[CONFIRMED]` | Oversees daily operations, adjusts physical stock counts, performs inventory write-offs, triggers out-of-stock toggles, configures operating hours, reviews daily sales/cash reconciliation, and processes authorized refunds. |
 | **System Administrator** | `[CONFIRMED]` | Technical administrator managing cloud hosting, database migrations, third-party API configurations (Razorpay, SMS gateways), and security audit logs. |

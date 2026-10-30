@@ -16,19 +16,19 @@ The system encompasses three client interfaces powered by a single, authoritativ
 
 ---
 
-## 📚 Phase 0.3: Authoritative Architecture & Requirements Documentation
+## 📚 Phase 0.4.1: Authoritative Architecture & Requirements Documentation
 
 All specifications, threat models, database schemas, and engineering roadmaps are maintained in [`docs/phase-0/`](./docs/phase-0/):
 
-1. [**Project Brief**](./docs/phase-0/PROJECT_BRIEF.md) — Product vision, platform scope, operational counter workflow, requirement classifications, and stakeholder roles.
-2. [**Functional Requirements**](./docs/phase-0/FUNCTIONAL_REQUIREMENTS.md) — Comprehensive user roles, module specifications tagged with confirmation status, and planning benchmarks.
-3. [**System Architecture**](./docs/phase-0/SYSTEM_ARCHITECTURE.md) — Architectural evaluation (modular monolith vs. alternatives), topology diagrams, detailed data flows (multi-product reservation, late payment webhook reconciliation), and subsystem designs.
-4. [**Database Design**](./docs/phase-0/DATABASE_DESIGN.md) — PostgreSQL ERD, authoritative inventory definitions (`physical_stock`, `reserved_stock`, `available_stock`), DDL tables, check constraints, complete RLS policies, and hardened deterministic stored procedures.
-5. [**Security Plan**](./docs/phase-0/SECURITY_PLAN.md) — STRIDE threat modeling, server-side authorization architecture, OTP abuse defense, zero-trust payment verification, and credential isolation.
-6. [**Testing Strategy**](./docs/phase-0/TESTING_STRATEGY.md) — Quality pyramid, 12 critical edge-case scenarios (deadlock prevention, all-or-nothing rollback, TTL cleanup, duplicate webhook idempotency, evidence-based refunds), and automated test tooling.
-7. [**Implementation Roadmap**](./docs/phase-0/IMPLEMENTATION_ROADMAP.md) — 10-phase dependency-driven engineering roadmap with strict progression cycle (`Plan → Implement → Code Review → Test → Approve → Next Phase`), WBS, and verification gates.
-8. [**Decisions & Open Questions**](./docs/phase-0/DECISIONS_AND_OPEN_QUESTIONS.md) — Architectural Decision Records (ADRs 001–007), cross-platform API contract parity, and categorized business decisions awaiting client approval.
-9. [**Development Guidelines**](./docs/phase-0/DEVELOPMENT_GUIDELINES.md) — Practical monorepo layout, environment variable templates, cross-platform contract parity (TypeScript Zod & Kotlin `data class`), Git conventions, and local dev setup.
+1. [**Project Brief**](./docs/phase-0/PROJECT_BRIEF.md) — Product vision, platform scope, separated Online vs. Cash operational counter workflows, requirement classifications, and stakeholder roles.
+2. [**Functional Requirements**](./docs/phase-0/FUNCTIONAL_REQUIREMENTS.md) — Comprehensive user roles, module specifications tagged with confirmation status, separated checkout lifecycles, and protected inventory write-off rules.
+3. [**System Architecture**](./docs/phase-0/SYSTEM_ARCHITECTURE.md) — Architectural evaluation (modular monolith vs. alternatives), topology diagrams, detailed data flows (multi-product reservation, late payment webhook reconciliation, write-offs), race condition resolution matrix, and state transitions.
+4. [**Database Design**](./docs/phase-0/DATABASE_DESIGN.md) — PostgreSQL ERD, authoritative inventory definitions (`physical_stock`, `reserved_stock`, `available_stock`), DDL tables, check constraints (`chk_stock_balance`, `chk_cash_no_online_expiry`), complete RLS policies across all 10 tables, and hardened deterministic stored procedures.
+5. [**Security Plan**](./docs/phase-0/SECURITY_PLAN.md) — STRIDE threat modeling, Dual-Layer Security Model, server-side authorization architecture, OTP abuse defense, zero-trust payment verification, refund timeout recovery, action-level role separation, and credential isolation.
+6. [**Testing Strategy**](./docs/phase-0/TESTING_STRATEGY.md) — Quality pyramid, 17 critical edge-case scenarios (deadlock prevention, all-or-nothing rollback, TTL cleanup, duplicate webhook idempotency, evidence-based refunds, refund timeout reconciliation, unexpected payment isolation, write-off protection, cash order immunity, partial refund concurrency), and future CI contract drift checks.
+7. [**Implementation Roadmap**](./docs/phase-0/IMPLEMENTATION_ROADMAP.md) — 10-phase dependency-driven engineering roadmap with standardized 6-part acceptance gate structure (`Deliverables`, `Automated Tests`, `Manual Verification`, `Security Checks`, `Acceptance Criteria`, `Evidence Required`).
+8. [**Decisions & Open Questions**](./docs/phase-0/DECISIONS_AND_OPEN_QUESTIONS.md) — Architectural Decision Records (ADRs 001–008), cross-platform API contract parity, and Central Decision Register of open business decisions awaiting client approval with recommended defaults.
+9. [**Development Guidelines**](./docs/phase-0/DEVELOPMENT_GUIDELINES.md) — Practical monorepo layout, environment variable templates, cross-platform contract data conventions (Money in paise, UUID v4, ISO-8601 UTC), Git conventions, and future CI contract drift verification.
 
 ---
 
