@@ -1,6 +1,6 @@
 # Moody Orange — Project Brief & Product Specification
 
-**Document Version:** 1.1.0 (Phase 0.1 Revision)  
+**Document Version:** 1.2.0 (Phase 0.2 Final Consistency Review)  
 **Phase:** Phase 0 (Requirements & Architecture)  
 **Status:** Pending Client Review & Sign-Off  
 **Target Brand:** Moody Orange  
@@ -14,13 +14,14 @@
 | Version | Date | Author | Description of Changes |
 | :--- | :--- | :--- | :--- |
 | **1.0.0** | 2026-10-30 | Lead Architect | Initial Phase 0 draft covering product scope, three platforms, and baseline architecture. |
-| **1.1.0** | 2026-10-30 | Lead Architect | **Phase 0.1 Revision:**<br>• Decoupled Backend API into an independent modular monolith (`apps/backend-api`).<br>• Rigorously tagged all requirements (`[CONFIRMED]`, `[PROPOSED]`, `[ASSUMPTION]`, `[CLIENT DECISION REQUIRED]`).<br>• Defined late webhook reconciliation and refund lifecycle.<br>• Clarified performance metrics as planning benchmarks. |
+| **1.1.0** | 2026-10-30 | Lead Architect | Phase 0.1 Revision: Decoupled Backend API into standalone modular monolith (`apps/backend-api`); added requirement tagging. |
+| **1.2.0** | 2026-10-30 | Lead Architect | **Phase 0.2 Final Consistency Review:**<br>• Enforced authoritative inventory naming (`physical_stock`, `reserved_stock`, `available_stock`) and lifecycle across all sections.<br>• Realigned 10-phase engineering roadmap with dependency-based progression.<br>• Re-audited all requirement tags: marked slot durations, PIN/QR, timeouts, cash limits, and uncollected policies strictly as `[PROPOSED / CLIENT DECISION REQUIRED]`. |
 
 ---
 
 ## 1. Executive Summary
 
-**Moody Orange** is a specialized retail ordering platform designed to streamline retail purchases for a premier physical confectionery and beverage store. The store specializes in three curated product categories:
+**Moody Orange** is a specialized retail ordering platform designed to streamline retail purchases for a physical boutique confectionery and beverage store. The store specializes in three curated product categories:
 1. **Artisanal Cakes** `[CONFIRMED]` (stocked specialty cakes, celebration cakes, and daily fresh bakes)
 2. **Fresh Cold-Pressed Juices** `[CONFIRMED]` (made-to-order and fresh-bottled daily juices, fruit blends, and wellness shots)
 3. **Gourmet Chocolates** `[CONFIRMED]` (curated boxes, single-origin bars, and hand-crafted truffles)
@@ -35,18 +36,17 @@ The core operational model is **Online Pre-Order with Physical Counter Collectio
 
 ### 2.1 Primary Business Objectives
 - **Zero Counter Queuing:** Minimize physical customer waiting times during peak store hours by enabling advance ordering and scheduled collection slots `[CONFIRMED]`.
-- **Absolute Inventory Integrity:** Eliminate physical vs. digital stock discrepancies through atomic, real-time database transactions `[CONFIRMED]`.
+- **Absolute Inventory Integrity:** Eliminate physical vs. digital stock discrepancies through atomic, row-locked database transactions `[CONFIRMED]`.
 - **Frictionless Omnichannel Ordering:** Enable customers to order seamlessly via responsive web or a high-performance native Android application `[CONFIRMED]`.
 - **Operational Clarity:** Equip in-store counter staff and kitchen managers with a real-time order dispatch board to orchestrate packing and counter handovers `[CONFIRMED]`.
 
-### 2.2 Planning Benchmarks & Target Indicators
-*(Note: These are engineering design targets to guide sizing and optimization, not contractual performance guarantees prior to load testing in Phase 7).*
+### 2.2 Planning Benchmarks & Design Targets
+*(Note: These are engineering design targets to guide sizing and optimization, not contractual performance guarantees prior to load testing).*
 
 | Planning Metric | Target Design Benchmark | Classification | Verification Mechanism |
 | :--- | :--- | :--- | :--- |
 | **Counter Handover Latency** | < 45 seconds from customer arrival | `[PROPOSED]` | Difference between customer check-in and staff completion |
-| **Overselling / Stockout Errors** | 0.00% under high concurrency | `[CONFIRMED]` | Automated concurrency load tests (k6) in Phase 7 |
-| **Payment Drop-off Rate** | < 12% | `[PLANNING TARGET]` | Funnel analytics from checkout init to payment captured |
+| **Overselling / Stockout Errors** | 0.00% under high concurrency | `[CONFIRMED]` | Automated concurrency load tests (k6) |
 | **Store Hours Availability** | 99.9% during operational hours | `[PLANNING TARGET]` | Cloud health checks and synthetic uptime monitors |
 | **Realtime Queue Latency** | < 1.0 second | `[PLANNING TARGET]` | WebSocket round-trip measurement between server and admin UI |
 
@@ -79,7 +79,7 @@ Moody Orange consists of **three distinct client interfaces** powered by **one a
                   |     - Standalone Modular Monolith (Node.js/TS)   |
                   |     - Versioned Endpoints (/api/v1/...)          |
                   |     - Razorpay Verification & Webhook Engine     |
-                  |     - Inventory & Order Transaction Engine       |
+                  |     - Deterministic Multi-Product Stock Engine   |
                   +--------------------------------------------------+
                                            |
                                            v
@@ -112,13 +112,13 @@ Moody Orange consists of **three distinct client interfaces** powered by **one a
 #### D. Standalone Authoritative Backend API `[CONFIRMED ARCHITECTURE]`
 - **Architecture:** Practical Modular Monolith (Node.js/TypeScript REST API in `apps/backend-api`).
 - **Separation of Concerns:** Completely decoupled from customer and admin web applications. Deployable and scalable independently.
-- **Role:** Sole authoritative engine executing business logic, price recalculations, stock reservations, payment gateway communications, and webhook verifications.
+- **Role:** Sole authoritative engine executing business logic, price recalculations, deterministic multi-product stock reservations, payment gateway communications, and webhook verifications.
 
 ---
 
 ## 4. Inclusions vs. Explicit Exclusions
 
-### 4.1 In-Scope Deliverables (Phased Development)
+### 4.1 In-Scope Deliverables
 - `[CONFIRMED]` Multi-platform system: Customer Web, Native Android App, Admin Web, and Standalone Backend API.
 - `[CONFIRMED]` Three primary categories: Cakes, Juices, and Chocolates.
 - `[CONFIRMED]` Mobile-number OTP authentication for customers (Indian mobile standards).
@@ -129,12 +129,14 @@ Moody Orange consists of **three distinct client interfaces** powered by **one a
 - `[CONFIRMED]` Server-side payment validation, HMAC webhook signature verification, and duplicate payment prevention.
 - `[CONFIRMED]` Pickup confirmation workflow when goods are collected at the counter.
 - `[CONFIRMED]` Real-time order state updates across all platforms.
-- `[PROPOSED]` Visual collection token: 4-digit numeric PIN and QR code for rapid counter handover.
-- `[PROPOSED]` Automated 10-minute Time-To-Live (TTL) on stock reservations for pending online payments.
-- `[PROPOSED]` Automated reconciliation and refund pipeline if an online payment succeeds after reservation expiry.
+- `[PROPOSED / CLIENT DECISION REQUIRED]` Visual collection token: 4-digit numeric PIN and QR code for rapid counter handover.
+- `[PROPOSED / CLIENT DECISION REQUIRED]` 10-minute Time-To-Live (TTL) on stock reservations for pending online payments.
+- `[PROPOSED / CLIENT DECISION REQUIRED]` Scheduled pickup time slots in 15-minute intervals.
+- `[PROPOSED / CLIENT DECISION REQUIRED]` Cash at pickup maximum order total cap (e.g., ₹1,000).
+- `[PROPOSED / CLIENT DECISION REQUIRED]` Uncollected order grace period and end-of-day food disposal policy.
 
 ### 4.2 Explicit Exclusions (Out of Scope for Initial Launch)
-- `[CONFIRMED EXCLUSION]` **Home Delivery & Courier Shipping:** No delivery address capture, route planning, or logistics partner integrations (e.g., Dunzo, Shadowfax). Counter pickup only.
+- `[CONFIRMED EXCLUSION]` **Home Delivery & Courier Shipping:** No delivery address capture, route planning, or logistics partner integrations. Counter pickup only.
 - `[CONFIRMED EXCLUSION]` **Multi-Store / Multi-Branch Topology:** Single physical store counter for initial release.
 - `[CONFIRMED EXCLUSION]` **Bespoke 3D Custom Cake Modeler:** Standardized and stocked/pre-prepared items only.
 - `[CONFIRMED EXCLUSION]` **Customer Stored-Value Wallets:** No in-app stored balances. Refunds return directly to original payment source.
@@ -142,13 +144,33 @@ Moody Orange consists of **three distinct client interfaces** powered by **one a
 
 ---
 
-## 5. Physical Store Operations & Fulfillment Workflow
+## 5. Authoritative Inventory Accounting Rules
+
+All components adhere to the following strict stock accounting definitions:
+- **`physical_stock`:** Total physical sellable units currently present in the shop.
+- **`reserved_stock`:** Units allocated to pending checkout reservations AND confirmed orders awaiting collection.
+- **`available_stock`:** Defined as `physical_stock - reserved_stock`.
+
+### 5.1 Authoritative Stock Accounting Example
+
+| Operational Event | `physical_stock` | `reserved_stock` | `available_stock` | Note |
+| :--- | :---: | :---: | :---: | :--- |
+| **Initial Stock** | 10 | 0 | 10 | 10 sellable units in display/chiller |
+| **Customer Reserves 2 Units** | 10 | 2 | 8 | Reserved during checkout |
+| **Payment Succeeds** | 10 | 2 | 8 | **Reservation NOT released!** Confirmed order holds reserved stock |
+| **Customer Collects 2 Units** | 8 | 0 | 8 | **Physical stock decreases on counter handover!** Reserved stock drops to 0 |
+| **Another Checkout Reserves 1**| 8 | 1 | 7 | New pending checkout |
+| **Reservation Expires** | 8 | 0 | 8 | Unpaid checkout timed out; reserved stock drops to 0 |
+
+---
+
+## 6. Physical Store Operations & Fulfillment Workflow
 
 ```
 [Customer Places Order] 
        │
        ▼
-[Stock Reserved Atomically via Database Procedure]
+[Stock Reserved Atomically (Deterministic Row Lock)]
        │
        ├─────────────────────────────────┐
        ▼                                 ▼
@@ -157,6 +179,7 @@ Moody Orange consists of **three distinct client interfaces** powered by **one a
        │ (Webhook Confirmed)             │ (Immediate Confirmation)
        ▼                                 ▼
 [Order Status: CONFIRMED] ───────────────┘
+  (Stock remains reserved)
        │
        ▼
 [Admin Live Queue Notification]
@@ -171,7 +194,7 @@ Moody Orange consists of **three distinct client interfaces** powered by **one a
 [Customer Arrives at Shop Counter]
        │
        ▼
-[Staff Verifies Order (PIN / QR / Order ID)]
+[Staff Verifies Order]
        │
        ├─────────────────────────────────┐
        ▼                                 ▼
@@ -184,12 +207,12 @@ Moody Orange consists of **three distinct client interfaces** powered by **one a
                         │
                         ▼
           [Order Status: COMPLETED]
-          [Stock Reservation Committed to Physical Deduct]
+          [physical_stock -= qty, reserved_stock -= qty]
 ```
 
 ---
 
-## 6. Project Stakeholders & System Roles
+## 7. Project Stakeholders & System Roles
 
 | Role | Classification | Core Responsibilities in Moody Orange |
 | :--- | :--- | :--- |

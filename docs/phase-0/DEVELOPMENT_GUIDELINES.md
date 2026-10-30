@@ -1,6 +1,6 @@
 # Moody Orange — Development Guidelines, Environment & Repository Standards
 
-**Document Version:** 1.1.0 (Phase 0.1 Revision)  
+**Document Version:** 1.2.0 (Phase 0.2 Final Consistency Review)  
 **Phase:** Phase 0 (Requirements & Architecture)  
 **Status:** Pending Client Review & Sign-Off  
 **Target System:** Moody Orange Unified Ordering Platform  
@@ -13,7 +13,8 @@
 | Version | Date | Author | Description of Changes |
 | :--- | :--- | :--- | :--- |
 | **1.0.0** | 2026-10-30 | Lead Architect | Initial development guidelines and repository conventions. |
-| **1.1.0** | 2026-10-30 | Lead Architect | **Phase 0.1 Revision:**<br>• Corrected repository URL to `https://github.com/AbhinavKumar36/orange`.<br>• Decoupled `apps/backend-api` into an independent workspace in the monorepo.<br>• Clarified cross-platform contract parity (OpenAPI/JSON Schema) without implying TypeScript sharing to Kotlin.<br>• Reaffirmed that application directories are planning structures and must NOT be created in Phase 0. |
+| **1.1.0** | 2026-10-30 | Lead Architect | Phase 0.1 Revision: Decoupled `apps/backend-api` and corrected repository URL. |
+| **1.2.0** | 2026-10-30 | Lead Architect | **Phase 0.2 Final Consistency Review:**<br>• Established OpenAPI 3.1 / JSON Schema as the authoritative, language-neutral API contract source.<br>• Documented standardized API versioning, error structures, idempotency keys, and pagination conventions.<br>• Formalized contract testing standards for TypeScript (Zod) and Kotlin (`data class` + `kotlinx.serialization`).<br>• Reaffirmed that application directories are planning structures and must NOT be created in Phase 0. |
 
 ---
 
@@ -34,7 +35,7 @@ moody-orange/
 │   ├── backend-api/                 # Standalone Authoritative REST API (Node.js/TS)
 │   │   ├── src/
 │   │   │   ├── modules/             # Modular domains (catalog, orders, payments, staff)
-│   │   │   ├── middleware/          # JWT auth, rate limiting, error handling
+│   │   │   ├── middleware/          # JWT auth, role authorization, rate limiting
 │   │   │   └── server.ts            # Fastify / Express server entrypoint
 │   │   ├── package.json
 │   │   └── .env.example
@@ -80,15 +81,15 @@ moody-orange/
 
 ---
 
-## 2. Cross-Platform Contract Parity (TypeScript & Kotlin)
+## 2. Authoritative API Contracts & Conventions
 
-To ensure the Customer Web, Admin Web, and Native Android App consume identical backend contracts without false assumptions:
+To ensure the Customer Web, Admin Web, and Native Android App consume identical backend contracts without cross-language TypeScript-to-Kotlin illusions:
 
 ```
                       +────────────────────────────────────────+
                       |   AUTHORITATIVE API CONTRACT           |
                       |   packages/api-contracts/schemas/      |
-                      |   (JSON Schema / OpenAPI Spec)         |
+                      |   (JSON Schema / OpenAPI 3.1 Spec)     |
                       +────────────────────────────────────────+
                                        │
                  ┌─────────────────────┴─────────────────────┐
@@ -108,7 +109,24 @@ To ensure the Customer Web, Admin Web, and Native Android App consume identical 
 > [!WARNING]
 > **No Direct Cross-Language Code Sharing:** TypeScript packages (`packages/api-contracts`) **cannot** be imported directly by the Android Gradle build. Android models are native Kotlin data classes that implement the exact field names, types, and validation rules specified in the API JSON schemas.
 
-### 2.1 Standardized API Error Response Convention
+### 2.1 API Conventions & Architectural Standards
+- **Versioning:** All REST API routes are versioned under `/api/v1/*`.
+- **Authentication:** Protected routes require a valid Supabase JWT passed via the `Authorization: Bearer <token>` header.
+- **Authorization:** Customer routes extract identity strictly from `jwt.sub`. Staff routes verify the caller's role against server-controlled `staff_roles` records.
+- **Idempotency:** State-mutating operations (checkout, refunds) accept an `X-Idempotency-Key: <UUID>` header. Retried requests with identical keys return the existing record without executing duplicate mutations.
+- **Pagination Convention:** List endpoints accept `limit` (default: 20, max: 100) and `cursor` (opaque base64 cursor), returning:
+  ```json
+  {
+    "data": [...],
+    "pagination": {
+      "has_more": true,
+      "next_cursor": "eyJpZCI6...==",
+      "total_count": 42
+    }
+  }
+  ```
+
+### 2.2 Standardized API Error Response Convention
 All endpoints under `/api/v1/*` must adhere to a uniform error structure:
 
 ```json
@@ -119,7 +137,8 @@ All endpoints under `/api/v1/*` must adhere to a uniform error structure:
     "details": {
       "product_id": "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d",
       "available_quantity": 1
-    }
+    },
+    "timestamp": "2026-10-30T19:15:00Z"
   }
 }
 ```
@@ -228,14 +247,14 @@ cd orange
 - `develop`: Primary integration and staging branch.
 - `feat/<scope>-<description>`: Feature branches (e.g., `feat/backend-stock-reservation`).
 - `fix/<scope>-<description>`: Bug fixes (e.g., `fix/webhook-signature-parsing`).
-- `docs/<scope>-<description>`: Documentation changes (e.g., `docs/phase-0-1-revision`).
+- `docs/<scope>-<description>`: Documentation changes (e.g., `docs/phase-0-2-consistency`).
 
 ### 4.3 Commit Standards (Conventional Commits)
 All commit messages must adhere to: `<type>(<scope>): <subject>`  
 *Examples:*
 - `feat(api): scaffold standalone backend modular monolith`
-- `fix(order): reconcile late webhook with automated refund trigger`
-- `docs(phase-0): update database schema with precise inventory definitions`
+- `fix(inventory): enforce physical_stock and deterministic row locks`
+- `docs(phase-0): finalize Phase 0.2 consistency review specifications`
 
 ---
 

@@ -1,6 +1,6 @@
 # Moody Orange — Architectural Decisions & Open Business Questions
 
-**Document Version:** 1.1.0 (Phase 0.1 Revision)  
+**Document Version:** 1.2.0 (Phase 0.2 Final Consistency Review)  
 **Phase:** Phase 0 (Requirements & Architecture)  
 **Status:** Pending Client Review & Sign-Off  
 **Target System:** Moody Orange Unified Ordering Platform  
@@ -13,7 +13,8 @@
 | Version | Date | Author | Description of Changes |
 | :--- | :--- | :--- | :--- |
 | **1.0.0** | 2026-10-30 | Lead Architect | Initial ADRs and open business questions. |
-| **1.1.0** | 2026-10-30 | Lead Architect | **Phase 0.1 Revision:**<br>• Revised ADR-002: Standalone Modular Monolith Backend API (`apps/backend-api`) replacing embedded Next.js API.<br>• Added ADR-005: Cross-platform API contract management (OpenAPI/JSON Schema) without cross-language TypeScript-to-Kotlin sharing illusions.<br>• Updated open business decisions list to clearly isolate unapproved operational assumptions. |
+| **1.1.0** | 2026-10-30 | Lead Architect | Phase 0.1 Revision: Revised ADR-002 (standalone backend) and added ADR-005. |
+| **1.2.0** | 2026-10-30 | Lead Architect | **Phase 0.2 Final Consistency Review:**<br>• Formalized ADR-004: Authoritative inventory accounting (`physical_stock`, `reserved_stock`), deterministic multi-product row-locking, and evidence-based refund progression.<br>• Re-audited all open business questions: marked reservation TTL, slot duration, PIN/QR, cash limits, and no-show policies strictly as client decisions required.<br>• Removed premature operational and financial assumptions from the technical core. |
 
 ---
 
@@ -48,29 +49,30 @@
 
 ---
 
-### ADR-004: Two-Phase Stock Reservation with 10-Minute TTL & Automated Late Webhook Reconciliation
-- **Context:** In quick commerce, stock must not be deducted before a customer pays, but must also not be oversold while a customer is completing payment. Furthermore, delayed payment webhooks can arrive after reservation expiry.
-- **Decision:** Implement a two-phase stock reservation pattern:
-  1. *Reservation Phase:* At checkout initiation, stock moves to `reserved_stock` with a 10-minute expiry timestamp (`expires_at`).
-  2. *Commit Phase:* Upon verified payment webhook, reservation converts to confirmed order.
-  3. *Auto-Release:* If checkout is abandoned, a background worker releases `reserved_stock`.
-  4. *Late Webhook Reconciliation:* If a delayed payment webhook arrives for an expired order:
-     - If stock is still available: Re-reserve stock and confirm order.
-     - If stock was sold to someone else: Refuse confirmation, mark order `cancelled_inventory_depleted`, and automatically trigger a full refund via Razorpay Refunds API.
-- **Consequences:** Completely eliminates flash-sale overselling while guaranteeing that customers who pay late receive either their goods or an immediate automated refund.
+### ADR-004: Authoritative Inventory Accounting, Deterministic Row-Locking & Evidence-Based Refunds
+- **Context:** The inventory model must prevent deadlocks across multi-product checkouts, eliminate race conditions, maintain stock reservations through payment success until physical collection, and accurately handle late payment webhooks without prematurely marking money as refunded.
+- **Decision:**
+  1. *Authoritative Stock Ledger:*
+     - `physical_stock`: Total physical sellable units present in the shop.
+     - `reserved_stock`: Units allocated to pending checkout reservations AND confirmed orders awaiting collection.
+     - `available_stock = physical_stock - reserved_stock`.
+     - Successful payment does NOT release the reservation. Physical stock decreases only at customer collection.
+  2. *Deterministic Multi-Product Locking:* All multi-product checkouts sort product IDs in ascending order (`ORDER BY product_id ASC`) before acquiring row locks, pre-validating all line items before allocating stock on an all-or-nothing basis.
+  3. *Evidence-Based Refunds:* Gateway refund acceptance (`HTTP 200`) sets payment status to `refund_processing`. Status becomes `refunded` ONLY upon verified receipt of the gateway webhook `refund.processed`.
+- **Consequences:** Eliminates inventory overselling and deadlocks, ensures accounting consistency across store operations, and prevents premature claims of completed refunds.
 
 ---
 
-### ADR-005: Cross-Platform API Contract Management (OpenAPI / JSON Schema)
+### ADR-005: Cross-Platform API Contract Management (OpenAPI 3.1 / JSON Schema)
 - **Context:** The system utilizes TypeScript for Web/Backend and Kotlin for Android. TypeScript types cannot be directly imported or executed in Kotlin Gradle projects.
 - **Decision:** API contracts are defined using JSON Schema / OpenAPI specifications in `packages/api-contracts`:
   - **TypeScript Clients (Web & Backend):** Utilize Zod schemas derived from the API contracts.
-  - **Kotlin Client (Android):** Implements equivalent Kotlin `data class` models with `kotlinx.serialization` strictly matching the JSON contracts.
+  - **Kotlin Client (Android):** Implements native Kotlin `data class` models with `kotlinx.serialization` strictly matching the JSON contracts.
 - **Consequences:** Eliminates false assumptions about cross-language sharing while enforcing strict contract parity across platforms.
 
 ---
 
-### ADR-006: Webhook-First Payment Settlement with Razorpay
+### ADR-006: Asynchronous Webhook-First Settlement & Webhook Verification (Razorpay)
 - **Context:** Client-side redirects can fail due to mobile network dropouts, closed browser tabs, or malicious spoofing.
 - **Decision:** Order confirmation is driven strictly by asynchronous Razorpay webhooks verified via HMAC-SHA256 signatures. Client-side success callbacks trigger polling or a WebSocket subscription to await authoritative server confirmation.
 - **Consequences:** Eliminates fake payment confirmation attacks and guarantees payment-order reconciliation.
@@ -80,10 +82,10 @@
 ### ADR-007: Practical Monorepo Structure
 - **Context:** Managing three interfaces, one backend service, and shared contracts across multiple separate repositories creates version drift and complex deployment coordination.
 - **Decision:** Maintain a single Git repository managed with Turborepo:
+  - `apps/backend-api`
   - `apps/customer-web`
   - `apps/admin-web`
   - `apps/android`
-  - `apps/backend-api`
   - `packages/api-contracts`
   - `supabase/`
 - **Consequences:** Atomic version control across backend migrations, API contracts, and frontend code.
@@ -92,7 +94,7 @@
 
 ## 2. Open Business Decisions Requiring Client Approval
 
-The following business rules and operational policies directly impact system logic and cannot be assumed. They require explicit client review and sign-off prior to implementing Phase 3 and Phase 5:
+The following business rules and operational policies directly impact system logic and cannot be assumed. They require explicit client review and sign-off prior to implementing Phase 5 (Cart & Stock Engine) and Phase 7 (Payments):
 
 ### Category A: Operational & In-Store Policies
 1. **Perishable Order Cancellation Window:**
@@ -170,3 +172,13 @@ The following business rules and operational policies directly impact system log
      - A: **4-Digit Collection PIN + QR Code:** Customer displays PIN or QR on mobile screen; staff types PIN or scans QR.
      - B: **Customer Mobile Number + Order Number:** Staff looks up order by phone number; customer verbally confirms name.
    - *Architect Recommendation:* **Option A**. Fast, error-free, and prevents verbal miscommunication at a busy counter.
+
+---
+
+### Category F: Reservation Timeout & Slot Durations
+10. **Stock Reservation Window & Pickup Slot Duration:**
+    - *Question:* What is the acceptable stock reservation timeout during checkout? What is the duration of scheduled pickup slots?
+    - *Proposals:*
+      - Reservation Timeout: 10 minutes (standard for payment window completion).
+      - Pickup Slot Interval: 15 minutes (e.g. 5:00 PM – 5:15 PM).
+    - *Action Required:* Client must confirm or adjust these operational values.
