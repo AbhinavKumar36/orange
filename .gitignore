@@ -1,0 +1,35 @@
+# Operating System Files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Environment Variables & Secrets
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.local
+local.properties
+
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build Outputs
+.next/
+dist/
+build/
+out/
+*.apk
+*.aab
+
+# IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Supabase
+.supabase/
+supabase/.temp/
