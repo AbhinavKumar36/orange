@@ -1,6 +1,6 @@
 # Moody Orange — Architectural Decisions & Open Business Questions
 
-**Document Version:** 1.2.0 (Phase 0.2 Final Consistency Review)  
+**Document Version:** 1.3.0 (Phase 0.3 Final Consistency Pass)  
 **Phase:** Phase 0 (Requirements & Architecture)  
 **Status:** Pending Client Review & Sign-Off  
 **Target System:** Moody Orange Unified Ordering Platform  
@@ -14,7 +14,8 @@
 | :--- | :--- | :--- | :--- |
 | **1.0.0** | 2026-10-30 | Lead Architect | Initial ADRs and open business questions. |
 | **1.1.0** | 2026-10-30 | Lead Architect | Phase 0.1 Revision: Revised ADR-002 (standalone backend) and added ADR-005. |
-| **1.2.0** | 2026-10-30 | Lead Architect | **Phase 0.2 Final Consistency Review:**<br>• Formalized ADR-004: Authoritative inventory accounting (`physical_stock`, `reserved_stock`), deterministic multi-product row-locking, and evidence-based refund progression.<br>• Re-audited all open business questions: marked reservation TTL, slot duration, PIN/QR, cash limits, and no-show policies strictly as client decisions required.<br>• Removed premature operational and financial assumptions from the technical core. |
+| **1.2.0** | 2026-10-30 | Lead Architect | Phase 0.2 Revision: Standardized `physical_stock` and evidence-based refunds. |
+| **1.3.0** | 2026-10-30 | Lead Architect | **Phase 0.3 Final Consistency Pass:**<br>• Updated ADR-004: Enforced cart duplicate aggregation, positive quantity validation, and customer-scoped idempotency keys.<br>• Updated ADR-006: Defined separate Cash-at-Pickup lifecycle (`unpaid` state) and authoritative Razorpay verification protocols.<br>• Re-audited all client decisions, keeping operational and financial policies strictly open pending client approval. |
 
 ---
 
@@ -49,17 +50,18 @@
 
 ---
 
-### ADR-004: Authoritative Inventory Accounting, Deterministic Row-Locking & Evidence-Based Refunds
-- **Context:** The inventory model must prevent deadlocks across multi-product checkouts, eliminate race conditions, maintain stock reservations through payment success until physical collection, and accurately handle late payment webhooks without prematurely marking money as refunded.
+### ADR-004: Authoritative Inventory Accounting, Deterministic Row-Locking & Input Validation
+- **Context:** The inventory model must prevent deadlocks across multi-product checkouts, eliminate race conditions, maintain stock reservations through payment success until physical collection, and reject malformed checkout inputs.
 - **Decision:**
   1. *Authoritative Stock Ledger:*
      - `physical_stock`: Total physical sellable units present in the shop.
      - `reserved_stock`: Units allocated to pending checkout reservations AND confirmed orders awaiting collection.
      - `available_stock = physical_stock - reserved_stock`.
      - Successful payment does NOT release the reservation. Physical stock decreases only at customer collection.
-  2. *Deterministic Multi-Product Locking:* All multi-product checkouts sort product IDs in ascending order (`ORDER BY product_id ASC`) before acquiring row locks, pre-validating all line items before allocating stock on an all-or-nothing basis.
-  3. *Evidence-Based Refunds:* Gateway refund acceptance (`HTTP 200`) sets payment status to `refund_processing`. Status becomes `refunded` ONLY upon verified receipt of the gateway webhook `refund.processed`.
-- **Consequences:** Eliminates inventory overselling and deadlocks, ensures accounting consistency across store operations, and prevents premature claims of completed refunds.
+  2. *Deterministic Multi-Product Locking:* All multi-product inventory procedures (checkout reservation, late payment reconciliation, order cancellation, staff handover) sort product IDs in ascending order (`ORDER BY product_id ASC FOR UPDATE`).
+  3. *Checkout Validation:* `rpc_reserve_order_stock` safely aggregates duplicate product IDs, enforces positive integer quantities, rejects empty carts and inactive products, and pre-validates availability for all items before allocating any stock.
+  4. *Customer-Scoped Idempotency:* Scoped strictly to `(customer_id, client_idempotency_key)` with payload hash verification.
+- **Consequences:** Eliminates inventory overselling and deadlocks, ensures accounting consistency across store operations, and prevents cross-customer idempotency data leaks.
 
 ---
 
@@ -72,10 +74,15 @@
 
 ---
 
-### ADR-006: Asynchronous Webhook-First Settlement & Webhook Verification (Razorpay)
-- **Context:** Client-side redirects can fail due to mobile network dropouts, closed browser tabs, or malicious spoofing.
-- **Decision:** Order confirmation is driven strictly by asynchronous Razorpay webhooks verified via HMAC-SHA256 signatures. Client-side success callbacks trigger polling or a WebSocket subscription to await authoritative server confirmation.
-- **Consequences:** Eliminates fake payment confirmation attacks and guarantees payment-order reconciliation.
+### ADR-006: Asynchronous Webhook Settlement, Evidence-Based Refunds & Cash State Separation
+- **Context:** Client-side redirects cannot be trusted. Cash orders cannot be forced into an online gateway payment state. Refunds cannot be assumed complete upon gateway request acceptance.
+- **Decision:**
+  1. *Payment State Separation:*
+     - Online orders: `pending` -> `captured` -> `refund_processing` -> `refunded`.
+     - Cash orders: Initialized as `unpaid`. Transitions to `captured` only upon staff cash receipt confirmation at counter handover.
+  2. *Authoritative Payment Verification:* Backend API validates payment ID, order ID, amount in paise, currency, and HMAC signature before invoking database procedures. Database procedures also verify expected order totals.
+  3. *Evidence-Based Refunds:* Gateway acceptance (`HTTP 200`) sets `refund_processing`. Status becomes `refunded` only upon verified receipt of the gateway webhook `refund.processed`. Cumulative refunds cannot exceed captured order amount.
+- **Consequences:** Eliminates fake payment confirmation attacks, prevents uncollected cash orders from being completed, and guarantees refund accounting integrity.
 
 ---
 

@@ -1,6 +1,6 @@
 # Moody Orange — Functional & Non-Functional Requirements Specification
 
-**Document Version:** 1.2.0 (Phase 0.2 Final Consistency Review)  
+**Document Version:** 1.3.0 (Phase 0.3 Final Consistency Pass)  
 **Phase:** Phase 0 (Requirements & Architecture)  
 **Status:** Pending Client Review & Sign-Off  
 **Target System:** Moody Orange Unified Ordering Platform  
@@ -14,7 +14,8 @@
 | :--- | :--- | :--- | :--- |
 | **1.0.0** | 2026-10-30 | Lead Architect | Initial functional requirements breakdown. |
 | **1.1.0** | 2026-10-30 | Lead Architect | Phase 0.1 Revision: Decoupled Backend API and added initial requirement tagging. |
-| **1.2.0** | 2026-10-30 | Lead Architect | **Phase 0.2 Final Consistency Review:**<br>• Enforced authoritative inventory model (`physical_stock`, `reserved_stock`, `available_stock`).<br>• Specified deterministic multi-product row locking, atomic validation, and all-or-nothing allocation.<br>• Refined payment lifecycle: separated order status from payment status, added `refund_processing`, and mandated gateway evidence before setting `refunded`.<br>• Added explicit server-side authorization matrix and verified JWT user extraction.<br>• Audited requirement classifications: marked unapproved operational policies strictly as `[PROPOSED / CLIENT DECISION REQUIRED]`. |
+| **1.2.0** | 2026-10-30 | Lead Architect | Phase 0.2 Revision: Standardized `physical_stock` and server-side authorization matrix. |
+| **1.3.0** | 2026-10-30 | Lead Architect | **Phase 0.3 Final Consistency Pass:**<br>• Enhanced checkout validation: aggregated duplicate product IDs, enforced positive integer quantities, rejected empty carts and inactive products.<br>• Scoped checkout idempotency strictly to authenticated customers with payload hash matching.<br>• Separated Cash-at-Pickup (`unpaid` state) from gateway payments; enforced cash confirmation prior to completion.<br>• Mandated deterministic ascending row-locking across all inventory operations.<br>• Formalized evidence-based refund lifecycle and cumulative refund limits. |
 
 ---
 
@@ -68,18 +69,23 @@ The system enforces strict Role-Based Access Control (RBAC). Roles are authorita
 - **FR-AUT-03 (Customer Profile):** `[CONFIRMED]` Customer captures full name on initial profile creation. Optional email for receipts.
 
 ### 2.5 Payment & Order Placement
-- **FR-PAY-01 (Payment Methods):** `[CONFIRMED]` System must support:
-  1. **Online Payment:** Integrated via Razorpay (UPI, Credit/Debit Cards, NetBanking, Wallets).
-  2. **Cash at Pickup:** Payment collected physically in cash at the store counter.
-- **FR-PAY-02 (Deterministic Multi-Product Stock Reservation):** `[CONFIRMED]`
-  - To prevent deadlocks, inventory rows for all items in the order must be locked in a **deterministic order** (e.g., `ORDER BY product_id ASC`).
-  - The server must validate availability (`physical_stock - reserved_stock >= requested_qty`) for **every** item before allocating any stock.
-  - Allocation is **all-or-nothing**: either all items are reserved atomically or none is. Partial reservations are strictly prohibited.
-  - Client transmits a `client_idempotency_key`; duplicate checkout requests within the TTL return the existing reservation draft without double-reserving stock.
-- **FR-PAY-03 (Reservation Timeout):** `[PROPOSED / CLIENT DECISION REQUIRED]` 10-minute reservation Time-To-Live (TTL). If payment is not completed within this window, reserved stock is released.
-- **FR-PAY-04 (Authoritative Payment Verification):** `[CONFIRMED]` An order is marked paid only upon server-side verification of payment gateway signatures and webhooks. Client-side callbacks alone are never treated as proof of payment.
-- **FR-PAY-05 (Reservation Retention on Payment Success):** `[CONFIRMED]` Successful payment does NOT release the stock reservation. Confirmed orders continue holding their reserved quantity until physical collection or cancellation.
-- **FR-PAY-06 (Cash Order Cap):** `[PROPOSED / CLIENT DECISION REQUIRED]` Cap maximum order value for Cash at Pickup (e.g., ₹1,000) to mitigate spoilage loss from uncollected orders.
+- **FR-PAY-01 (Payment Methods & State Separation):** `[CONFIRMED]` System supports:
+  1. **Online Payment (Razorpay):** `payment_status` progresses through `pending` -> `captured` -> `refund_processing` -> `refunded`.
+  2. **Cash at Pickup:** `payment_status` is initialized as `unpaid`. It transitions to `captured` only when physical cash is received at counter handover.
+- **FR-PAY-02 (Rigorous Checkout Input Validation):** `[CONFIRMED]`
+  - Empty carts are rejected immediately (`HTTP 400`).
+  - Line item quantities must be positive integers (`quantity > 0`). Non-positive quantities are rejected.
+  - Duplicate product IDs in a single cart payload are safely aggregated (`SUM(quantity) GROUP BY product_id`) before stock evaluation.
+  - Inactive products (`is_active = false`) or products missing an inventory record are rejected.
+  - Multi-product row locks are acquired in deterministic ascending order (`ORDER BY product_id ASC FOR UPDATE`).
+  - Pre-validation verifies available stock for **every** item before any stock is allocated (all-or-nothing atomic reservation).
+- **FR-PAY-03 (Customer-Scoped Idempotency):** `[CONFIRMED]`
+  - Checkout idempotency keys are scoped strictly to the authenticated customer (`customer_id + idempotency_key`).
+  - Backend verifies canonical payload hash: repeated requests with identical payload return the existing draft; requests reusing a key with a mismatched payload are rejected with `HTTP 409 Conflict`.
+- **FR-PAY-04 (Reservation Timeout):** `[PROPOSED / CLIENT DECISION REQUIRED]` 10-minute reservation Time-To-Live (TTL). If payment is not completed within this window, reserved stock is released.
+- **FR-PAY-05 (Authoritative Payment Verification):** `[CONFIRMED]` Online payments are verified authoritatively: Backend API verifies HMAC signature, provider payment ID, provider order ID, amount in paise, and currency before invoking database procedures.
+- **FR-PAY-06 (Reservation Retention on Payment Success):** `[CONFIRMED]` Successful payment does NOT release the stock reservation. Confirmed orders continue holding their reserved quantity until physical collection or cancellation.
+- **FR-PAY-07 (Cash Order Cap):** `[PROPOSED / CLIENT DECISION REQUIRED]` Cap maximum order value for Cash at Pickup (e.g., ₹1,000) to mitigate spoilage loss from uncollected orders.
 
 ### 2.6 Order Tracking & Collection Verification
 - **FR-TRK-01 (Order Identification):** `[CONFIRMED]` Every placed order receives a unique, human-readable Order Number (e.g., `MO-2610-042`).
@@ -97,8 +103,8 @@ The system enforces strict Role-Based Access Control (RBAC). Roles are authorita
 - **FR-ADM-01 (Live Order Queue):** `[CONFIRMED]` Real-time dispatch board displaying active orders grouped by status (`Confirmed`, `Preparing`, `Ready for Pickup`, `Completed Today`).
 - **FR-ADM-02 (New Order Alerts):** `[PROPOSED]` Audible sound chime and visual badge alert when a new order arrives on the counter board.
 - **FR-ADM-03 (Pickup Handover & Completion):** `[CONFIRMED]` Staff verifies the customer at the counter, confirms the order, and updates status to `Completed`.  
-  **Physical Stock Decrement:** Upon completion, `physical_stock` decreases by the order quantity, and `reserved_stock` decreases by the order quantity.
-- **FR-ADM-04 (Cash Collection Recording):** `[CONFIRMED]` For "Cash at Pickup" orders, the system displays the amount due and requires staff confirmation of cash receipt before marking the order `Completed`.
+  **Physical Stock Decrement:** Upon completion, `physical_stock` decreases by the order quantity, and `reserved_stock` decreases by the order quantity in deterministic ascending order.
+- **FR-ADM-04 (Cash Collection Recording Enforcement):** `[CONFIRMED]` For "Cash at Pickup" orders (`payment_status = 'unpaid'`), the order CANNOT be marked `Completed` until staff explicitly checks the mandatory cash confirmation box, recording the cash payment.
 
 ### 3.2 Inventory & Catalog Management
 - **FR-INV-01 (Product & Category CRUD):** `[CONFIRMED]` Staff managers can create, update, and manage categories and products (title, description, price, tax rate, preparation time, and availability).
@@ -106,12 +112,6 @@ The system enforces strict Role-Based Access Control (RBAC). Roles are authorita
 - **FR-INV-03 (Physical Stock Adjustments):** `[CONFIRMED]` Managers can update `physical_stock` counts and review inventory change history.
 - **FR-INV-04 (Damaged & Spoiled Stock Handling):** `[CONFIRMED]` Damaged, spoiled, or expired items are handled through a dedicated inventory write-off procedure that decrements `physical_stock` with mandatory audit logging.
 - **FR-INV-05 (Instant Availability Toggle):** `[CONFIRMED]` One-click action to immediately mark any item as `Out of Stock` or `In Stock` across all platforms.
-
-### 3.3 Operational Configuration & Reporting
-- **FR-OPS-01 (Store Hours & Schedule Configuration):** `[CONFIRMED]` Manage daily opening and closing hours and block special holiday closures.
-- **FR-OPS-02 (Slot Capacity Configuration):** `[PROPOSED / CLIENT DECISION REQUIRED]` Ability to configure maximum orders allowed per pickup time slot.
-- **FR-REP-01 (Basic Operational & Sales Reporting):** `[CONFIRMED]` Daily summary of orders fulfilled, broken down by payment method (Online Razorpay vs. Counter Cash).
-- **FR-REP-02 (Cancellation & Refund Logging):** `[CONFIRMED]` Audit log of all cancelled orders, reasons for cancellation, and refund statuses.
 
 ---
 
@@ -131,27 +131,3 @@ Because the Supabase Service Role key bypasses RLS, the Backend API (`apps/backe
 | **Modify Prices / Catalog (`PUT /catalog/products/:id`)** | Denied | Denied | Allowed | Allowed |
 | **Process Refunds (`POST /orders/:id/refund`)** | Denied | Denied | Allowed | Allowed |
 | **Manage Staff Roles (`POST /admin/roles`)** | Denied | Denied | Denied | Allowed |
-
----
-
-## 5. Non-Functional Requirements (NFRs)
-
-### 5.1 Performance & Latency Benchmarks
-*(Note: Design benchmarks to guide architecture sizing, to be validated under load in Phase 8).*
-- **NFR-PER-01 (Web Loading Benchmark):** `[PLANNING TARGET]` First Contentful Paint (FCP) < 1.5 seconds on standard mobile 4G.
-- **NFR-PER-02 (API Response Time):** `[PLANNING TARGET]` Catalog and cart query response times < 300ms p95 under standard load.
-- **NFR-PER-03 (Real-time Broadcast Latency):** `[PLANNING TARGET]` Order state update propagation from server to client interfaces < 1.0 second over WebSockets.
-- **NFR-PER-04 (Native Android Cold Start):** `[PLANNING TARGET]` App cold start to interactive home screen < 2.0 seconds on mid-tier Android devices (API 26+).
-
-### 5.2 Concurrency & Data Integrity
-- **NFR-CON-01 (Zero Overselling & Deadlock Prevention):** `[CONFIRMED]` Under concurrent checkout traffic, multi-product database transactions must sort items deterministically and enforce row-level locks (`SELECT ... FOR UPDATE`). No two customers may be confirmed for the same unit of limited stock.
-- **NFR-CON-02 (Webhook Idempotency):** `[CONFIRMED]` Payment and refund webhooks must be strictly idempotent. Repeated webhook deliveries must produce identical state without duplicate order fulfillment or double refunds.
-
-### 5.3 Reliability & Availability
-- **NFR-REL-01 (Operating Uptime):** `[PLANNING TARGET]` 99.9% uptime target during physical store operational hours.
-- **NFR-REL-02 (Network Drop Resilience):** `[CONFIRMED]` Client applications must handle mobile network interruptions gracefully, with automated reconnection and retry safety using client-generated idempotency keys.
-
-### 5.4 Security & Compliance
-- **NFR-SEC-01 (Credential Isolation):** `[CONFIRMED]` Supabase service-role keys, Razorpay key secrets, and webhook secrets must be accessible ONLY to the standalone Backend API runtime. Never bundle secrets in Web or Android builds.
-- **NFR-SEC-02 (Customer Isolation via RLS & API):** `[CONFIRMED]` Customer identity is strictly derived from verified JWT claims. Direct client table mutations are denied via RLS.
-- **NFR-SEC-03 (Input Validation):** `[CONFIRMED]` All incoming API requests must be validated against authoritative OpenAPI / JSON schemas before execution.

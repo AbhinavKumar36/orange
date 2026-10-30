@@ -1,6 +1,6 @@
 # Moody Orange — Project Brief & Product Specification
 
-**Document Version:** 1.2.0 (Phase 0.2 Final Consistency Review)  
+**Document Version:** 1.3.0 (Phase 0.3 Final Consistency Pass)  
 **Phase:** Phase 0 (Requirements & Architecture)  
 **Status:** Pending Client Review & Sign-Off  
 **Target Brand:** Moody Orange  
@@ -14,8 +14,9 @@
 | Version | Date | Author | Description of Changes |
 | :--- | :--- | :--- | :--- |
 | **1.0.0** | 2026-10-30 | Lead Architect | Initial Phase 0 draft covering product scope, three platforms, and baseline architecture. |
-| **1.1.0** | 2026-10-30 | Lead Architect | Phase 0.1 Revision: Decoupled Backend API into standalone modular monolith (`apps/backend-api`); added requirement tagging. |
-| **1.2.0** | 2026-10-30 | Lead Architect | **Phase 0.2 Final Consistency Review:**<br>• Enforced authoritative inventory naming (`physical_stock`, `reserved_stock`, `available_stock`) and lifecycle across all sections.<br>• Realigned 10-phase engineering roadmap with dependency-based progression.<br>• Re-audited all requirement tags: marked slot durations, PIN/QR, timeouts, cash limits, and uncollected policies strictly as `[PROPOSED / CLIENT DECISION REQUIRED]`. |
+| **1.1.0** | 2026-10-30 | Lead Architect | Phase 0.1 Revision: Decoupled Backend API into standalone modular monolith (`apps/backend-api`). |
+| **1.2.0** | 2026-10-30 | Lead Architect | Phase 0.2 Revision: Standardized `physical_stock` accounting and realigned 10-phase roadmap. |
+| **1.3.0** | 2026-10-30 | Lead Architect | **Phase 0.3 Final Consistency Pass:**<br>• Formalized customer-scoped checkout idempotency and cart input validation rules.<br>• Separated Cash-at-Pickup (`unpaid` state) from online payment gateway states.<br>• Enforced deterministic row-locking and evidence-based refund lifecycle across physical shop operations.<br>• Re-audited requirement classifications. |
 
 ---
 
@@ -170,13 +171,13 @@ All components adhere to the following strict stock accounting definitions:
 [Customer Places Order] 
        │
        ▼
-[Stock Reserved Atomically (Deterministic Row Lock)]
+[Stock Reserved Atomically (Deterministic Row Lock: ORDER BY product_id ASC)]
        │
        ├─────────────────────────────────┐
        ▼                                 ▼
 [Online Payment (Razorpay)]       [Cash at Pickup]
        │                                 │
-       │ (Webhook Confirmed)             │ (Immediate Confirmation)
+       │ (Webhook Confirmed)             │ (Confirmed with payment_status = 'unpaid')
        ▼                                 ▼
 [Order Status: CONFIRMED] ───────────────┘
   (Stock remains reserved)

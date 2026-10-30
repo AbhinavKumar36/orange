@@ -1,6 +1,6 @@
 # Moody Orange — Phased Implementation Roadmap & Engineering Plan
 
-**Document Version:** 1.2.0 (Phase 0.2 Final Consistency Review)  
+**Document Version:** 1.3.0 (Phase 0.3 Final Consistency Pass)  
 **Phase:** Phase 0 (Requirements & Architecture)  
 **Status:** Pending Client Review & Sign-Off  
 **Target System:** Moody Orange Unified Ordering Platform  
@@ -14,7 +14,8 @@
 | :--- | :--- | :--- | :--- |
 | **1.0.0** | 2026-10-30 | Lead Architect | Initial 9-phase roadmap. |
 | **1.1.0** | 2026-10-30 | Lead Architect | Phase 0.1 Revision: Formalized 6-step phase progression cycle. |
-| **1.2.0** | 2026-10-30 | Lead Architect | **Phase 0.2 Final Consistency Review:**<br>• Realigned the roadmap into 10 dependency-driven phases.<br>• Separated Customer Web catalogue (Phase 3) and Android catalogue (Phase 4) to verify catalog discovery before transactional checkout.<br>• Placed Cart/Reservation (Phase 5) and Admin Operations (Phase 6) before Payment Integration (Phase 7).<br>• Enforced explicit completion gates and client approvals before advancing. |
+| **1.2.0** | 2026-10-30 | Lead Architect | Phase 0.2 Revision: Realigned into 10 dependency-driven phases. |
+| **1.3.0** | 2026-10-30 | Lead Architect | **Phase 0.3 Final Consistency Pass:**<br>• Hardened Phase 2 (Contracts & Stored Procedures) with input validation, duplicate aggregation, and customer-scoped idempotency specifications.<br>• Refined Phase 5 (Cart & Reservation) and Phase 7 (Payments & Refunds) with Cash-at-Pickup `unpaid` lifecycle and cumulative refund limit enforcement. |
 
 ---
 
@@ -78,12 +79,12 @@ Every engineering phase follows a mandatory 6-step quality control lifecycle. No
 ```
 
 ### Architectural Dependency Rationale:
-1. **Foundation First (Phases 1–2):** The monorepo tooling, PostgreSQL schema, RLS policies, and language-neutral OpenAPI contracts in `packages/api-contracts` must exist before frontend applications write code.
+1. **Foundation First (Phases 1–2):** The monorepo tooling, PostgreSQL schema, hardened RLS policies, input validation procedures, and language-neutral OpenAPI contracts in `packages/api-contracts` must exist before frontend applications write code.
 2. **Read-Path Validation (Phases 3–4):** Building and verifying the catalog read-path on Customer Web and Android allows both frontend teams to validate API contracts, image loading, and caching against real data before introducing transactional checkout logic.
-3. **Reservation & Cart Engine (Phase 5):** Establishes atomic, deterministic multi-product row-locking and stock reservation prior to payment integration.
-4. **Admin Queue (Phase 6):** Equips store staff to observe and manage orders before live payments are connected.
+3. **Reservation & Cart Engine (Phase 5):** Establishes atomic, deterministic multi-product row-locking, duplicate cart item aggregation, customer-scoped idempotency, and stock reservation prior to payment integration.
+4. **Admin Queue (Phase 6):** Equips store staff to observe and manage orders, handle cash receipt confirmation for `unpaid` cash orders, and execute physical stock decrements upon counter handover.
 5. **Payments & Refunds (Phase 7):** Integrates Razorpay test mode, HMAC webhook verification, and the automated late-webhook refund flow on top of a battle-tested order and inventory engine.
-6. **Hardening & Acceptance (Phase 8):** Concurrency stress testing (k6), mobile penetration review, and full user journey verification.
+6. **Hardening & Acceptance (Phase 8):** Concurrency stress testing (k6), mobile penetration review, and full user journey verification across all 12 edge cases.
 7. **Production (Phase 9):** Live keys, production hosting, custom domains, and staff training.
 
 ---
@@ -112,11 +113,12 @@ Every engineering phase follows a mandatory 6-step quality control lifecycle. No
 
 ### Phase 2: Database Schema, RLS & Backend Contracts
 - **Prerequisites:** Phase 1 complete and approved.
-- **Objectives:** Apply PostgreSQL DDL migrations, configure Row Level Security (RLS) policies, author stored procedures, and define language-neutral API contracts.
+- **Objectives:** Apply PostgreSQL DDL migrations, configure Row Level Security (RLS) policies, author hardened stored procedures, and define language-neutral API contracts.
 - **Key Deliverables:**
   - Idempotent SQL migrations for tables (`profiles`, `staff_roles`, `categories`, `products`, `inventory`, `orders`, `order_items`, `payments`, `refunds`, `audit_logs`).
-  - Strict RLS policies denying direct client table writes.
-  - Stored procedures: `rpc_reserve_order_stock` and `rpc_reconcile_late_payment`.
+  - Strict RLS policies denying direct client table writes across all tables.
+  - Hardened stored procedures: `rpc_reserve_order_stock` (with duplicate aggregation, positive quantity validation, customer-scoped idempotency), `rpc_reconcile_late_payment`, `rpc_complete_order_handover`, and `rpc_cancel_order`.
+  - All `SECURITY DEFINER` functions configured with explicit `SET search_path = public, pg_temp;` and revoked public execute privileges.
   - Language-neutral OpenAPI 3.1 / JSON Schema definitions in `packages/api-contracts`.
   - Comprehensive `pgTAP` database test suites.
 - **Completion Gate:** `supabase db reset` executes cleanly; 100% of `pgTAP` RLS tests pass in CI.
@@ -149,7 +151,7 @@ Every engineering phase follows a mandatory 6-step quality control lifecycle. No
 
 ### Phase 5: Cart, Inventory Reservation & Checkout Engine
 - **Prerequisites:** Phases 3 and 4 complete and approved.
-- **Objectives:** Implement cart calculations, deterministic multi-product row-locking, stock reservation procedure, and customer mobile OTP authentication.
+- **Objectives:** Implement cart calculations, deterministic multi-product row-locking, stock reservation procedure, customer-scoped idempotency, and customer mobile OTP authentication.
 - **Key Deliverables:**
   - Persistent cart state on Web and Android.
   - Customer mobile phone OTP authentication (SMS gateway integration).
@@ -162,11 +164,12 @@ Every engineering phase follows a mandatory 6-step quality control lifecycle. No
 
 ### Phase 6: Admin Product, Inventory & Order Operations
 - **Prerequisites:** Phase 5 complete and approved.
-- **Objectives:** Build the staff counter portal, live dispatch queue, PIN/QR pickup verification modal, and inventory adjustment tools.
+- **Objectives:** Build the staff counter portal, live dispatch queue, PIN/QR pickup verification modal, cash receipt confirmation, and inventory adjustment tools.
 - **Key Deliverables:**
   - Admin Web protected dashboard with staff authentication and RBAC.
   - Live Kanban order dispatch board connected to Supabase Realtime WebSocket channel.
   - Counter collection verification modal (PIN entry and QR code scanning).
+  - Cash-at-pickup collection confirmation workflow: blocks order completion until staff confirms cash receipt.
   - Physical stock adjustment screen with audit reason logging.
   - Emergency out-of-stock toggle.
 - **Completion Gate:** New order creates card on admin queue within 1 second; staff completes handover, triggering physical stock deduction.
@@ -178,23 +181,23 @@ Every engineering phase follows a mandatory 6-step quality control lifecycle. No
 - **Objectives:** Integrate Razorpay test mode, HMAC-SHA256 webhook verification, cash-at-pickup flow, and the automated late-webhook refund pipeline.
 - **Key Deliverables:**
   - Razorpay standard checkout sheet integration on Web and Android SDK.
+  - Authoritative payment verification before invoking DB state changes.
   - Webhook endpoint `/api/v1/webhooks/razorpay` with HMAC signature validation and idempotency checks.
   - Late payment reconciliation procedure (`rpc_reconcile_late_payment`).
-  - Automated refund workflow: gateway acceptance transitions to `refund_processing`; webhook `refund.processed` authoritatively transitions to `refunded`.
-  - Cash-at-pickup collection confirmation workflow.
+  - Automated refund workflow: gateway acceptance transitions to `refund_processing`; webhook `refund.processed` authoritatively transitions to `refunded`. Cumulative refund limit enforced.
 - **Completion Gate:** Test card/UPI payment marks order `confirmed` and payment `captured`; delayed payment for expired/sold-out order triggers automated refund; cash order requires staff cash confirmation.
 
 ---
 
 ### Phase 8: End-to-End Testing, Security Hardening & Acceptance
 - **Prerequisites:** Phase 7 complete and approved.
-- **Objectives:** Validate all 10 critical edge cases, execute load tests, perform mobile penetration analysis, and conduct stakeholder user acceptance testing (UAT).
+- **Objectives:** Validate all 12 critical edge cases, execute load tests, perform mobile penetration analysis, and conduct stakeholder user acceptance testing (UAT).
 - **Key Deliverables:**
   - Automated Playwright E2E test suite covering full customer journeys.
   - k6 load scripts testing peak concurrent checkout throughput.
   - Mobile APK reverse-engineering inspection verifying zero hardcoded secrets.
-  - Verification of all 10 critical edge-case scenarios in `TESTING_STRATEGY.md`.
-- **Completion Gate:** All 10 edge-case scenarios pass; zero leaked secrets; formal written acceptance sign-off from technical lead and client.
+  - Verification of all 12 critical edge-case scenarios in `TESTING_STRATEGY.md`.
+- **Completion Gate:** All 12 edge-case scenarios pass; zero leaked secrets; formal written acceptance sign-off from technical lead and client.
 
 ---
 
@@ -216,13 +219,13 @@ Every engineering phase follows a mandatory 6-step quality control lifecycle. No
 
 | Phase | Milestone Name | Dependencies | Estimated Complexity | Completion Gate |
 | :---: | :--- | :--- | :---: | :--- |
-| **0** | Requirements & Architecture | None | Medium | Client sign-off on 9 architecture documents |
-| **1** | Repository & Backend Foundation | Phase 0 | Medium | Local Supabase running, API health check green |
-| **2** | DB Schema, RLS & Contracts | Phase 1 | High | `pgTAP` tests pass 100%, OpenAPI contracts ready |
-| **3** | Customer Web Catalogue | Phase 2 | Medium | Web catalog displays items, ISR caching verified |
-| **4** | Android App Catalogue | Phase 2 | Medium | Native Compose catalog displays items, Coil cached |
-| **5** | Cart, Stock Lock & Checkout | Phases 3, 4 | High | Deterministic lock verified, 0 overselling under load |
-| **6** | Admin Operations & Queue | Phase 5 | High | Realtime dispatch chimes, PIN/QR handover works |
-| **7** | Payments, Webhooks & Refunds | Phase 6 | High | HMAC verified, idempotency works, auto-refund verified |
-| **8** | E2E Testing & Hardening | Phase 7 | High | All 10 edge cases pass, security audit clean |
-| **9** | Production Launch & Handover | Phase 8 | Medium | Live payment confirmed, counter order collected |
+| **0** | **Requirements & Architecture Approval** | None | Medium | Client sign-off on 9 architecture documents |
+| **1** | **Repository & Backend Foundation** | Phase 0 | Medium | Local Supabase running, API health check green |
+| **2** | **DB Schema, RLS & Contracts** | Phase 1 | High | `pgTAP` tests pass 100%, OpenAPI contracts ready |
+| **3** | **Customer Web Catalogue** | Phase 2 | Medium | Web catalog displays items, ISR caching verified |
+| **4** | **Android App Catalogue** | Phase 2 | Medium | Native Compose catalog displays items, Coil cached |
+| **5** | **Cart, Stock Lock & Checkout** | Phases 3, 4 | High | Deterministic lock verified, 0 overselling under load |
+| **6** | **Admin Operations & Queue** | Phase 5 | High | Realtime dispatch chimes, PIN/QR handover works |
+| **7** | **Payments, Webhooks & Refunds** | Phase 6 | High | HMAC verified, idempotency works, auto-refund verified |
+| **8** | **E2E Testing & Hardening** | Phase 7 | High | All 12 edge cases pass, security audit clean |
+| **9** | **Production Launch & Handover** | Phase 8 | Medium | Live payment confirmed, counter order collected |

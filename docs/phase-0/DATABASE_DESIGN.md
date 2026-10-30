@@ -1,6 +1,6 @@
 # Moody Orange — Database Architecture & Schema Specification
 
-**Document Version:** 1.2.0 (Phase 0.2 Final Consistency Review)  
+**Document Version:** 1.3.0 (Phase 0.3 Final Consistency Pass)  
 **Phase:** Phase 0 (Requirements & Architecture)  
 **Status:** Pending Client Review & Sign-Off  
 **Database Engine:** PostgreSQL 15+ (Hosted on Supabase)  
@@ -14,7 +14,8 @@
 | :--- | :--- | :--- | :--- |
 | **1.0.0** | 2026-10-30 | Lead Architect | Initial schema definitions, tables, and RLS policies. |
 | **1.1.0** | 2026-10-30 | Lead Architect | Phase 0.1 Revision: Decoupled Backend API and added initial late webhook handling. |
-| **1.2.0** | 2026-10-30 | Lead Architect | **Phase 0.2 Final Consistency Review:**<br>• Enforced `physical_stock` consistently across all tables, constraints, RPCs, and ERD (eliminated `current_stock`).<br>• Implemented deterministic multi-product row locking (`ORDER BY product_id ASC`) and atomic all-or-nothing validation in `rpc_reserve_order_stock`.<br>• Expanded `payment_status_enum` to include `refund_pending`, `refund_processing`, `partially_refunded`, and `refund_failed`.<br>• Clarified evidence-based refund progression: gateway acceptance sets `refund_processing`; `refunded` set only upon `refund.processed` webhook.<br>• Reaffirmed zero direct privileged database access for client applications. |
+| **1.2.0** | 2026-10-30 | Lead Architect | Phase 0.2 Revision: Standardized `physical_stock` and multi-product deterministic row locks. |
+| **1.3.0** | 2026-10-30 | Lead Architect | **Phase 0.3 Final Consistency Pass:**<br>• Hardened `rpc_reserve_order_stock`: aggregated duplicate product IDs, enforced positive quantities, rejected empty carts and inactive products.<br>• Scoped checkout idempotency keys strictly to authenticated customers with payload hash verification.<br>• Separated cash-at-pickup (`unpaid` state) from online payment gateway states; blocked cash order completion without verified cash payment.<br>• Enforced deterministic `ORDER BY product_id ASC FOR UPDATE` locking across ALL inventory-modifying procedures (checkout, cancellation, handover, late payment).<br>• Hardened `SECURITY DEFINER` functions with explicit `search_path = public, pg_temp` and restricted `EXECUTE` privileges.<br>• Defined complete RLS policies across all 10 database tables. |
 
 ---
 
@@ -68,28 +69,33 @@ draft -> payment_pending -> confirmed -> preparing -> ready_for_pickup -> comple
            └─► cancelled_inventory_depleted (late payment when stock is sold out)
 
 PAYMENT STATUS PIPELINE:
-pending ──► captured (or paid) ──► refund_pending ──► refund_processing ──► refunded
-   │                                                         │
-   └─► failed                                                └─► refund_failed
+Online:  pending ──► captured (or paid) ──► refund_pending ──► refund_processing ──► refunded
+            │                                                               │
+            └─► failed                                                      └─► refund_failed
+
+Cash:    unpaid ──────────────────────────────────────────────────────────────► paid (upon counter collection)
+            │
+            └─► cancelled (if order cancelled before collection)
 ```
 
 ### 2.2 Payment & Refund Lifecycle States Detailed
-1. `pending`: Initial state when payment session is created with Razorpay.
-2. `authorized`: Gateway authorized funds; pending auto-capture (if manual capture configured).
-3. `captured`: Gateway confirmed funds captured via verified webhook (`payment.captured`). **Does NOT release stock reservation.**
-4. `failed`: Customer payment declined or aborted.
-5. `refund_pending`: Server initiated a refund request (e.g. late webhook or staff cancellation).
-6. `refund_processing`: Gateway accepted refund request (`HTTP 200` to refund API). **Money is in transit; NOT yet confirmed refunded!**
-7. `partially_refunded`: Partial amount refunded.
-8. `refunded`: Authoritatively confirmed via Razorpay webhook `refund.processed`.
-9. `refund_failed`: Gateway reported refund failure via webhook `refund.failed`. Alerts store manager for manual intervention.
+1. `unpaid`: Specific to Cash-at-Pickup orders prior to physical counter collection.
+2. `pending`: Initial state when an online payment session is created with Razorpay.
+3. `authorized`: Gateway authorized funds; pending auto-capture (if manual capture configured).
+4. `captured`: Gateway confirmed funds captured via verified webhook (`payment.captured`). **Does NOT release stock reservation.**
+5. `failed`: Customer payment declined or aborted.
+6. `refund_pending`: Server initiated a refund request (e.g., late webhook arrival or staff cancellation). Recorded in `refunds` table.
+7. `refund_processing`: Gateway accepted refund request (`HTTP 200` to Razorpay Refunds API). **Funds are in transit; NOT yet confirmed refunded!**
+8. `partially_refunded`: Partial amount refunded.
+9. `refunded`: Authoritatively confirmed via Razorpay webhook `refund.processed`.
+10. `refund_failed`: Gateway reported refund failure via webhook `refund.failed`. Alerts store manager for manual intervention.
 
 ---
 
 ## 3. Database Schema Definitions (DDL)
 
 ```sql
--- Enumerated Types
+-- Custom Enumerated Types
 CREATE TYPE order_status_enum AS ENUM (
     'draft',
     'payment_pending',
@@ -104,7 +110,8 @@ CREATE TYPE order_status_enum AS ENUM (
 );
 
 CREATE TYPE payment_status_enum AS ENUM (
-    'pending',
+    'unpaid',             -- Cash at Pickup prior to collection
+    'pending',            -- Online payment awaiting capture
     'authorized',
     'captured',
     'failed',
@@ -124,6 +131,13 @@ CREATE TYPE staff_role_enum AS ENUM (
     'counter_staff',
     'manager',
     'admin'
+);
+
+CREATE TYPE refund_status_enum AS ENUM (
+    'pending',
+    'refund_processing',
+    'refunded',
+    'refund_failed'
 );
 
 -- 1. PROFILES (Customer Profile bound to Supabase auth.users)
@@ -204,16 +218,25 @@ CREATE TABLE public.orders (
     tax_amount NUMERIC(10, 2) NOT NULL DEFAULT 0.00 CHECK (tax_amount >= 0),
     packaging_amount NUMERIC(10, 2) NOT NULL DEFAULT 0.00 CHECK (packaging_amount >= 0),
     total_amount NUMERIC(10, 2) NOT NULL CHECK (total_amount >= 0),
+    provider_order_id VARCHAR(100),
     collection_pin VARCHAR(6),
     collection_qr_hash VARCHAR(64),
-    client_idempotency_key VARCHAR(100) UNIQUE,
+    client_idempotency_key VARCHAR(100),
+    client_payload_hash VARCHAR(64),
     special_notes TEXT,
     cancellation_reason TEXT,
     expires_at TIMESTAMPTZ,
     collected_at TIMESTAMPTZ,
     collected_by_staff_id UUID REFERENCES auth.users(id),
     created_at TIMESTAMPTZ NOT NULL DEFAULT TIMEZONE('utc', NOW()),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT TIMEZONE('utc', NOW())
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT TIMEZONE('utc', NOW()),
+
+    -- Idempotency scoped strictly to the customer
+    CONSTRAINT uq_customer_idempotency UNIQUE (customer_id, client_idempotency_key),
+    -- Cash orders must have payment_status 'unpaid' or 'captured'/'paid'
+    CONSTRAINT chk_cash_order_state CHECK (
+        payment_method != 'cash_at_pickup' OR payment_status IN ('unpaid', 'captured', 'failed')
+    )
 );
 
 CREATE INDEX idx_orders_customer ON public.orders(customer_id, created_at DESC);
@@ -233,11 +256,11 @@ CREATE TABLE public.order_items (
     created_at TIMESTAMPTZ NOT NULL DEFAULT TIMEZONE('utc', NOW())
 );
 
--- 8. PAYMENTS (Gateway Audit Records)
+-- 8. PAYMENTS (Gateway & Cash Audit Records)
 CREATE TABLE public.payments (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     order_id UUID NOT NULL REFERENCES public.orders(id) ON DELETE RESTRICT,
-    provider VARCHAR(30) NOT NULL,
+    provider VARCHAR(30) NOT NULL, -- 'razorpay' or 'cash_register'
     provider_order_id VARCHAR(100),
     provider_payment_id VARCHAR(100) UNIQUE,
     provider_signature VARCHAR(255),
@@ -260,8 +283,8 @@ CREATE TABLE public.refunds (
     provider_refund_id VARCHAR(100) UNIQUE,
     amount NUMERIC(10, 2) NOT NULL CHECK (amount > 0),
     currency VARCHAR(3) NOT NULL DEFAULT 'INR',
-    status VARCHAR(30) NOT NULL DEFAULT 'refund_processing', -- 'refund_processing', 'refunded', 'refund_failed'
-    idempotency_key VARCHAR(100) UNIQUE,
+    status refund_status_enum NOT NULL DEFAULT 'pending',
+    idempotency_key VARCHAR(100) NOT NULL UNIQUE,
     reason TEXT NOT NULL,
     raw_payload JSONB,
     created_at TIMESTAMPTZ NOT NULL DEFAULT TIMEZONE('utc', NOW()),
@@ -285,9 +308,9 @@ CREATE TABLE public.audit_logs (
 
 ---
 
-## 4. Row Level Security (RLS) & Access Boundaries
+## 4. Complete Row Level Security (RLS) Policy Specifications
 
-Row Level Security is enabled on every table.
+Every table has Row Level Security enabled (`ALTER TABLE ... ENABLE ROW LEVEL SECURITY;`).
 
 > [!IMPORTANT]
 > **No client application—neither Customer Web, Android App, nor Admin Web—receives direct privileged database access.**  
@@ -295,36 +318,86 @@ Row Level Security is enabled on every table.
 > • All mutations to `orders`, `inventory`, `payments`, and `refunds` are blocked from direct client execution and must route through `apps/backend-api`, which connects using the isolated Service Role key to execute secured stored procedures.
 
 ```sql
--- Role helper function
+-- Role helper function with explicit search_path
 CREATE OR REPLACE FUNCTION public.get_staff_role()
-RETURNS staff_role_enum AS $$
+RETURNS staff_role_enum 
+LANGUAGE sql 
+SECURITY DEFINER 
+STABLE
+SET search_path = public, pg_temp
+AS $$
   SELECT role FROM public.staff_roles 
   WHERE user_id = auth.uid() AND is_active = true;
-$$ LANGUAGE sql SECURITY DEFINER STABLE;
+$$;
 
--- Public Catalog Read Access
+-- 1. PROFILES
+ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can view own profile" ON public.profiles FOR SELECT TO authenticated USING (id = auth.uid());
+CREATE POLICY "Users can update own profile" ON public.profiles FOR UPDATE TO authenticated USING (id = auth.uid());
+CREATE POLICY "Staff can view customer profiles" ON public.profiles FOR SELECT TO authenticated USING (public.get_staff_role() IS NOT NULL);
+
+-- 2. STAFF ROLES
+ALTER TABLE public.staff_roles ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Staff can view their own role" ON public.staff_roles FOR SELECT TO authenticated USING (user_id = auth.uid());
+CREATE POLICY "Admins can view all staff roles" ON public.staff_roles FOR SELECT TO authenticated USING (public.get_staff_role() = 'admin');
+CREATE POLICY "Admins can manage staff roles" ON public.staff_roles FOR ALL TO authenticated USING (public.get_staff_role() = 'admin');
+
+-- 3. CATEGORIES
+ALTER TABLE public.categories ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Public categories are viewable" ON public.categories FOR SELECT USING (is_active = true);
-CREATE POLICY "Public products are viewable" ON public.products FOR SELECT USING (is_active = true);
-CREATE POLICY "Public inventory availability is viewable" ON public.inventory FOR SELECT USING (true);
+CREATE POLICY "Staff can view all categories" ON public.categories FOR SELECT TO authenticated USING (public.get_staff_role() IS NOT NULL);
+CREATE POLICY "Managers can manage categories" ON public.categories FOR ALL TO authenticated USING (public.get_staff_role() IN ('manager', 'admin'));
 
--- Customer Data Isolation
+-- 4. PRODUCTS
+ALTER TABLE public.products ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Public products are viewable" ON public.products FOR SELECT USING (is_active = true);
+CREATE POLICY "Staff can view all products" ON public.products FOR SELECT TO authenticated USING (public.get_staff_role() IS NOT NULL);
+CREATE POLICY "Managers can manage products" ON public.products FOR ALL TO authenticated USING (public.get_staff_role() IN ('manager', 'admin'));
+
+-- 5. INVENTORY
+ALTER TABLE public.inventory ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Public can view inventory" ON public.inventory FOR SELECT USING (true);
+CREATE POLICY "Managers can update inventory" ON public.inventory FOR UPDATE TO authenticated USING (public.get_staff_role() IN ('manager', 'admin'));
+CREATE POLICY "Deny direct client inventory insert/delete" ON public.inventory FOR INSERT WITH CHECK (false);
+
+-- 6. ORDERS
+ALTER TABLE public.orders ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Customers view own orders" ON public.orders FOR SELECT TO authenticated USING (customer_id = auth.uid());
+CREATE POLICY "Staff view all orders" ON public.orders FOR SELECT TO authenticated USING (public.get_staff_role() IS NOT NULL);
+CREATE POLICY "Deny direct client order creation" ON public.orders FOR INSERT WITH CHECK (false);
+CREATE POLICY "Deny direct client order updates" ON public.orders FOR UPDATE USING (false);
+CREATE POLICY "Deny direct client order deletion" ON public.orders FOR DELETE USING (false);
+
+-- 7. ORDER ITEMS
+ALTER TABLE public.order_items ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Customers view own order items" ON public.order_items FOR SELECT TO authenticated 
 USING (EXISTS (SELECT 1 FROM public.orders WHERE orders.id = order_items.order_id AND orders.customer_id = auth.uid()));
+CREATE POLICY "Staff view all order items" ON public.order_items FOR SELECT TO authenticated USING (public.get_staff_role() IS NOT NULL);
+CREATE POLICY "Deny direct client order items write" ON public.order_items FOR ALL WITH CHECK (false);
 
--- Staff Read Access
-CREATE POLICY "Staff view all orders" ON public.orders FOR SELECT TO authenticated USING (public.get_staff_role() IS NOT NULL);
-CREATE POLICY "Staff view order items" ON public.order_items FOR SELECT TO authenticated USING (public.get_staff_role() IS NOT NULL);
+-- 8. PAYMENTS
+ALTER TABLE public.payments ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Customers view own payments" ON public.payments FOR SELECT TO authenticated 
+USING (EXISTS (SELECT 1 FROM public.orders WHERE orders.id = payments.order_id AND orders.customer_id = auth.uid()));
+CREATE POLICY "Staff view all payments" ON public.payments FOR SELECT TO authenticated USING (public.get_staff_role() IS NOT NULL);
+CREATE POLICY "Deny direct client payments write" ON public.payments FOR ALL WITH CHECK (false);
 
--- Block Direct Client Writes
-CREATE POLICY "Deny direct client order insertion" ON public.orders FOR INSERT WITH CHECK (false);
-CREATE POLICY "Deny direct client order updates" ON public.orders FOR UPDATE USING (false);
-CREATE POLICY "Deny direct client inventory modification" ON public.inventory FOR UPDATE USING (false);
+-- 9. REFUNDS
+ALTER TABLE public.refunds ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Customers view own refunds" ON public.refunds FOR SELECT TO authenticated 
+USING (EXISTS (SELECT 1 FROM public.orders WHERE orders.id = refunds.order_id AND orders.customer_id = auth.uid()));
+CREATE POLICY "Staff view all refunds" ON public.refunds FOR SELECT TO authenticated USING (public.get_staff_role() IS NOT NULL);
+CREATE POLICY "Deny direct client refunds write" ON public.refunds FOR ALL WITH CHECK (false);
+
+-- 10. AUDIT LOGS
+ALTER TABLE public.audit_logs ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Admins can view audit logs" ON public.audit_logs FOR SELECT TO authenticated USING (public.get_staff_role() = 'admin');
+CREATE POLICY "Deny client audit logs write" ON public.audit_logs FOR ALL WITH CHECK (false);
 ```
 
 ---
 
-## 5. Critical Database Stored Procedures (RPCs)
+## 5. Critical Database Stored Procedures (Hardened & Scoped)
 
 ### 5.1 Multi-Product Deterministic Stock Reservation (`rpc_reserve_order_stock`)
 
@@ -338,6 +411,7 @@ CREATE OR REPLACE FUNCTION public.rpc_reserve_order_stock(
     p_scheduled_pickup TIMESTAMPTZ,
     p_payment_method payment_method_enum,
     p_idempotency_key VARCHAR,
+    p_payload_hash VARCHAR,
     p_special_notes TEXT
 )
 RETURNS TABLE (
@@ -348,6 +422,7 @@ RETURNS TABLE (
 )
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = public, pg_temp
 AS $$
 DECLARE
     v_existing_order RECORD;
@@ -363,15 +438,26 @@ DECLARE
     v_max_prep_time INT := 15;
     v_estimated_pickup TIMESTAMPTZ;
     v_expires_at TIMESTAMPTZ := TIMEZONE('utc', NOW()) + INTERVAL '10 minutes';
+    v_payment_status payment_status_enum;
 BEGIN
-    -- 1. Idempotency Check: Return existing order if client retried with same key
+    -- 1. Input Validation: Reject empty carts
+    IF p_items IS NULL OR jsonb_array_length(p_items) = 0 THEN
+        RAISE EXCEPTION 'Cart cannot be empty.';
+    END IF;
+
+    -- 2. Customer-Scoped Idempotency Check with Payload Hash Verification
     IF p_idempotency_key IS NOT NULL THEN
-        SELECT id, order_number, total_amount, expires_at 
+        SELECT id, order_number, total_amount, expires_at, client_payload_hash 
         INTO v_existing_order 
         FROM public.orders 
-        WHERE client_idempotency_key = p_idempotency_key;
+        WHERE customer_id = p_customer_id AND client_idempotency_key = p_idempotency_key;
         
         IF FOUND THEN
+            -- Check if payload matches original
+            IF p_payload_hash IS NOT NULL AND v_existing_order.client_payload_hash != p_payload_hash THEN
+                RAISE EXCEPTION 'Idempotency key reused with mismatched order payload.';
+            END IF;
+
             out_order_id := v_existing_order.id;
             out_order_number := v_existing_order.order_number;
             out_total_amount := v_existing_order.total_amount;
@@ -381,32 +467,47 @@ BEGIN
         END IF;
     END IF;
 
-    -- 2. Deterministic Row-Locking & Pre-validation: Lock inventory in sorted order to prevent deadlocks
+    -- 3. Safely Aggregate Duplicate Product IDs & Validate Positive Quantities
+    -- Locks rows deterministically in ascending product_id order
     FOR v_item IN 
-        SELECT (x->>'product_id')::UUID AS product_id, (x->>'quantity')::INT AS quantity
+        SELECT (x->>'product_id')::UUID AS product_id, SUM((x->>'quantity')::INT)::INT AS quantity
         FROM jsonb_array_elements(p_items) AS x
+        GROUP BY (x->>'product_id')::UUID
         ORDER BY (x->>'product_id')::UUID ASC
     LOOP
+        -- Enforce positive integer quantity
+        IF v_item.quantity <= 0 THEN
+            RAISE EXCEPTION 'Product quantity must be greater than zero. Received % for %', v_item.quantity, v_item.product_id;
+        END IF;
+
+        -- Check that product exists and is active
+        SELECT * INTO v_product FROM public.products WHERE id = v_item.product_id;
+        IF NOT FOUND OR v_product.is_active = false THEN
+            RAISE EXCEPTION 'Product % is invalid or inactive.', v_item.product_id;
+        END IF;
+
+        -- Lock inventory row in deterministic ascending order
         SELECT physical_stock, reserved_stock INTO v_inv
         FROM public.inventory
         WHERE product_id = v_item.product_id
         FOR UPDATE;
 
         IF NOT FOUND THEN
-            RAISE EXCEPTION 'Product % is invalid or does not have inventory tracking.', v_item.product_id;
+            RAISE EXCEPTION 'Product % does not have an active inventory record.', v_item.product_id;
         END IF;
 
-        -- Validate availability for EVERY item before modifying ANY stock
+        -- Pre-validation: ensure availability for ALL items before allocating ANY stock
         IF (v_inv.physical_stock - v_inv.reserved_stock) < v_item.quantity THEN
-            RAISE EXCEPTION 'Insufficient stock for product %. Requested: %, Available: %', 
-                v_item.product_id, v_item.quantity, (v_inv.physical_stock - v_inv.reserved_stock);
+            RAISE EXCEPTION 'Insufficient stock for product "%". Requested: %, Available: %', 
+                v_product.name, v_item.quantity, (v_inv.physical_stock - v_inv.reserved_stock);
         END IF;
     END LOOP;
 
-    -- 3. Atomic Allocation: All items verified; now reserve stock and compute prices
+    -- 4. Atomic All-or-Nothing Allocation: All items verified; now reserve stock
     FOR v_item IN 
-        SELECT (x->>'product_id')::UUID AS product_id, (x->>'quantity')::INT AS quantity
+        SELECT (x->>'product_id')::UUID AS product_id, SUM((x->>'quantity')::INT)::INT AS quantity
         FROM jsonb_array_elements(p_items) AS x
+        GROUP BY (x->>'product_id')::UUID
         ORDER BY (x->>'product_id')::UUID ASC
     LOOP
         UPDATE public.inventory
@@ -433,26 +534,36 @@ BEGIN
         v_estimated_pickup := p_scheduled_pickup;
     END IF;
 
-    -- Generate human-readable order number
+    -- Set initial payment status based on payment method
+    IF p_payment_method = 'cash_at_pickup' THEN
+        v_payment_status := 'unpaid';
+    ELSE
+        v_payment_status := 'pending';
+    END IF;
+
     v_order_number := 'MO-' || TO_CHAR(NOW(), 'YYYYMMDD') || '-' || LPAD(FLOOR(RANDOM() * 10000)::TEXT, 4, '0');
 
-    -- 4. Create Draft Order
+    -- 5. Create Draft Order
     INSERT INTO public.orders (
         order_number, customer_id, customer_phone, customer_name,
         fulfillment_type, scheduled_pickup_at, estimated_pickup_at,
         order_status, payment_status, payment_method,
         subtotal_amount, tax_amount, packaging_amount, total_amount,
-        client_idempotency_key, special_notes, expires_at
+        client_idempotency_key, client_payload_hash, special_notes, expires_at
     ) VALUES (
         v_order_number, p_customer_id, p_customer_phone, p_customer_name,
         p_fulfillment, p_scheduled_pickup, v_estimated_pickup,
-        'draft', 'pending', p_payment_method,
+        'draft', v_payment_status, p_payment_method,
         v_subtotal, v_tax_total, v_packaging, v_grand_total,
-        p_idempotency_key, p_special_notes, v_expires_at
+        p_idempotency_key, p_payload_hash, p_special_notes, v_expires_at
     ) RETURNING id INTO v_order_id;
 
-    -- 5. Insert Snapshot Order Items
-    FOR v_item IN SELECT (x->>'product_id')::UUID AS product_id, (x->>'quantity')::INT AS quantity FROM jsonb_array_elements(p_items) AS x
+    -- 6. Insert Snapshot Order Items
+    FOR v_item IN 
+        SELECT (x->>'product_id')::UUID AS product_id, SUM((x->>'quantity')::INT)::INT AS quantity
+        FROM jsonb_array_elements(p_items) AS x
+        GROUP BY (x->>'product_id')::UUID
+        ORDER BY (x->>'product_id')::UUID ASC
     LOOP
         SELECT name, base_price, tax_rate_pct INTO v_product FROM public.products WHERE id = v_item.product_id;
 
@@ -473,26 +584,32 @@ BEGIN
     RETURN NEXT;
 END;
 $$;
+
+-- Restrict execution strictly to service_role (Backend API)
+REVOKE EXECUTE ON FUNCTION public.rpc_reserve_order_stock FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.rpc_reserve_order_stock TO service_role;
 ```
 
 ---
 
-### 5.2 Late Webhook Reconciliation (`rpc_reconcile_late_payment`)
+### 5.2 Deterministic Late Payment Reconciliation (`rpc_reconcile_late_payment`)
 
 ```sql
 CREATE OR REPLACE FUNCTION public.rpc_reconcile_late_payment(
     p_order_id UUID,
     p_provider_payment_id VARCHAR,
+    p_provider_order_id VARCHAR,
     p_amount NUMERIC,
     p_raw_payload JSONB
 )
 RETURNS TABLE (
-    out_action VARCHAR, -- 'CONFIRMED_REALLOCATED' or 'TRIGGER_REFUND'
+    out_action VARCHAR,
     out_order_status order_status_enum,
     out_payment_status payment_status_enum
 )
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = public, pg_temp
 AS $$
 DECLARE
     v_order RECORD;
@@ -506,8 +623,21 @@ BEGIN
         RAISE EXCEPTION 'Order % not found', p_order_id;
     END IF;
 
-    -- 1. Check if all items can be re-allocated in sorted deterministic order
-    FOR v_item IN SELECT product_id, quantity FROM public.order_items WHERE order_id = p_order_id ORDER BY product_id ASC
+    -- Authoritative Payment Verification: Amount and Provider Order ID MUST match
+    IF p_amount <> v_order.total_amount THEN
+        RAISE EXCEPTION 'Payment amount mismatch. Expected %, received %', v_order.total_amount, p_amount;
+    END IF;
+
+    IF v_order.provider_order_id IS NOT NULL AND p_provider_order_id <> v_order.provider_order_id THEN
+        RAISE EXCEPTION 'Provider order ID mismatch. Expected %, received %', v_order.provider_order_id, p_provider_order_id;
+    END IF;
+
+    -- 1. Check if all items can be re-allocated in deterministic ascending order
+    FOR v_item IN 
+        SELECT product_id, quantity 
+        FROM public.order_items 
+        WHERE order_id = p_order_id 
+        ORDER BY product_id ASC
     LOOP
         SELECT physical_stock, reserved_stock INTO v_inv
         FROM public.inventory 
@@ -520,18 +650,17 @@ BEGIN
         END IF;
     END LOOP;
 
-    -- 2. Branch: Reallocate OR Mark for Refund
+    -- 2. Branch: Reallocate OR Mark for Evidence-Based Refund
     IF v_can_allocate THEN
-        -- Re-reserve stock
-        FOR v_item IN SELECT product_id, quantity FROM public.order_items WHERE order_id = p_order_id
+        FOR v_item IN SELECT product_id, quantity FROM public.order_items WHERE order_id = p_order_id ORDER BY product_id ASC
         LOOP
             UPDATE public.inventory 
             SET reserved_stock = reserved_stock + v_item.quantity 
             WHERE product_id = v_item.product_id;
         END LOOP;
 
-        INSERT INTO public.payments (order_id, provider, provider_payment_id, amount, status, raw_payload)
-        VALUES (p_order_id, 'razorpay', p_provider_payment_id, p_amount, 'captured', p_raw_payload)
+        INSERT INTO public.payments (order_id, provider, provider_order_id, provider_payment_id, amount, status, raw_payload)
+        VALUES (p_order_id, 'razorpay', p_provider_order_id, p_provider_payment_id, p_amount, 'captured', p_raw_payload)
         ON CONFLICT (provider_payment_id) DO NOTHING;
 
         UPDATE public.orders 
@@ -542,9 +671,9 @@ BEGIN
         out_order_status := 'confirmed';
         out_payment_status := 'captured';
     ELSE
-        -- Inventory is depleted; set payment to refund_pending
-        INSERT INTO public.payments (order_id, provider, provider_payment_id, amount, status, raw_payload)
-        VALUES (p_order_id, 'razorpay', p_provider_payment_id, p_amount, 'refund_pending', p_raw_payload)
+        -- Inventory depleted; record payment as refund_pending
+        INSERT INTO public.payments (order_id, provider, provider_order_id, provider_payment_id, amount, status, raw_payload)
+        VALUES (p_order_id, 'razorpay', p_provider_order_id, p_provider_payment_id, p_amount, 'refund_pending', p_raw_payload)
         ON CONFLICT (provider_payment_id) DO NOTHING;
 
         UPDATE public.orders 
@@ -562,4 +691,142 @@ BEGIN
     RETURN NEXT;
 END;
 $$;
+
+REVOKE EXECUTE ON FUNCTION public.rpc_reconcile_late_payment FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.rpc_reconcile_late_payment TO service_role;
+```
+
+---
+
+### 5.3 Deterministic Order Handover & Cash Verification (`rpc_complete_order_handover`)
+
+```sql
+CREATE OR REPLACE FUNCTION public.rpc_complete_order_handover(
+    p_order_id UUID,
+    p_staff_id UUID,
+    p_cash_collected BOOLEAN
+)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+    v_order RECORD;
+    v_item RECORD;
+BEGIN
+    SELECT * INTO v_order FROM public.orders WHERE id = p_order_id FOR UPDATE;
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Order % not found', p_order_id;
+    END IF;
+
+    IF v_order.order_status != 'ready_for_pickup' THEN
+        RAISE EXCEPTION 'Order is not ready for pickup. Current status: %', v_order.order_status;
+    END IF;
+
+    -- Cash at Pickup: Ensure staff confirmed physical cash receipt
+    IF v_order.payment_method = 'cash_at_pickup' THEN
+        IF p_cash_collected IS NOT TRUE THEN
+            RAISE EXCEPTION 'Cannot complete cash order without staff confirmation of cash receipt.';
+        END IF;
+
+        -- Record cash payment
+        INSERT INTO public.payments (order_id, provider, amount, status, raw_payload)
+        VALUES (p_order_id, 'cash_register', v_order.total_amount, 'captured', jsonb_build_object('collected_by', p_staff_id));
+
+        UPDATE public.orders SET payment_status = 'captured' WHERE id = p_order_id;
+    END IF;
+
+    -- Decrement physical_stock and reserved_stock in deterministic order
+    FOR v_item IN SELECT product_id, quantity FROM public.order_items WHERE order_id = p_order_id ORDER BY product_id ASC
+    LOOP
+        UPDATE public.inventory
+        SET physical_stock = physical_stock - v_item.quantity,
+            reserved_stock = reserved_stock - v_item.quantity,
+            updated_at = TIMEZONE('utc', NOW())
+        WHERE product_id = v_item.product_id;
+    END LOOP;
+
+    -- Complete order
+    UPDATE public.orders 
+    SET order_status = 'completed', 
+        collected_at = NOW(), 
+        collected_by_staff_id = p_staff_id,
+        updated_at = NOW() 
+    WHERE id = p_order_id;
+
+    RETURN true;
+END;
+$$;
+
+REVOKE EXECUTE ON FUNCTION public.rpc_complete_order_handover FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.rpc_complete_order_handover TO service_role;
+```
+
+---
+
+### 5.4 Deterministic Order Cancellation (`rpc_cancel_order`)
+
+```sql
+CREATE OR REPLACE FUNCTION public.rpc_cancel_order(
+    p_order_id UUID,
+    p_actor_id UUID,
+    p_reason TEXT,
+    p_is_staff BOOLEAN
+)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+    v_order RECORD;
+    v_item RECORD;
+    v_new_status order_status_enum;
+BEGIN
+    SELECT * INTO v_order FROM public.orders WHERE id = p_order_id FOR UPDATE;
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Order % not found', p_order_id;
+    END IF;
+
+    -- Customer cancellation: only allowed while draft or confirmed (before kitchen prep)
+    IF NOT p_is_staff AND v_order.order_status NOT IN ('draft', 'confirmed') THEN
+        RAISE EXCEPTION 'Customer cannot cancel order once preparation has begun.';
+    END IF;
+
+    IF p_is_staff THEN
+        v_new_status := 'cancelled_by_staff';
+    ELSE
+        v_new_status := 'cancelled_by_customer';
+    END IF;
+
+    -- Release reserved_stock in deterministic order
+    FOR v_item IN SELECT product_id, quantity FROM public.order_items WHERE order_id = p_order_id ORDER BY product_id ASC
+    LOOP
+        UPDATE public.inventory
+        SET reserved_stock = GREATEST(0, reserved_stock - v_item.quantity),
+            updated_at = TIMEZONE('utc', NOW())
+        WHERE product_id = v_item.product_id;
+    END LOOP;
+
+    -- Update order status
+    UPDATE public.orders 
+    SET order_status = v_new_status, 
+        cancellation_reason = p_reason,
+        updated_at = NOW() 
+    WHERE id = p_order_id;
+
+    -- If order was paid online, mark for refund
+    IF v_order.payment_method = 'online_razorpay' AND v_order.payment_status = 'captured' THEN
+        UPDATE public.orders SET payment_status = 'refund_pending' WHERE id = p_order_id;
+    END IF;
+
+    RETURN true;
+END;
+$$;
+
+REVOKE EXECUTE ON FUNCTION public.rpc_cancel_order FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.rpc_cancel_order TO service_role;
 ```

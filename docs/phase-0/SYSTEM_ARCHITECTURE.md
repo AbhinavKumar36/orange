@@ -1,6 +1,6 @@
 # Moody Orange — System Architecture Specification
 
-**Document Version:** 1.2.0 (Phase 0.2 Final Consistency Review)  
+**Document Version:** 1.3.0 (Phase 0.3 Final Consistency Pass)  
 **Phase:** Phase 0 (Requirements & Architecture)  
 **Status:** Pending Client Review & Sign-Off  
 **Target System:** Moody Orange Unified Ordering Platform  
@@ -14,7 +14,8 @@
 | :--- | :--- | :--- | :--- |
 | **1.0.0** | 2026-10-30 | Lead Architect | Initial architectural proposal with embedded Next.js API. |
 | **1.1.0** | 2026-10-30 | Lead Architect | Phase 0.1 Revision: Decoupled standalone Backend API modular monolith (`apps/backend-api`). |
-| **1.2.0** | 2026-10-30 | Lead Architect | **Phase 0.2 Final Consistency Review:**<br>• Enforced authoritative inventory fields (`physical_stock`, `reserved_stock`, `available_stock`) across diagrams and flows.<br>• Specified deterministic row locking (`ORDER BY product_id ASC`) and atomic multi-product reservation.<br>• Corrected payment/refund lifecycle: separated order vs. payment status; mandated that refund requests transition to `refund_processing`, with `refunded` confirmed only upon `refund.processed` webhook.<br>• Formalized server-side authorization architecture since the service-role key bypasses RLS.<br>• Documented OpenAPI / JSON Schema as the language-neutral contract authority. |
+| **1.2.0** | 2026-10-30 | Lead Architect | Phase 0.2 Revision: Standardized `physical_stock` and multi-product deterministic row locks. |
+| **1.3.0** | 2026-10-30 | Lead Architect | **Phase 0.3 Final Consistency Pass:**<br>• Hardened Flow 1 data flow: aggregated duplicate product IDs, validated positive quantities, scoped idempotency keys to customer with payload hash.<br>• Separated Cash-at-Pickup (`unpaid` state) from online payment gateway states; prevented cash order completion without verified cash receipt.<br>• Enforced deterministic `ORDER BY product_id ASC FOR UPDATE` locking across all inventory procedures.<br>• Documented authoritative Razorpay payment validation prior to DB procedure invocation.<br>• Formalized evidence-based refund state progression (`refund_pending` -> `refund_processing` -> `refunded`). |
 
 ---
 
@@ -22,44 +23,10 @@
 
 ### 1.1 Core Architectural Principles
 1. **Single Authoritative Source of Truth:** `[CONFIRMED]` All business calculations, prices, stock balances, taxes, and order state progressions are enforced strictly on the server and database. Client applications are presentation layers with zero authority to dictate prices or stock.
-2. **Zero-Trust Client Inputs:** `[CONFIRMED]` The backend never accepts client-calculated totals, arbitrary payment confirmation signals, or client-asserted customer IDs.
-3. **Atomic Multi-Product Concurrency Guarantee:** `[CONFIRMED]` Inventory reservations lock rows in deterministic order (`ORDER BY product_id ASC`) to eliminate deadlocks, and validate all line items before allocating stock on an all-or-nothing basis.
+2. **Zero-Trust Client Inputs:** `[CONFIRMED]` The backend never accepts client-calculated totals, arbitrary payment confirmation signals, or client-asserted customer IDs. Customer identity is derived strictly from verified JWT `sub`.
+3. **Atomic Multi-Product Concurrency Guarantee:** `[CONFIRMED]` Inventory reservations lock rows in deterministic ascending order (`ORDER BY product_id ASC`) to eliminate deadlocks, and pre-validate all line items before allocating stock on an all-or-nothing basis.
 4. **Asynchronous Webhook-First Settlement & Evidence-Based Refunds:** `[CONFIRMED]` Payment capture and refunds are confirmed exclusively via cryptographically signed webhooks and direct gateway evidence, never client-side redirects alone.
 5. **Independent Backend Separation:** `[CONFIRMED ARCHITECTURE]` The backend API is logically and deployably independent from both the customer-facing and admin-facing web applications.
-
----
-
-### 1.2 Backend Topology Evaluation: Modular Monolith vs. Alternatives
-
-```
-+───────────────────────────────────────────────────────────────────────────────+
-| PATTERN A: Embedded API in Customer Next.js App                               |
-| Evaluation: Tight coupling. Scaling or deploying the customer storefront      |
-|             restarts the API, risking in-flight Android checkout transactions.|
-| Status: REJECTED                                                              |
-+───────────────────────────────────────────────────────────────────────────────+
-
-+───────────────────────────────────────────────────────────────────────────────+
-| PATTERN B: Microservices (Catalog, Orders, Payments, Inventory Services)      |
-| Evaluation: Extreme operational complexity, distributed transactions (sagas), |
-|             network latency overhead, multiple CI/CD pipelines, unnecessary   |
-|             for a single physical retail store.                               |
-| Status: REJECTED (Unwarranted complexity)                                     |
-+───────────────────────────────────────────────────────────────────────────────+
-
-+───────────────────────────────────────────────────────────────────────────────+
-| PATTERN C: Practical Modular Monolith Backend API (RECOMMENDED)               |
-| Location: apps/backend-api (Node.js / TypeScript REST API)                    |
-| Evaluation:                                                                   |
-| • Independently deployable and isolated from frontend web apps.               |
-| • Single, authoritative REST API (/api/v1/...) consumed identically by        |
-|   Customer Web, Admin Web, and Native Android App.                            |
-| • Internal modular domains (Catalog, Orders, Payments, Staff) share a single  |
-|   high-performance codebase and single PostgreSQL connection pool.            |
-| • Zero distributed transaction overhead; uses Postgres ACID transactions.     |
-| Status: ACCEPTED & ADOPTED                                                    |
-+───────────────────────────────────────────────────────────────────────────────+
-```
 
 ---
 
@@ -96,7 +63,7 @@ graph TB
         AUTH["Supabase Auth<br/>(Phone OTP & JWT Verification)"]
         RT["Supabase Realtime<br/>(WebSocket CDC Broadcast)"]
         ST["Supabase Storage<br/>(Product Images Bucket CDN)"]
-        PG[("PostgreSQL 15+ Database<br/>- Row Level Security (RLS)<br/>- Stored Procedures (RPCs)<br/>- ACID Concurrency Locks")]
+        PG[("PostgreSQL 15+ Database<br/>- Row Level Security (RLS)<br/>- Hardened Stored Procedures (RPCs)<br/>- Deterministic Row Locks")]
     end
 
     subgraph "External Payment & Telecom Partners"
@@ -142,28 +109,30 @@ Because the Backend API communicates with Supabase using the Service Role key (w
 [ Incoming HTTP Request ]
           │
           ▼
-   [ Extract Bearer Token from Authorization Header ]
+   [ 1. Authenticate JWT ]
+   Validate Supabase JWT via cryptographic signature (ES256 / HS256)
+   └── (Invalid / Missing / Expired) ──► HTTP 401 Unauthorized
           │
           ▼
-   [ Verify Supabase JWT Cryptographically ] ───(Invalid / Expired)───► [ HTTP 401 Unauthorized ]
+   [ 2. Extract Caller Identity ]
+   Identity = jwt.sub (UUID). NEVER accept customer_id from request body or query params.
           │
           ▼
-   [ Extract Verified User ID (jwt.sub) ]
-   (Customer identity CANNOT be specified via request body)
-          │
-          ▼
-   [ Is Route Protected by Role? ]
-     ├─► Customer Route: Verify customer is acting on own resource (e.g. order.customer_id == jwt.sub)
-     │     └── Failed ──► [ HTTP 403 Forbidden ]
+   [ 3. Authorize Role & Resource Ownership ]
+     ├─► Customer Route: Ensure target resource belongs to caller:
+     │     SELECT 1 FROM orders WHERE id = :order_id AND customer_id = :jwt_sub
+     │     └── Not Owner ──► HTTP 403 Forbidden
      │
-     └─► Staff Route: Query public.staff_roles for jwt.sub (Cache TTL: 60s)
-           └── Role not matching required role ──► [ HTTP 403 Forbidden ]
+     └─► Staff Route: Query public.staff_roles for :jwt_sub:
+           SELECT role FROM staff_roles WHERE user_id = :jwt_sub AND is_active = true
+           └── Lacks Required Role ──► HTTP 403 Forbidden
           │
           ▼
-   [ Input Validation via Zod Schemas ] ───(Malformed Payload)───► [ HTTP 400 Bad Request ]
+   [ 4. Input Validation & Customer-Scoped Idempotency Check ]
+   Validate Zod schema; compute canonical payload hash; scope idempotency key to jwt.sub
           │
           ▼
-   [ Execute Privileged Database Stored Procedure (RPC) ]
+   [ 5. Execute Privileged Database Transaction / RPC ]
 ```
 
 ---
@@ -182,37 +151,45 @@ sequenceDiagram
 
     Customer->>API: POST /api/v1/orders/checkout<br/>Headers: Authorization (JWT), X-Idempotency-Key<br/>Body: { items: [{product_id, qty}], fulfillment, pickup_time }
     
-    Note over API: 1. Verify JWT & extract customer_id = jwt.sub<br/>2. Validate payload via Zod<br/>3. Check idempotency key
+    Note over API: 1. Extract customer_id = jwt.sub<br/>2. Validate payload via Zod (quantities > 0, cart not empty)<br/>3. Compute payload hash for idempotency verification
     API->>DB: CALL rpc_reserve_order_stock(...)
     
     critical Atomic Multi-Product Database Transaction
-        DB->>DB: Sort items deterministically: ORDER BY product_id ASC
+        Note over DB: Check idempotency scoped to (customer_id, idempotency_key)
+        alt Key Exists with Matching Payload Hash
+            DB-->>API: Return existing order draft
+        else Key Exists with Mismatched Payload
+            DB-->>API: ROLLBACK (Error: IDEMPOTENCY_KEY_PAYLOAD_MISMATCH)
+        end
+
+        Note over DB: Aggregate duplicate product IDs: SUM(qty) GROUP BY product_id
+        DB->>DB: Sort aggregated items deterministically: ORDER BY product_id ASC
         DB->>DB: SELECT physical_stock, reserved_stock FROM inventory<br/>WHERE product_id IN (...) ORDER BY product_id ASC FOR UPDATE
         
-        Note over DB: Step 1: Pre-validation of ALL items
-        loop For Every Item in Order
+        Note over DB: Pre-validation of ALL items
+        loop For Every Item in Aggregated Order
             DB->>DB: Check (physical_stock - reserved_stock) >= requested_qty
             alt Any Item Has Insufficient Stock
-                DB-->>API: ROLLBACK (Error: INSUFFICIENT_STOCK, item_id)
+                DB-->>API: ROLLBACK (Error: INSUFFICIENT_STOCK)
                 API-->>Customer: 409 Conflict ("Item X is out of stock. Zero items reserved.")
             end
         end
 
-        Note over DB: Step 2: Atomic All-or-Nothing Allocation
-        loop For Every Item in Order
+        Note over DB: Atomic All-or-Nothing Allocation
+        loop For Every Item in Aggregated Order
             DB->>DB: UPDATE inventory SET reserved_stock = reserved_stock + qty
         end
-        DB->>DB: INSERT INTO orders (order_status='draft', payment_status='pending', expires_at=NOW()+10min)
+        DB->>DB: INSERT INTO orders (order_status='draft', payment_status=INITIAL_STATUS, expires_at=NOW()+10min)
         DB->>DB: INSERT INTO order_items (snapshot unit_price, tax_rate)
         DB-->>API: COMMIT (order_id, calculated_total_amount)
     end
 
-    alt Online Payment Selected
+    alt Online Payment Selected (payment_status = 'pending')
         API->>RP: POST /v1/orders (amount: total_in_paise, currency: 'INR', receipt: order_id)
         RP-->>API: { razorpay_order_id: "order_xyz123" }
         API->>DB: UPDATE orders SET provider_order_id = 'order_xyz123'
         API-->>Customer: 201 Created { order_id, razorpay_order_id, amount, expires_at }
-    else Cash at Pickup Selected
+    else Cash at Pickup Selected (payment_status = 'unpaid')
         API->>DB: UPDATE orders SET order_status='confirmed', payment_status='unpaid'
         API-->>Customer: 201 Created { order_id, status: 'confirmed', collection_token }
     end
@@ -220,7 +197,7 @@ sequenceDiagram
 
 ---
 
-### 4.2 Flow 2: Razorpay Payment Settlement & Reservation Retention
+### 4.2 Flow 2: Razorpay Payment Settlement & Authoritative Verification
 
 ```mermaid
 sequenceDiagram
@@ -238,27 +215,24 @@ sequenceDiagram
     Gateway-->>Customer: Display Client-Side Success Cue (Awaiting Confirmation)
 
     Note over RP,WebhookAPI: Independent Asynchronous Webhook
-    RP->>WebhookAPI: POST /api/v1/webhooks/razorpay<br/>Header: X-Razorpay-Signature<br/>Payload: { event: "payment.captured", payment_id, order_id }
+    RP->>WebhookAPI: POST /api/v1/webhooks/razorpay<br/>Header: X-Razorpay-Signature<br/>Payload: { event: "payment.captured", payment_id, order_id, amount, currency }
 
     Note over WebhookAPI: 1. Verify HMAC-SHA256 signature against RAZORPAY_WEBHOOK_SECRET
     alt Invalid Signature
         WebhookAPI-->>RP: 400 Bad Request (Log Security Alert)
     else Signature Valid
-        Note over WebhookAPI: 2. Idempotency Check: Check provider_payment_id in payments table
-        alt Payment Already Processed
-            WebhookAPI-->>RP: 200 OK (Duplicate ignored safely)
-        else First-Time Processing
-            WebhookAPI->>DB: CALL rpc_finalize_payment_success(payment_payload)
-            critical Atomic State Transition
-                DB->>DB: INSERT INTO payments (status='captured', provider_payment_id=...)
-                DB->>DB: UPDATE orders SET order_status='confirmed', payment_status='captured'
-                Note over DB: IMPORTANT: reserved_stock is NOT released!<br/>Confirmed orders hold reserved stock until collection.
-            end
-            DB->>RT: Emit status event on 'orders:order_id' & 'store:orders'
-            RT-->>Customer: Live Screen Updates: "Order Confirmed!"
-            RT-->>Admin: Ring Audio Alert + Insert Card in Live Queue
-            WebhookAPI-->>RP: 200 OK
+        Note over WebhookAPI: 2. Authoritative Verification: Verify payment_id, order_id, amount in paise, currency
+        WebhookAPI->>DB: CALL rpc_finalize_payment_success(payment_payload)
+        critical Atomic State Transition
+            DB->>DB: Verify p_amount matches orders.total_amount
+            DB->>DB: INSERT INTO payments (status='captured', provider_payment_id=...)
+            DB->>DB: UPDATE orders SET order_status='confirmed', payment_status='captured'
+            Note over DB: IMPORTANT: reserved_stock is NOT released!<br/>Confirmed orders hold reserved stock until collection.
         end
+        DB->>RT: Emit status event on 'orders:order_id' & 'store:orders'
+        RT-->>Customer: Live Screen Updates: "Order Confirmed!"
+        RT-->>Admin: Ring Audio Alert + Insert Card in Live Queue
+        WebhookAPI-->>RP: 200 OK
     end
 ```
 
@@ -276,11 +250,11 @@ sequenceDiagram
     participant RT as Supabase Realtime
 
     RP->>WebhookAPI: POST /api/v1/webhooks/razorpay (event: payment.captured for Expired Order A)
-    Note over WebhookAPI: Verify HMAC Signature (Valid)
+    Note over WebhookAPI: Verify HMAC Signature, Order ID, Amount, Currency (Valid)
     
-    WebhookAPI->>DB: CALL rpc_reconcile_late_payment(payment_details)
+    WebhookAPI->>DB: CALL rpc_reconcile_late_payment(...)
     critical Atomic Reconciliation Evaluation
-        DB->>DB: Lock inventory rows for Order A deterministically
+        DB->>DB: Lock inventory rows for Order A deterministically: ORDER BY product_id ASC FOR UPDATE
         Note over DB: Check if (physical_stock - reserved_stock) >= Order A items
         alt Inventory IS Still Available for ALL Items
             DB->>DB: Re-reserve stock: reserved_stock = reserved_stock + qty
@@ -297,12 +271,12 @@ sequenceDiagram
         WebhookAPI-->>RP: 200 OK
         DB->>RT: Push "Confirmed" to customer and admin
     else Inventory Depleted (Evidence-Based Refund Workflow)
-        Note over WebhookAPI: Step 1: Request Refund from Razorpay
+        Note over WebhookAPI: Step 1: Request Refund from Razorpay with Idempotency Key
         WebhookAPI->>RP_API: POST /v1/payments/{payment_id}/refund<br/>Headers: X-Refund-Idempotency-Key
         RP_API-->>WebhookAPI: HTTP 200 { id: "rfnd_123", status: "processed" }
         
         Note over WebhookAPI: Step 2: Gateway acceptance sets 'refund_processing', NOT 'refunded'!
-        WebhookAPI->>DB: INSERT INTO refunds (provider_refund_id, status='refund_processing', ...)
+        WebhookAPI->>DB: INSERT INTO refunds (provider_refund_id, status='refund_processing', idempotency_key=...)
         WebhookAPI->>DB: UPDATE orders SET payment_status = 'refund_processing'
         WebhookAPI-->>RP: 200 OK
 
@@ -336,22 +310,27 @@ sequenceDiagram
     DB-->>API: Return order details and payment status
     API-->>AdminUI: Render Order Verification Modal
 
-    alt Order is Cash at Pickup (Unpaid)
+    alt Order is Cash at Pickup (payment_status = 'unpaid')
         AdminUI->>Staff: Prompt: "COLLECT CASH: ₹X.XX"
-        Staff->>Customer: Collects Cash and places in cash drawer
+        Staff->>Customer: Collects Cash and places in cash register
         Staff->>AdminUI: Checks box: [x] "Cash Received in Register" & Clicks "Complete"
         AdminUI->>API: POST /api/v1/staff/orders/complete { order_id, cash_collected: true }
         critical Commit Cash Payment and Physical Stock Decrement
-            API->>DB: UPDATE orders SET order_status='completed', payment_status='captured', collected_at=NOW()
-            API->>DB: UPDATE inventory SET physical_stock = physical_stock - qty, reserved_stock = reserved_stock - qty
-            API->>DB: INSERT INTO payments (provider='cash', status='captured', amount=...)
+            Note over API,DB: CALL rpc_complete_order_handover(order_id, staff_id, cash_collected=true)
+            DB->>DB: Verify payment_method='cash_at_pickup' AND cash_collected=true
+            DB->>DB: Lock inventory rows: ORDER BY product_id ASC FOR UPDATE
+            DB->>DB: UPDATE orders SET order_status='completed', payment_status='captured', collected_at=NOW()
+            DB->>DB: UPDATE inventory SET physical_stock = physical_stock - qty, reserved_stock = reserved_stock - qty
+            DB->>DB: INSERT INTO payments (provider='cash_register', status='captured', amount=...)
         end
-    else Order is Prepaid Online
+    else Order is Prepaid Online (payment_status = 'captured')
         Staff->>AdminUI: Clicks "Handover & Complete"
         AdminUI->>API: POST /api/v1/staff/orders/complete { order_id }
         critical Commit Physical Stock Decrement
-            API->>DB: UPDATE orders SET order_status='completed', collected_at=NOW()
-            API->>DB: UPDATE inventory SET physical_stock = physical_stock - qty, reserved_stock = reserved_stock - qty
+            Note over API,DB: CALL rpc_complete_order_handover(order_id, staff_id, cash_collected=false)
+            DB->>DB: Lock inventory rows: ORDER BY product_id ASC FOR UPDATE
+            DB->>DB: UPDATE orders SET order_status='completed', collected_at=NOW()
+            DB->>DB: UPDATE inventory SET physical_stock = physical_stock - qty, reserved_stock = reserved_stock - qty
         end
     end
 
@@ -359,24 +338,3 @@ sequenceDiagram
     RT-->>Customer: Screen updates: "Order Completed. Thank you for visiting!"
     AdminUI-->>Staff: Card moves to "Completed Today"
 ```
-
----
-
-## 5. Authoritative API Contracts & Cross-Platform Parity
-
-To ensure the Customer Web, Admin Web, and Native Android App consume identical contracts without cross-language TypeScript-to-Kotlin illusions:
-- **Single Source of Truth:** `packages/api-contracts` contains language-neutral **OpenAPI 3.1 / JSON Schema** definitions.
-- **TypeScript Web & Backend:** Ingests Zod schemas derived from the API contracts.
-- **Kotlin Android Application:** Implements native Kotlin `data class` models with `kotlinx.serialization` strictly matching the JSON contracts.
-- **API Versioning:** All endpoints are versioned at `/api/v1/*`.
-- **Standard Error Payload:**
-  ```json
-  {
-    "error": {
-      "code": "INSUFFICIENT_STOCK",
-      "message": "One or more items are out of stock.",
-      "details": { "product_id": "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d", "available_quantity": 0 },
-      "timestamp": "2026-10-30T19:15:00Z"
-    }
-  }
-  ```

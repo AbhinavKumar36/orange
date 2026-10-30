@@ -1,6 +1,6 @@
 # Moody Orange — System Security, Threat Model & Compliance Plan
 
-**Document Version:** 1.2.0 (Phase 0.2 Final Consistency Review)  
+**Document Version:** 1.3.0 (Phase 0.3 Final Consistency Pass)  
 **Phase:** Phase 0 (Requirements & Architecture)  
 **Status:** Pending Client Review & Sign-Off  
 **Target System:** Moody Orange Unified Ordering Platform  
@@ -14,7 +14,8 @@
 | :--- | :--- | :--- | :--- |
 | **1.0.0** | 2026-10-30 | Lead Architect | Initial threat model and security specifications. |
 | **1.1.0** | 2026-10-30 | Lead Architect | Phase 0.1 Revision: Strict credential isolation to `apps/backend-api`. |
-| **1.2.0** | 2026-10-30 | Lead Architect | **Phase 0.2 Final Consistency Review:**<br>• Formalized server-side authorization architecture to account for Service Role key bypassing RLS.<br>• Mandated customer identity extraction strictly from verified JWT `sub`, prohibiting body-asserted IDs.<br>• Established server-controlled staff role checks and multi-product row lock invariants.<br>• Specified refund idempotency and double-refund prevention protocols.<br>• Audited requirement classifications. |
+| **1.2.0** | 2026-10-30 | Lead Architect | Phase 0.2 Revision: Server-side authorization architecture and verified JWT extraction. |
+| **1.3.0** | 2026-10-30 | Lead Architect | **Phase 0.3 Final Consistency Pass:**<br>• Formalized customer-scoped idempotency keys (`customer_id + client_idempotency_key`) with payload hash verification.<br>• Documented authoritative Razorpay payment validation (verifying payment ID, order ID, amount, currency, and signature before DB invocation).<br>• Hardened all `SECURITY DEFINER` procedures with explicit `search_path = public, pg_temp` and restricted `EXECUTE` privileges.<br>• Documented complete RLS coverage across all 10 database tables.<br>• Enforced cumulative refund caps and evidence-based refund confirmation. |
 
 ---
 
@@ -22,18 +23,18 @@
 
 | STRIDE Category | Threat Scenario | Impact | Mandatory Defensive Mitigation | Status |
 | :--- | :--- | :--- | :--- | :--- |
-| **Spoofing** | Attacker impersonates another customer to steal cake/juices at the counter. | Unauthorized order pickup, theft of goods. | Counter staff must verify customer collection token (PIN / QR / Order ID) and phone number. | `[CONFIRMED]` |
-| **Tampering** | Customer manipulates request payload to purchase an expensive cake for ₹1.00. | Commercial financial loss. | **Zero-trust client prices.** Server recalculates all subtotals, taxes, and packaging fees from database tables. Client prices are completely discarded. | `[CONFIRMED]` |
+| **Spoofing** | Attacker impersonates another customer to steal items at the counter or claim orders via guessed idempotency key. | Unauthorized order pickup, cross-account data leakage. | Idempotency keys are scoped strictly to authenticated customer (`customer_id + key`). Counter staff must verify customer collection token. | `[CONFIRMED]` |
+| **Tampering** | Customer manipulates request payload to purchase an expensive cake for ₹1.00 or submits forged payment amounts. | Commercial financial loss. | **Zero-trust client prices.** Database procedures verify that payment amounts match `orders.total_amount`. Server recalculates all prices from DB tables. | `[CONFIRMED]` |
 | **Repudiation** | Staff claims cash was not collected, or customer denies receiving order. | Internal cash theft or customer dispute. | Staff must explicitly check a mandatory "Cash Received" confirmation before closing an order. Comprehensive event logging in `payments` and `audit_logs`. | `[CONFIRMED]` |
 | **Information Disclosure** | Scraping customer phone numbers, names, or addresses by enumerating sequential order IDs. | Customer privacy violation, regulatory exposure. | Use non-sequential UUIDs for database IDs. Enforce PostgreSQL Row Level Security (RLS) so customers query strictly where `customer_id = auth.uid()`. | `[CONFIRMED]` |
 | **Denial of Service** | Script floods OTP endpoints to exhaust SMS credits, or locks up stock without paying. | Financial drain (SMS costs), legitimate customers blocked by fake stockouts. | Strict IP and phone-number rate limiting on OTP endpoints. 10-minute reservation TTL with automated cleanup. Max 3 pending orders per customer. | `[CONFIRMED]` |
-| **Elevation of Privilege** | Customer passes `{ "role": "admin" }` or attempts to assign themselves a staff role. | Full system compromise. | Database-enforced Role-Based Access Control (`staff_roles`). Backend API checks caller role against trusted DB records on every privileged request. | `[CONFIRMED]` |
+| **Elevation of Privilege** | Customer passes `{ "role": "admin" }` or attempts to invoke privileged database procedures directly. | Full system compromise. | Database procedures revoke `EXECUTE` from `PUBLIC` and grant only to `service_role`. API verifies caller roles against trusted DB records on every request. | `[CONFIRMED]` |
 
 ---
 
 ## 2. Server-Side Authorization Architecture
 
-Because the Backend API (`apps/backend-api`) connects to PostgreSQL using the Supabase Service Role key (which bypasses Row Level Security), **the API layer must authoritatively execute authentication, ownership validation, and role authorization before issuing any database mutation**:
+Because the Backend API (`apps/backend-api`) connects to PostgreSQL using the Supabase Service Role key (which deliberately bypasses Row Level Security), **the API layer acts as the authoritative security enforcement gateway**:
 
 ```
 [ Incoming HTTP Request ]
@@ -58,7 +59,11 @@ Because the Backend API (`apps/backend-api`) connects to PostgreSQL using the Su
            └── Lacks Required Role ──► HTTP 403 Forbidden
           │
           ▼
-   [ 4. Execute Privileged Database Transaction / RPC ]
+   [ 4. Input Validation & Payload Hash Verification ]
+   Validate payload with Zod; verify idempotency key scope
+          │
+          ▼
+   [ 5. Execute Privileged Database Transaction / RPC ]
 ```
 
 ### 2.1 Role-Based Access Control (RBAC) Matrix
@@ -78,55 +83,70 @@ Because the Backend API (`apps/backend-api`) connects to PostgreSQL using the Su
 
 ---
 
-## 3. Strict Credential Isolation & Boundary Protection
+## 3. Checkout Idempotency & Customer Scoping `[CONFIRMED]`
 
-> [!CAUTION]
-> **The Supabase Service Role Key, Razorpay Key Secret, and Webhook Secret must exist ONLY in the backend server environment (`apps/backend-api/.env`).** Under no circumstances may privileged keys be embedded in client-side code bundles or Android APKs.
-
-| Credential | Scope | Where Stored / Exposed | Prohibited Locations |
-| :--- | :--- | :--- | :--- |
-| **Supabase Anon Key** | Public Read / Auth Init | Public Client Code (Next.js public env, Android `BuildConfig`) | Safe for public exposure (guarded by RLS) |
-| **Supabase Service Role Key** | Database Superuser Access | **Standalone Backend API ONLY (`apps/backend-api/.env`)** | **STRICTLY FORBIDDEN** in Customer Web, Admin Web, Android APK, Git |
-| **Razorpay Key ID** | Public Merchant ID | Client Checkout UI & Backend API | Publicly visible (safe) |
-| **Razorpay Key Secret** | Financial Capture & Refunds | **Standalone Backend API ONLY (`apps/backend-api/.env`)** | **STRICTLY FORBIDDEN** in Web client bundles, Android APK, Git |
-| **Razorpay Webhook Secret** | Webhook HMAC Verification | **Standalone Backend API ONLY (`apps/backend-api/.env`)** | **STRICTLY FORBIDDEN** in Web client bundles, Android APK, Git |
-| **SMS Gateway API Key** | OTP Dispatch | **Standalone Backend API ONLY** (or Supabase Auth dashboard) | **STRICTLY FORBIDDEN** in Web client bundles, Android APK, Git |
+To prevent cross-customer replay attacks or data leaks:
+1. **Scoped Storage:** Idempotency keys are stored in `public.orders` with a composite unique constraint: `UNIQUE (customer_id, client_idempotency_key)`. A customer guessing another customer's idempotency key will never match.
+2. **Payload Hash Verification:** When a checkout request arrives, the server computes a SHA-256 hash of the canonical request payload (`client_payload_hash`).
+   - If the key exists for the customer and the hash matches: Return the existing draft order.
+   - If the key exists but the hash differs (mismatched items or fulfillment): Reject immediately with `HTTP 409 Conflict` ("Idempotency key reused with mismatched order payload").
 
 ---
 
-## 4. Payment & Refund Security Architecture
+## 4. Authoritative Payment & Refund Verification Protocols
 
-### 4.1 Zero-Trust Client Payment Callbacks `[CONFIRMED]`
-Client-side callbacks from Razorpay Web Checkout or Android SDK are treated strictly as **UX cues**, NEVER as proof of payment. Payment status transitions to `captured` only when the server receives and cryptographically validates the `payment.captured` webhook.
+### 4.1 Payment Verification Sequence `[CONFIRMED]`
+Neither the Backend API nor the database procedures blindly trust payment notifications:
+1. **Webhook Signature Check:** The Backend API validates `X-Razorpay-Signature` against `RAZORPAY_WEBHOOK_SECRET` using HMAC-SHA256 with constant-time equality check (`crypto.timingSafeEqual`).
+2. **Authoritative Field Matching:** Before calling the database procedure, the Backend API verifies:
+   - `payment.entity.id` matches provider payment ID format (`pay_*`).
+   - `payment.entity.order_id` matches the stored `orders.provider_order_id`.
+   - `payment.entity.amount` (in paise) exactly equals `orders.total_amount * 100`.
+   - `payment.entity.currency` equals `'INR'`.
+   - `payment.entity.status` equals `'captured'`.
+3. **Database Invariant Enforcement:** `rpc_reconcile_late_payment` and payment recording procedures independently verify that `p_amount = v_order.total_amount`. Mismatched amounts raise an exception and abort the transaction.
 
-### 4.2 Webhook Signature Verification `[CONFIRMED]`
-Every incoming Razorpay webhook must be validated against `RAZORPAY_WEBHOOK_SECRET` using HMAC-SHA256 with a constant-time equality check (`crypto.timingSafeEqual`) to prevent timing attacks.
-
-### 4.3 Evidence-Based Refund Verification & Double-Refund Prevention `[CONFIRMED]`
-1. **Idempotency Key Enforcement:** Every refund request dispatched to the Razorpay Refunds API must include a unique `X-Refund-Idempotency-Key` (e.g., `rfnd_orderId_timestamp`).
-2. **Intermediate Status:** A successful HTTP 200 response from Razorpay's refund endpoint transitions the payment status to `refund_processing`, **NOT** `refunded`.
-3. **Confirmed Gateway Evidence:** Status becomes `refunded` only upon receiving the verified asynchronous webhook `refund.processed`.
-4. **Failure Handling:** If the gateway sends `refund.failed`, the record updates to `refund_failed`, an immutable log is recorded in `audit_logs`, and an urgent notification is surfaced on the store manager's dashboard for manual investigation.
-
----
-
-## 5. Customer Mobile Phone OTP Security & Abuse Prevention `[CONFIRMED]`
-
-- **IP Rate Limiting:** Maximum 10 OTP requests per 10 minutes per IP address.
-- **Phone Cooldown:** Minimum 60-second cooldown between consecutive OTP requests for the same phone number.
-- **Daily Phone Quota:** Maximum 5 OTP dispatches per phone number per 24 hours.
-- **Failed Attempt Lockout:** Maximum 5 invalid OTP verification attempts before the session is permanently invalidated and the phone enters a 15-minute lockout.
-- **DLT Regulatory Compliance:** Commercial SMS dispatch must comply with Indian TRAI Distributed Ledger Technology (DLT) regulations using registered Sender IDs and pre-approved templates.
+### 4.2 Refund Ledger Security & Cumulative Cap Enforcement `[CONFIRMED]`
+1. **Idempotency Key Enforcement:** Every refund request includes a unique `idempotency_key` (e.g., `rfnd_<order_id>_<timestamp>`).
+2. **Cumulative Refund Cap:** Stored procedures and API middleware enforce that:
+   $$\sum \text{refunds.amount (where status} \neq \text{'refund_failed')} + \text{new\_refund} \le \text{payment.amount (where status = 'captured')}$$
+   Attempting to refund more than the captured order amount is rejected at the database level.
+3. **Evidence-Based Progression:** Gateway HTTP 200 acceptance transitions status to `refund_processing`. Status becomes `refunded` **only** upon receiving verified webhook `refund.processed`.
 
 ---
 
-## 6. Audit Logging & Operational Accountability `[CONFIRMED]`
+## 5. Database Function Hardening & Privilege Boundaries
 
-The following privileged operations trigger an append-only insert into `public.audit_logs`:
-- Manual physical stock count adjustments and spoilage deductions.
-- Base price and tax rate modifications.
-- Staff role assignments, promotions, or revocations.
-- Order cancellations and refund executions.
-- Manual store emergency closure toggles.
+All stored procedures in PostgreSQL are hardened against SQL injection, search path hijacking, and unauthorized invocation:
 
-The `public.audit_logs` table is strictly append-only. No user role, including `admin`, possesses `DELETE` or `UPDATE` permissions on audit records.
+1. **Explicit Search Path:** Every `SECURITY DEFINER` function explicitly sets:
+   ```sql
+   SET search_path = public, pg_temp;
+   ```
+   This prevents malicious search-path hijacking attacks where untrusted users create objects in temporary schemas.
+2. **Restricted Execute Permissions:** By default, PostgreSQL grants `EXECUTE` on new functions to `PUBLIC`. All sensitive procedures explicitly revoke public access:
+   ```sql
+   REVOKE EXECUTE ON FUNCTION public.rpc_reserve_order_stock FROM PUBLIC;
+   GRANT EXECUTE ON FUNCTION public.rpc_reserve_order_stock TO service_role;
+   ```
+   Direct calls by `anon` or standard `authenticated` database connections are rejected with permission errors.
+3. **Static Parameterized Queries:** Dynamic SQL execution (`EXECUTE format(...)`) is avoided. All database operations use static parameterized SQL statements.
+
+---
+
+## 6. Complete Table Row Level Security (RLS) Matrix
+
+| Table Name | Anon Access | Authenticated Customer Access | Staff / Counter Access | Manager / Admin Access | Service Role Access |
+| :--- | :---: | :---: | :---: | :---: | :---: |
+| **`profiles`** | Denied | SELECT / UPDATE (own record) | SELECT (all) | SELECT (all) | ALL (via API) |
+| **`staff_roles`** | Denied | Denied | SELECT (own role) | SELECT / ALL (admins only) | ALL (via API) |
+| **`categories`** | SELECT (active) | SELECT (active) | SELECT (all) | ALL (manage catalog) | ALL (via API) |
+| **`products`** | SELECT (active) | SELECT (active) | SELECT (all) | ALL (manage catalog) | ALL (via API) |
+| **`inventory`** | SELECT (public) | SELECT (public) | SELECT (public) | UPDATE (adjust stock) | ALL (via API) |
+| **`orders`** | Denied | SELECT (own orders only) | SELECT / UPDATE (all) | SELECT / UPDATE (all) | ALL (via API) |
+| **`order_items`** | Denied | SELECT (own orders only) | SELECT (all) | SELECT (all) | ALL (via API) |
+| **`payments`** | Denied | SELECT (own orders only) | SELECT (all) | SELECT (all) | ALL (via API) |
+| **`refunds`** | Denied | SELECT (own orders only) | SELECT (all) | SELECT (all) | ALL (via API) |
+| **`audit_logs`** | Denied | Denied | Denied | SELECT (admins only) | ALL (via API) |
+
+*Direct client INSERT, UPDATE, and DELETE operations on `orders`, `order_items`, `payments`, and `refunds` are denied across all user roles via RLS.*

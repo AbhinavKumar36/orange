@@ -1,6 +1,6 @@
 # Moody Orange — Development Guidelines, Environment & Repository Standards
 
-**Document Version:** 1.2.0 (Phase 0.2 Final Consistency Review)  
+**Document Version:** 1.3.0 (Phase 0.3 Final Consistency Pass)  
 **Phase:** Phase 0 (Requirements & Architecture)  
 **Status:** Pending Client Review & Sign-Off  
 **Target System:** Moody Orange Unified Ordering Platform  
@@ -14,7 +14,8 @@
 | :--- | :--- | :--- | :--- |
 | **1.0.0** | 2026-10-30 | Lead Architect | Initial development guidelines and repository conventions. |
 | **1.1.0** | 2026-10-30 | Lead Architect | Phase 0.1 Revision: Decoupled `apps/backend-api` and corrected repository URL. |
-| **1.2.0** | 2026-10-30 | Lead Architect | **Phase 0.2 Final Consistency Review:**<br>• Established OpenAPI 3.1 / JSON Schema as the authoritative, language-neutral API contract source.<br>• Documented standardized API versioning, error structures, idempotency keys, and pagination conventions.<br>• Formalized contract testing standards for TypeScript (Zod) and Kotlin (`data class` + `kotlinx.serialization`).<br>• Reaffirmed that application directories are planning structures and must NOT be created in Phase 0. |
+| **1.2.0** | 2026-10-30 | Lead Architect | Phase 0.2 Revision: Standardized OpenAPI contracts and cross-platform contract parity. |
+| **1.3.0** | 2026-10-30 | Lead Architect | **Phase 0.3 Final Consistency Pass:**<br>• Formalized customer-scoped checkout idempotency (`customer_id + key`) with payload hash verification in API contracts.<br>• Specified input validation contracts: duplicate aggregation, positive integer quantities, non-empty carts.<br>• Defined Cash-at-Pickup `unpaid` payment state and evidence-based refund progression in API responses.<br>• Reaffirmed strict Phase 0 documentation-only boundaries. |
 
 ---
 
@@ -113,7 +114,9 @@ To ensure the Customer Web, Admin Web, and Native Android App consume identical 
 - **Versioning:** All REST API routes are versioned under `/api/v1/*`.
 - **Authentication:** Protected routes require a valid Supabase JWT passed via the `Authorization: Bearer <token>` header.
 - **Authorization:** Customer routes extract identity strictly from `jwt.sub`. Staff routes verify the caller's role against server-controlled `staff_roles` records.
-- **Idempotency:** State-mutating operations (checkout, refunds) accept an `X-Idempotency-Key: <UUID>` header. Retried requests with identical keys return the existing record without executing duplicate mutations.
+- **Customer-Scoped Idempotency:** State-mutating operations (checkout, refunds) accept an `X-Idempotency-Key: <UUID>` header. The Backend API scopes the key to `(jwt.sub, idempotency_key)` and computes a SHA-256 payload hash (`client_payload_hash`):
+  - Retried requests with identical key and matching payload return the original draft order.
+  - Reusing a key with a mismatched payload returns `HTTP 409 Conflict`.
 - **Pagination Convention:** List endpoints accept `limit` (default: 20, max: 100) and `cursor` (opaque base64 cursor), returning:
   ```json
   {
@@ -144,12 +147,12 @@ All endpoints under `/api/v1/*` must adhere to a uniform error structure:
 ```
 
 Standard HTTP Status Codes:
-- `400 Bad Request`: Malformed syntax or missing required headers.
+- `400 Bad Request`: Malformed syntax, empty cart, non-positive quantity, or missing required headers.
 - `401 Unauthorized`: Missing or invalid Supabase JWT.
-- `403 Forbidden`: Authenticated user lacks required role (e.g., customer calling staff endpoint).
+- `403 Forbidden`: Authenticated user lacks required role or attempts to access another customer's resource.
 - `404 Not Found`: Resource does not exist.
-- `409 Conflict`: Concurrency conflict or inventory reservation failure.
-- `422 Unprocessable Entity`: Business validation failed (e.g., pickup slot full).
+- `409 Conflict`: Concurrency conflict, inventory reservation failure, or idempotency key payload mismatch.
+- `422 Unprocessable Entity`: Business validation failed (e.g., cumulative refund exceeds captured amount).
 - `429 Too Many Requests`: Rate limit exceeded (OTP cooldown or request flood).
 - `500 Internal Server Error`: Unhandled server exception.
 
@@ -247,14 +250,14 @@ cd orange
 - `develop`: Primary integration and staging branch.
 - `feat/<scope>-<description>`: Feature branches (e.g., `feat/backend-stock-reservation`).
 - `fix/<scope>-<description>`: Bug fixes (e.g., `fix/webhook-signature-parsing`).
-- `docs/<scope>-<description>`: Documentation changes (e.g., `docs/phase-0-2-consistency`).
+- `docs/<scope>-<description>`: Documentation changes (e.g., `docs/phase-0-3-database-security`).
 
 ### 4.3 Commit Standards (Conventional Commits)
 All commit messages must adhere to: `<type>(<scope>): <subject>`  
 *Examples:*
 - `feat(api): scaffold standalone backend modular monolith`
 - `fix(inventory): enforce physical_stock and deterministic row locks`
-- `docs(phase-0): finalize Phase 0.2 consistency review specifications`
+- `docs(phase-0): finalize Phase 0.3 database and security consistency pass`
 
 ---
 
