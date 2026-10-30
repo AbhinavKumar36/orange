@@ -1,31 +1,39 @@
 # Moody Orange — System Security, Threat Model & Compliance Plan
 
-**Document Version:** 1.0.0  
+**Document Version:** 1.1.0 (Phase 0.1 Revision)  
 **Phase:** Phase 0 (Requirements & Architecture)  
 **Status:** Pending Client Review & Sign-Off  
 **Target System:** Moody Orange Unified Ordering Platform  
+**Repository:** [https://github.com/AbhinavKumar36/orange](https://github.com/AbhinavKumar36/orange)  
 
 ---
 
-## 1. Threat Modeling & Attack Surface Analysis
+## Revision History
 
-Using the **STRIDE** methodology, we identify key vulnerabilities in a quick-commerce retail platform and mandate specific defensive controls:
-
-| STRIDE Category | Threat Scenario | Impact | Mandatory Defensive Mitigation |
+| Version | Date | Author | Description of Changes |
 | :--- | :--- | :--- | :--- |
-| **Spoofing** | Attacker impersonates a legitimate customer to view or collect their cake/chocolates at the counter. | Unauthorized order pickup, theft of goods. | High-entropy 4-digit Collection PIN + cryptographically hashed QR code required for counter pickup. Customer identity bound to verified mobile phone via OTP. |
-| **Tampering** | Malicious customer manipulates request payload to order a ₹1,200 cake for ₹1.00. | Financial loss. | **Zero-trust client prices.** Server recalculates all sub-totals, taxes, and packaging fees from database tables. Client-provided prices are completely discarded. |
-| **Repudiation** | Customer claims they never authorized or collected an order; or staff claims cash was never received. | Chargeback disputes, internal cash theft. | Mandatory audit trail in `payments`, `audit_logs`, and `inventory_logs`. Staff must explicitly confirm physical cash receipt in register before completing handover. |
-| **Information Disclosure** | Competitor scrapes customer phone numbers, names, or addresses by iterating sequential order IDs. | Privacy violation, regulatory breach. | Non-sequential UUIDv4/UUIDv7 primary keys. Database Row Level Security (RLS) ensures customers can only query rows where `customer_id = auth.uid()`. |
-| **Denial of Service** | Bot script drains SMS credits via OTP flooding or floods checkout to lock up inventory without paying. | Financial drain (SMS costs), legitimate customers blocked by fake stockouts. | Strict IP and phone-number rate limiting on OTP endpoints. 10-minute TTL on stock reservations with automated cleanup. Maximum 3 pending orders per customer. |
-| **Elevation of Privilege** | Counter staff attempts to access store profit analytics or change product prices. | Unauthorized commercial tampering. | Database-enforced Role-Based Access Control (`staff_role_enum`). Admin API endpoints verify role claim before executing mutations. |
+| **1.0.0** | 2026-10-30 | Lead Architect | Initial threat model and security specifications. |
+| **1.1.0** | 2026-10-30 | Lead Architect | **Phase 0.1 Revision:**<br>• Enforced strict credential isolation: service-role keys confined strictly to `apps/backend-api`.<br>• Explicitly established that no customer or staff client holds direct privileged database access.<br>• Formalized server-controlled staff roles and privilege escalation defenses.<br>• Classified security measures (`[CONFIRMED]`, `[PROPOSED]`, `[CLIENT DECISION REQUIRED]`). |
 
 ---
 
-## 2. Authentication Security Architecture
+## 1. Threat Modeling & STRIDE Matrix
 
-### 2.1 Customer Mobile Number & OTP Verification
-The customer authentication flow relies on Indian mobile phone numbers (+91) with 6-digit OTP delivery. To prevent financial drain and abuse, the following controls are mandatory:
+| STRIDE Category | Threat Scenario | Impact | Mandatory Defensive Mitigation | Status |
+| :--- | :--- | :--- | :--- | :--- |
+| **Spoofing** | Attacker impersonates a legitimate customer to collect perishable food at the counter. | Unauthorized order pickup, theft of goods. | Counter staff must verify customer collection token (PIN / QR / Order ID) and phone number. | `[CONFIRMED]` |
+| **Tampering** | Customer manipulates request payload to purchase an expensive cake for ₹1.00. | Commercial financial loss. | **Zero-trust client prices.** Server recalculates all subtotals, taxes, and packaging fees from database tables. Client prices are completely discarded. | `[CONFIRMED]` |
+| **Repudiation** | Staff claims cash was not collected, or customer denies receiving order. | Internal cash theft or customer dispute. | Staff must explicitly check a mandatory "Cash Received" confirmation before closing an order. Comprehensive event logging in `payments` and `audit_logs`. | `[CONFIRMED]` |
+| **Information Disclosure** | Scraping customer phone numbers, names, or addresses by enumerating sequential order IDs. | Customer privacy violation, regulatory exposure. | Use non-sequential UUIDs for database IDs. Enforce PostgreSQL Row Level Security (RLS) so customers query strictly where `customer_id = auth.uid()`. | `[CONFIRMED]` |
+| **Denial of Service** | Script floods OTP endpoints to exhaust SMS credits, or locks up stock without paying. | Financial drain (SMS costs), legitimate customers blocked by fake stockouts. | Strict IP and phone-number rate limiting on OTP endpoints. 10-minute reservation TTL with automated cleanup. Max 3 pending orders per customer. | `[CONFIRMED]` |
+| **Elevation of Privilege** | Counter staff or customer attempts to access store financial reports or modify product prices. | Commercial tampering. | Database-enforced Role-Based Access Control (`staff_role_enum`). Admin API endpoints verify role claim before executing mutations. | `[CONFIRMED]` |
+
+---
+
+## 2. Authentication & Authorization Security
+
+### 2.1 Customer Mobile Number & OTP Verification `[CONFIRMED]`
+The customer authentication flow relies on Indian mobile phone numbers (+91) with 6-digit OTP delivery. To prevent financial drain and abuse:
 
 ```
 [Customer Submits Phone]
@@ -40,30 +48,51 @@ The customer authentication flow relies on Indian mobile phone numbers (+91) wit
  [Daily Phone Quota Check] ───(> 5 OTPs / day)─────────► [HTTP 429 "Daily limit reached"]
           │
           ▼
- [Generate Cryptographic 6-Digit OTP & Hash]
+ [Generate Cryptographic 6-Digit OTP]
           │
           ▼
 [Dispatch SMS via Gateway with DLT Template]
 ```
 
-- **OTP Expiration:** OTP is valid for exactly 5 minutes (300 seconds).
-- **Verification Throttling:** Maximum 5 failed verification attempts per OTP session. Upon the 5th failed attempt, the OTP is permanently invalidated, and the phone number enters a 15-minute lockout.
-- **Development/Test Bypass:** Test phone numbers (e.g., `+91 99999 99999`) with static OTPs are restricted strictly to `local` and `staging` environments and disabled via environment configuration in production.
+- **OTP Expiration:** OTP is valid for exactly 5 minutes (300 seconds) `[PROPOSED]`.
+- **Verification Throttling:** Maximum 5 failed verification attempts per OTP session. Upon the 5th failed attempt, the OTP is permanently invalidated `[CONFIRMED]`.
+- **Test Mode Bypass:** Test phone numbers (e.g., `+91 99999 99999`) with static OTPs are restricted strictly to local and staging environments and disabled via environment configuration in production `[CONFIRMED]`.
 
-### 2.2 Store Staff & Admin Authentication
-- Staff members authenticate using corporate email and high-entropy passwords (minimum 12 characters, requiring uppercase, lowercase, numbers, and special characters).
+### 2.2 Store Staff & Admin Authentication `[CONFIRMED]`
+- Staff members authenticate using corporate email and high-entropy passwords (minimum 12 characters).
 - Enforced Session Timeouts: Counter staff sessions auto-expire after 12 hours of inactivity to prevent unattended terminal misuse at the physical shop counter.
-- Role checks are performed at both the API layer (JWT decoding) and the Database layer (via `public.get_staff_role()` inside RLS policies).
+
+### 2.3 Server-Controlled Staff Roles & Privilege Escalation Defense `[CONFIRMED]`
+- Staff roles (`counter_staff`, `manager`, `admin`) are stored in `public.staff_roles` in PostgreSQL.
+- **Strict Lockdown:** The `public.staff_roles` table has RLS enabled with direct client mutations denied (`INSERT`, `UPDATE`, `DELETE` blocked for `authenticated` role).
+- Role assignments and promotions can only be executed via the Backend API by an authenticated `admin` user.
+- Customers have zero access to the `staff_roles` table. Attempts by customers to pass role claims in API headers are rejected during JWT signature validation.
 
 ---
 
-## 3. Payment Security & Integrity
+## 3. Strict Credential Isolation & Access Boundaries
 
-### 3.1 Zero-Trust Client Callbacks
-Client-side callbacks from the Razorpay Web Checkout SDK or Android SDK (`onPaymentSuccess(paymentId)`) are treated strictly as **UX cues**, NEVER as authoritative proof of payment.
+> [!CAUTION]
+> **No customer, counter staff, or store manager client ever receives direct privileged database access or server secrets.**
+
+| Credential | Scope | Where Stored / Exposed | Prohibited Locations |
+| :--- | :--- | :--- | :--- |
+| **Supabase Anon Key** | Public Read / Auth Init | Public Client Code (Next.js public env, Android `BuildConfig`) | Safe for public exposure (guarded by RLS) |
+| **Supabase Service Role Key** | Database Superuser Access | **Standalone Backend API ONLY (`apps/backend-api/.env`)** | **STRICTLY FORBIDDEN** in Customer Web, Admin Web, Android APK, Git |
+| **Razorpay Key ID** | Public Merchant ID | Client Checkout UI & Backend API | Publicly visible (safe) |
+| **Razorpay Key Secret** | Financial Capture & Refunds | **Standalone Backend API ONLY (`apps/backend-api/.env`)** | **STRICTLY FORBIDDEN** in Web client bundles, Android APK, Git |
+| **Razorpay Webhook Secret** | Webhook HMAC Verification | **Standalone Backend API ONLY (`apps/backend-api/.env`)** | **STRICTLY FORBIDDEN** in Web client bundles, Android APK, Git |
+| **SMS Gateway API Key** | OTP Dispatch | **Standalone Backend API ONLY** (or Supabase Auth dashboard) | **STRICTLY FORBIDDEN** in Web client bundles, Android APK, Git |
+
+---
+
+## 4. Payment Security & Verification Protocol
+
+### 4.1 Zero-Trust Client Callbacks `[CONFIRMED]`
+Client-side callbacks from Razorpay Web Checkout or Android SDK are treated strictly as **UX cues**, NEVER as proof of payment.
 
 ```
-       [Customer Device]                [Razorpay Gateway]             [Moody Orange Server]
+       [Customer Device]                [Razorpay Gateway]            [Backend API (backend-api)]
               │                                  │                                │
               ├────── Initiates Payment ────────►│                                │
               │                                  ├────── Webhook Event ──────────►│
@@ -71,87 +100,34 @@ Client-side callbacks from the Razorpay Web Checkout SDK or Android SDK (`onPaym
               │                                  │                                │
               │                                  │                     [1. Verify HMAC Signature]
               │                                  │                     [2. Check Idempotency Key]
-              │                                  │                     [3. Commit Order in DB]
+              │                                  │                     [3. Commit Order via DB RPC]
               │                                  │                                │
   (UX Only)   │◄── Displays Success Screen ──────┤                                │
               │                                                                   │
-              ├────── Polling / Realtime Check ──────────────────────────────────►│
+              ├────── Polls Order Status ────────────────────────────────────────►│
               │◄───── Returns Authoritative Status ('confirmed') ─────────────────┤
 ```
 
-### 3.2 Webhook Signature Verification
-Every incoming Razorpay webhook must be validated against `RAZORPAY_WEBHOOK_SECRET` using HMAC-SHA256:
+### 4.2 Webhook Signature Verification `[CONFIRMED]`
+Incoming webhooks from Razorpay must be validated against `RAZORPAY_WEBHOOK_SECRET` using HMAC-SHA256 with constant-time equality check to prevent timing attacks.
 
-```typescript
-// Pseudocode for Webhook Handler Security
-import crypto from 'crypto';
-
-export async function verifyRazorpaySignature(
-  rawBody: string,
-  signatureHeader: string,
-  secret: string
-): Promise<boolean> {
-  const expectedSignature = crypto
-    .createHmac('sha256', secret)
-    .update(rawBody)
-    .digest('hex');
-
-  // Constant-time comparison to prevent timing attacks
-  return crypto.timingSafeEqual(
-    Buffer.from(signatureHeader, 'utf8'),
-    Buffer.from(expectedSignature, 'utf8')
-  );
-}
-```
-
-### 3.3 Idempotency & Double-Spend Protection
-- Each webhook payload contains `payload.payment.entity.id` (e.g., `pay_Hdf73kd82`).
-- The server records this in the `payments` table with a `UNIQUE` constraint on `provider_payment_id`.
-- If Razorpay retries webhook delivery due to network latency, subsequent requests match the unique constraint, return `200 OK` immediately, and avoid redundant state changes or double deductions.
+### 4.3 Idempotency & Double-Spend Protection `[CONFIRMED]`
+Every payment event is recorded with a unique constraint on `provider_payment_id`. Repeated webhook deliveries match the unique constraint, return HTTP 200 OK immediately, and avoid redundant state changes or double deductions.
 
 ---
 
-## 4. Secret Management & Credential Isolation
+## 5. Audit Logging & Operational Accountability
 
-### 4.1 Strict Credential Boundary Rules
-Under NO circumstances may privileged keys be embedded in client-side code bundles:
+### 5.1 Sensitive Admin Operations Audit `[CONFIRMED]`
+The following actions must generate an append-only entry in `public.audit_logs`:
+- Any manual modification to product base prices or tax rates.
+- Any manual physical stock count adjustment or spoilage write-off.
+- Any staff role creation, promotion, or deactivation.
+- Any customer order cancellation and refund issuance.
+- Any manual store emergency closure toggle.
 
-| Credential | Scope | Where Stored / Exposed | Prohibited Locations |
-| :--- | :--- | :--- | :--- |
-| **Supabase Anon Key** | Public Read / Auth Init | Public Client Code (Next.js public env, Android `BuildConfig`) | Safe for public exposure (guarded by RLS) |
-| **Supabase Service Role Key** | Full DB Superuser Access | **Server Runtime ONLY** (Next.js server env, secure container) | **STRICTLY FORBIDDEN** in Web client bundles, Android APK, Git |
-| **Razorpay Key ID** | Public Merchant Identifier | Client Checkout UI & Server | Publicly visible (safe) |
-| **Razorpay Key Secret** | Financial Capture & Refund | **Server Runtime ONLY** | **STRICTLY FORBIDDEN** in Web client bundles, Android APK, Git |
-| **Razorpay Webhook Secret** | Webhook HMAC Verification | **Server Runtime ONLY** | **STRICTLY FORBIDDEN** in Web client bundles, Android APK, Git |
-| **SMS Gateway API Key** | OTP Dispatch | **Server Runtime ONLY** (or Supabase Auth provider dashboard) | **STRICTLY FORBIDDEN** in Web client bundles, Android APK, Git |
+The `public.audit_logs` table is strictly append-only. No user role, including `admin`, possesses `DELETE` or `UPDATE` permissions on audit records.
 
-### 4.2 Native Android App Hardening
-- **Android Keystore:** User authentication tokens (JWT and refresh tokens) are encrypted using keys generated inside the hardware-backed Android Keystore system.
-- **R8 / ProGuard Obfuscation:** Release builds must enable code shrinking, obfuscation, and optimization to hinder reverse-engineering.
-- **Root Detection / Safety:** Basic integrity checks to prevent running administrative counter functions on compromised or rooted devices.
-
----
-
-## 5. Network & Operational Security
-
-### 5.1 Content Security Policy (CSP) & Web Headers
-All web interfaces (Customer & Admin) must serve hardened HTTP headers:
-- `Content-Security-Policy`: Restricts script execution to self, Razorpay checkout domains (`checkout.razorpay.com`), and Supabase API origins.
-- `Strict-Transport-Security`: Enforces TLS 1.3 with `max-age=31536000; includeSubDomains`.
-- `X-Frame-Options: DENY`: Prevents clickjacking attacks.
-- `X-Content-Type-Options: nosniff`: Prevents MIME-type sniffing.
-
-### 5.2 API Rate Limiting
-- Public Endpoints (`/api/v1/catalog/*`): 120 requests / minute / IP.
-- Auth Endpoints (`/api/v1/auth/otp/*`): 5 requests / 10 minutes / IP & Phone.
-- Checkout Endpoints (`/api/v1/orders/checkout`): 10 requests / minute / Customer ID.
-
-### 5.3 Audit Logging for Sensitive Admin Operations
-Any manual change to product base prices, manual inventory adjustments, or cancellation of confirmed orders must trigger an insert into `public.audit_logs`:
-- Captures: `actor_id`, `actor_role`, `action`, `entity_type`, `entity_id`, `old_values` (JSONB), `new_values` (JSONB), `ip_address`, and UTC timestamp.
-- Audit logs are append-only. No user, including `admin` role, has `DELETE` permissions on `public.audit_logs`.
-
-### 5.4 Database Backups & Disaster Recovery
-- **Daily Automated Backups:** Maintained by Supabase managed service with 7-day retention for development/staging, and 30-day retention with Point-in-Time Recovery (PITR) for production.
-- **RTO (Recovery Time Objective):** < 1 hour in case of catastrophic instance failure.
-- **RPO (Recovery Point Objective):** < 5 minutes using continuous Write-Ahead Log (WAL) archiving.
+### 5.2 Database Backups & Disaster Recovery `[CONFIRMED]`
+- **Automated Daily Backups:** Managed by Supabase with 7-day retention in staging and 30-day retention with Point-in-Time Recovery (PITR) in production.
+- **Continuous WAL Archiving:** Enables restoration to any point in time within minutes of an incident.
