@@ -26,11 +26,11 @@ jobs:
           version: latest
 
       - name: Start Database
-        run: supabase db start
+        run: supabase start
 
       - name: Execute pgTAP Database Tests
         run: supabase test db --debug
 
       - name: Stop Database
         if: always()
-        run: supabase stop
+        run: supabase stop --no-backup
