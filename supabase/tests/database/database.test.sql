@@ -57,9 +57,9 @@ ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO public.products (id, category_id, name, slug, base_price)
 VALUES 
-    ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '11111111-1111-1111-1111-111111111111', 'Test Prod A', 'test-prod-a', 100.00),
-    ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', '11111111-1111-1111-1111-111111111111', 'Test Prod B', 'test-prod-b', 100.00),
-    ('cccccccc-cccc-cccc-cccc-cccccccccccc', '11111111-1111-1111-1111-111111111111', 'Test Prod C', 'test-prod-c', 100.00)
+    ('e1111111-1111-1111-1111-111111111111', '11111111-1111-1111-1111-111111111111', 'Constraint Prod 1', 'constraint-prod-1', 100.00),
+    ('e2222222-2222-2222-2222-222222222222', '11111111-1111-1111-1111-111111111111', 'Constraint Prod 2', 'constraint-prod-2', 100.00),
+    ('e3333333-3333-3333-3333-333333333333', '11111111-1111-1111-1111-111111111111', 'Constraint Prod 3', 'constraint-prod-3', 100.00)
 ON CONFLICT (id) DO NOTHING;
 
 -- ------------------------------------------------------------------------------
@@ -68,22 +68,22 @@ ON CONFLICT (id) DO NOTHING;
 -- Test negative product base_price rejection
 PREPARE bad_price AS INSERT INTO public.products (category_id, name, slug, base_price)
 VALUES ('11111111-1111-1111-1111-111111111111', 'Bad Price Cake', 'bad-price-cake', -10.00);
-SELECT throws_ok('bad_price', '23514', NULL, 'chk_base_price_non_negative must reject negative product price');
+SELECT throws_ok('bad_price', '23514', 'chk_base_price_non_negative must reject negative product price');
 
 -- Test stock balance invariant: reserved_stock cannot exceed physical_stock
 PREPARE bad_stock AS INSERT INTO public.inventory (product_id, physical_stock, reserved_stock)
-VALUES ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 5, 10);
-SELECT throws_ok('bad_stock', '23514', NULL, 'chk_stock_balance must reject reserved_stock > physical_stock');
+VALUES ('e1111111-1111-1111-1111-111111111111', 5, 10);
+SELECT throws_ok('bad_stock', '23514', 'chk_stock_balance must reject reserved_stock > physical_stock');
 
 -- Test negative physical_stock rejection
 PREPARE negative_physical AS INSERT INTO public.inventory (product_id, physical_stock, reserved_stock)
-VALUES ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', -1, 0);
-SELECT throws_ok('negative_physical', '23514', NULL, 'chk_physical_non_negative must reject negative physical_stock');
+VALUES ('e2222222-2222-2222-2222-222222222222', -1, 0);
+SELECT throws_ok('negative_physical', '23514', 'chk_physical_non_negative must reject negative physical_stock');
 
 -- Test negative reserved_stock rejection
 PREPARE negative_reserved AS INSERT INTO public.inventory (product_id, physical_stock, reserved_stock)
-VALUES ('cccccccc-cccc-cccc-cccc-cccccccccccc', 10, -2);
-SELECT throws_ok('negative_reserved', '23514', NULL, 'chk_reserved_non_negative must reject negative reserved_stock');
+VALUES ('e3333333-3333-3333-3333-333333333333', 10, -2);
+SELECT throws_ok('negative_reserved', '23514', 'chk_reserved_non_negative must reject negative reserved_stock');
 
 -- Test Cash Order expiry constraint: cash orders must NOT have an online expiry timestamp
 PREPARE bad_cash_expiry AS INSERT INTO public.orders (
@@ -95,18 +95,18 @@ PREPARE bad_cash_expiry AS INSERT INTO public.orders (
     NOW() + INTERVAL '1 hour', 'confirmed', 'unpaid', 'cash_at_pickup',
     100.00, 100.00, NOW() + INTERVAL '10 minutes'
 );
-SELECT throws_ok('bad_cash_expiry', '23514', NULL, 'chk_cash_no_online_expiry must reject cash orders with expires_at set');
+SELECT throws_ok('bad_cash_expiry', '23514', 'chk_cash_no_online_expiry must reject cash orders with expires_at set');
 
 -- ------------------------------------------------------------------------------
 -- 3. Stored Procedures Existence & Execution Permissions
 -- ------------------------------------------------------------------------------
-SELECT has_function('public', 'rpc_reserve_order_stock', 'rpc_reserve_order_stock must exist');
-SELECT has_function('public', 'rpc_release_expired_reservations', 'rpc_release_expired_reservations must exist');
-SELECT has_function('public', 'rpc_reconcile_late_payment', 'rpc_reconcile_late_payment must exist');
-SELECT has_function('public', 'rpc_complete_order_handover', 'rpc_complete_order_handover must exist');
-SELECT has_function('public', 'rpc_write_off_inventory', 'rpc_write_off_inventory must exist');
-SELECT has_function('public', 'rpc_cancel_order', 'rpc_cancel_order must exist');
-SELECT has_function('public', 'rpc_issue_refund', 'rpc_issue_refund must exist');
+SELECT has_function('rpc_reserve_order_stock', 'rpc_reserve_order_stock must exist');
+SELECT has_function('rpc_release_expired_reservations', 'rpc_release_expired_reservations must exist');
+SELECT has_function('rpc_reconcile_late_payment', 'rpc_reconcile_late_payment must exist');
+SELECT has_function('rpc_complete_order_handover', 'rpc_complete_order_handover must exist');
+SELECT has_function('rpc_write_off_inventory', 'rpc_write_off_inventory must exist');
+SELECT has_function('rpc_cancel_order', 'rpc_cancel_order must exist');
+SELECT has_function('rpc_issue_refund', 'rpc_issue_refund must exist');
 
 -- ------------------------------------------------------------------------------
 -- 4. Test RPC: Inventory Reservation (Online & Cash Parity)
@@ -188,7 +188,7 @@ PREPARE mismatched_idemp AS SELECT * FROM public.rpc_reserve_order_stock(
     'different-payload-hash',
     'Extra candles'
 );
-SELECT throws_ok('mismatched_idemp', NULL, 'Idempotency key reused with mismatched order payload.', 'Payload mismatch must abort with exception');
+SELECT throws_ok('mismatched_idemp', 'Idempotency key reused with mismatched order payload.', 'Payload mismatch must abort with exception');
 
 -- Action 4: All-or-Nothing Oversell Rejection
 PREPARE oversell_order AS SELECT * FROM public.rpc_reserve_order_stock(
@@ -203,7 +203,7 @@ PREPARE oversell_order AS SELECT * FROM public.rpc_reserve_order_stock(
     'hash-oversell',
     NULL
 );
-SELECT throws_ok('oversell_order', NULL, NULL, 'Oversell attempt must abort and leave stock intact');
+SELECT throws_ok('oversell_order', 'Oversell attempt must abort and leave stock intact');
 
 -- ------------------------------------------------------------------------------
 -- 5. Test RPC: Cash-at-Pickup Order Lifecycle
@@ -284,7 +284,7 @@ PREPARE blocked_write_off AS SELECT * FROM public.rpc_write_off_inventory(
     '00000000-0000-0000-0000-000000000003',
     'Spilled batch'
 );
-SELECT throws_ok('blocked_write_off', NULL, NULL, 'Write-off exceeding available stock must be blocked');
+SELECT throws_ok('blocked_write_off', 'Write-off exceeding available stock must be blocked');
 
 -- Writing off 2 units (2 <= 7) succeeds cleanly
 SELECT * FROM public.rpc_write_off_inventory(
