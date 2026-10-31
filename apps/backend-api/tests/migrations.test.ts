@@ -118,7 +118,10 @@ describe('Supabase Database Migrations & Security Invariants', () => {
     const testFiles = readdirSync(testsDir).filter((f) => f.endsWith('.sql'));
     expect(testFiles.length).toBeGreaterThanOrEqual(1);
 
-    const testSql = readFileSync(join(testsDir, 'database.test.sql'), 'utf-8');
+    const testFilePath = existsSync(join(testsDir, 'database/database.test.sql'))
+      ? join(testsDir, 'database/database.test.sql')
+      : join(testsDir, 'database.test.sql');
+    const testSql = readFileSync(testFilePath, 'utf-8');
     expect(testSql).toContain('plan(');
     expect(testSql).toContain('chk_stock_balance');
     expect(testSql).toContain('rpc_reserve_order_stock');

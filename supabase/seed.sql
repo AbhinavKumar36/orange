@@ -27,7 +27,7 @@ VALUES
   'authenticated',
   'authenticated',
   'customer@moodyorange.local',
-  crypt('password123', gen_salt('bf')),
+  extensions.crypt('password123', extensions.gen_salt('bf')),
   NOW(),
   '{"provider":"email","providers":["email"]}',
   '{}',
@@ -41,7 +41,7 @@ VALUES
   'authenticated',
   'authenticated',
   'staff@moodyorange.local',
-  crypt('password123', gen_salt('bf')),
+  extensions.crypt('password123', extensions.gen_salt('bf')),
   NOW(),
   '{"provider":"email","providers":["email"]}',
   '{}',
@@ -55,7 +55,7 @@ VALUES
   'authenticated',
   'authenticated',
   'manager@moodyorange.local',
-  crypt('password123', gen_salt('bf')),
+  extensions.crypt('password123', extensions.gen_salt('bf')),
   NOW(),
   '{"provider":"email","providers":["email"]}',
   '{}',
@@ -69,7 +69,7 @@ VALUES
   'authenticated',
   'authenticated',
   'admin@moodyorange.local',
-  crypt('password123', gen_salt('bf')),
+  extensions.crypt('password123', extensions.gen_salt('bf')),
   NOW(),
   '{"provider":"email","providers":["email"]}',
   '{}',
@@ -123,7 +123,7 @@ VALUES
   'email',
   NOW(), NOW(), NOW()
 )
-ON CONFLICT (provider, provider_id) DO NOTHING;
+ON CONFLICT DO NOTHING;
 
 -- 3. Profiles
 INSERT INTO public.profiles (id, phone, full_name, email)

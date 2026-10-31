@@ -25,6 +25,44 @@ SELECT has_table('public', 'refunds', 'Table public.refunds must exist');
 SELECT has_table('public', 'audit_logs', 'Table public.audit_logs must exist');
 
 -- ------------------------------------------------------------------------------
+-- Setup Hermetic Test Users, Categories & Products
+-- Ensures foreign keys are satisfied for all subsequent tests
+-- ------------------------------------------------------------------------------
+INSERT INTO auth.users (id, email)
+VALUES 
+    ('00000000-0000-0000-0000-000000000001', 'customer@moodyorange.local'),
+    ('00000000-0000-0000-0000-000000000002', 'staff@moodyorange.local'),
+    ('00000000-0000-0000-0000-000000000003', 'manager@moodyorange.local'),
+    ('00000000-0000-0000-0000-000000000004', 'admin@moodyorange.local')
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO public.profiles (id, phone, full_name, email)
+VALUES 
+    ('00000000-0000-0000-0000-000000000001', '+919876543210', 'Test Customer', 'customer@moodyorange.local'),
+    ('00000000-0000-0000-0000-000000000002', '+919876543211', 'Counter Staff', 'staff@moodyorange.local'),
+    ('00000000-0000-0000-0000-000000000003', '+919876543212', 'Store Manager', 'manager@moodyorange.local'),
+    ('00000000-0000-0000-0000-000000000004', '+919876543213', 'System Administrator', 'admin@moodyorange.local')
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO public.staff_roles (user_id, role, is_active)
+VALUES 
+    ('00000000-0000-0000-0000-000000000002', 'counter_staff', true),
+    ('00000000-0000-0000-0000-000000000003', 'manager', true),
+    ('00000000-0000-0000-0000-000000000004', 'admin', true)
+ON CONFLICT (user_id) DO NOTHING;
+
+INSERT INTO public.categories (id, name, slug) 
+VALUES ('11111111-1111-1111-1111-111111111111', 'Test Category', 'test-category')
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO public.products (id, category_id, name, slug, base_price)
+VALUES 
+    ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '11111111-1111-1111-1111-111111111111', 'Test Prod A', 'test-prod-a', 100.00),
+    ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', '11111111-1111-1111-1111-111111111111', 'Test Prod B', 'test-prod-b', 100.00),
+    ('cccccccc-cccc-cccc-cccc-cccccccccccc', '11111111-1111-1111-1111-111111111111', 'Test Prod C', 'test-prod-c', 100.00)
+ON CONFLICT (id) DO NOTHING;
+
+-- ------------------------------------------------------------------------------
 -- 2. Constraints: Stock Balance & Negative Values
 -- ------------------------------------------------------------------------------
 -- Test negative product base_price rejection
