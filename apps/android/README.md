@@ -7,13 +7,15 @@
 - JDK 17
 - Android SDK 35 (compileSdk), minSdk 26
 
-## Setup Instructions
-1. Copy the environment configuration template:
+## Setup & Configuration
+1. **SDK Path**:
+   Android Studio automatically populates `sdk.dir` in `local.properties` based on your machine's installation. Do not commit machine-specific SDK paths to Git.
+2. **API & Supabase Configuration**:
+   Copy `local.properties.example` to `local.properties`:
    ```bash
    cp local.properties.example local.properties
    ```
-2. Open `apps/android` in Android Studio.
-3. Allow Gradle to sync.
-4. Run on an Android emulator or connected device with API level 26+.
-   *(Note: Android emulator uses `10.0.2.2` to access host `localhost` services).*
-
+   The Gradle build will automatically read `API_BASE_URL`, `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `RAZORPAY_KEY_ID` from `local.properties` (or from environment variables in CI).
+3. **Open in Android Studio**:
+   Open `apps/android` directly in Android Studio. Gradle will sync automatically and prepare build targets.
+   *(Note: Android emulator maps `10.0.2.2` to the host machine `localhost`).*

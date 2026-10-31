@@ -1,7 +1,21 @@
+import { fileURLToPath } from 'node:url';
+import path from 'node:path';
+import type { FastifyInstance } from 'fastify';
 import { loadConfig } from './config/env.js';
 import { buildApp } from './app.js';
 
-async function startServer() {
+export function isDirectExecution(): boolean {
+  if (!process.argv[1]) return false;
+  try {
+    const currentModulePath = path.resolve(fileURLToPath(import.meta.url));
+    const executedScriptPath = path.resolve(process.argv[1]);
+    return currentModulePath.toLowerCase() === executedScriptPath.toLowerCase();
+  } catch {
+    return false;
+  }
+}
+
+export async function startServer(): Promise<FastifyInstance | undefined> {
   try {
     const config = loadConfig();
     const app = await buildApp({ config });
@@ -28,17 +42,14 @@ async function startServer() {
 
     app.log.info(`Moody Orange Backend API running on http://${config.HOST}:${config.PORT}`);
     app.log.info(`Health check available at http://${config.HOST}:${config.PORT}/health`);
+    return app;
   } catch (error) {
     console.error('Fatal startup error:', error);
     process.exit(1);
   }
 }
 
-// Only start when executed directly
-if (process.argv[1] && import.meta.url.endsWith(process.argv[1].replace(/\\/g, '/'))) {
-  startServer();
-} else {
-  // Fallback direct execution check for tsx/node
+// Only start the network listener when this module is directly executed
+if (isDirectExecution()) {
   startServer();
 }
-

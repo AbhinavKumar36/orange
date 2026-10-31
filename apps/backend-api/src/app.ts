@@ -1,7 +1,7 @@
 import fastify, { type FastifyInstance, type FastifyServerOptions } from 'fastify';
 import cors from '@fastify/cors';
 import { type AppConfig, loadConfig } from './config/env.js';
-import { errorHandlerPlugin } from './plugins/errorHandler.js';
+import { setupErrorHandler } from './plugins/errorHandler.js';
 import { healthRoutes } from './routes/health.js';
 
 export interface BuildAppOptions {
@@ -15,6 +15,13 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
   const app = fastify({
     logger: options.fastifyOptions?.logger ?? {
       level: config.NODE_ENV === 'test' ? 'silent' : 'info',
+      redact: [
+        'req.headers.authorization',
+        'req.headers.cookie',
+        'req.headers["x-idempotency-key"]',
+        'req.headers["x-refund-idempotency-key"]',
+        'req.headers["x-supabase-key"]',
+      ],
     },
     ...options.fastifyOptions,
   });
@@ -27,12 +34,11 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
     credentials: true,
   });
 
-  // Register central error handling
-  await app.register(errorHandlerPlugin);
+  // Configure central error handling on root instance
+  setupErrorHandler(app);
 
   // Register routes
   await app.register(healthRoutes);
 
   return app;
 }
-

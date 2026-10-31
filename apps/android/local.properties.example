@@ -1,12 +1,20 @@
-sdk.dir=/Users/username/Library/Android/sdk
+## Moody Orange — Android Local Configuration Template
+##
+## NOTE ON sdk.dir:
+## Do NOT hardcode or commit sdk.dir in this template.
+## Android Studio automatically detects and configures the developer-specific SDK path
+## in `local.properties` upon opening the project (e.g. C:\Users\<user>\AppData\Local\Android\Sdk on Windows
+## or /Users/<user>/Library/Android/sdk on macOS).
+##
+## To configure local development properties:
+## Copy this file to `apps/android/local.properties` and customize if needed:
 
-# Backend API Endpoint (10.0.2.2 maps to host machine in Android Emulator)
+# Backend API Endpoint (10.0.2.2 maps to host machine in standard Android Emulator)
 API_BASE_URL=http://10.0.2.2:4000/api/v1/
 
-# Supabase Public Keys
+# Supabase Public Keys (Client-safe anon key; NEVER expose service role key)
 SUPABASE_URL=http://10.0.2.2:54321
 SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.example_anon_key
 
-# Razorpay Public Merchant ID (Secret key is NEVER present in Android)
+# Razorpay Public Merchant ID (Secret key is NEVER present in Android application)
 RAZORPAY_KEY_ID=rzp_test_exampleKeyId1234
-

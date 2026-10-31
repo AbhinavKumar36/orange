@@ -1,8 +1,34 @@
+import java.util.Properties
+import java.io.FileInputStream
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.serialization)
 }
+
+// Safely load local development properties if present
+val localProperties = Properties()
+val localPropertiesFile = rootProject.file("local.properties")
+if (localPropertiesFile.exists()) {
+    FileInputStream(localPropertiesFile).use { localProperties.load(it) }
+}
+
+val apiBaseUrl: String = localProperties.getProperty("API_BASE_URL")
+    ?: System.getenv("API_BASE_URL")
+    ?: "http://10.0.2.2:4000/api/v1/"
+
+val supabaseUrl: String = localProperties.getProperty("SUPABASE_URL")
+    ?: System.getenv("SUPABASE_URL")
+    ?: "http://10.0.2.2:54321"
+
+val supabaseAnonKey: String = localProperties.getProperty("SUPABASE_ANON_KEY")
+    ?: System.getenv("SUPABASE_ANON_KEY")
+    ?: ""
+
+val razorpayKeyId: String = localProperties.getProperty("RAZORPAY_KEY_ID")
+    ?: System.getenv("RAZORPAY_KEY_ID")
+    ?: ""
 
 android {
     namespace = "com.moodyorange.app"
@@ -19,6 +45,11 @@ android {
         vectorDrawables {
             useSupportLibrary = true
         }
+
+        buildConfigField("String", "API_BASE_URL", "\"$apiBaseUrl\"")
+        buildConfigField("String", "SUPABASE_URL", "\"$supabaseUrl\"")
+        buildConfigField("String", "SUPABASE_ANON_KEY", "\"$supabaseAnonKey\"")
+        buildConfigField("String", "RAZORPAY_KEY_ID", "\"$razorpayKeyId\"")
     }
 
     buildTypes {
@@ -39,6 +70,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 
@@ -53,4 +85,3 @@ dependencies {
     implementation(libs.androidx.material3)
     debugImplementation(libs.androidx.ui.tooling)
 }
-

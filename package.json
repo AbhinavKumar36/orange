@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "packageManager": "npm@11.19.1",
   "workspaces": [
     "apps/*",
     "packages/*"
@@ -20,4 +21,3 @@
     "turbo": "^2.4.4"
   }
 }
-

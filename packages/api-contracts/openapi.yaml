@@ -5,17 +5,19 @@ info:
     Authoritative REST API specification for Moody Orange boutique quick-commerce
     ordering platform.
   version: 1.0.0
+  license:
+    name: Proprietary
+    identifier: Proprietary
 servers:
   - url: /api/v1
     description: Current API version root
-  - url: http://localhost:4000/api/v1
-    description: Local development backend server
 paths:
   /health:
     get:
       summary: Health check endpoint
       description: Returns service health status.
       operationId: getHealth
+      security: []
       responses:
         '200':
           description: Service is healthy and operational.
@@ -23,6 +25,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HealthResponse'
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 components:
   schemas:
     HealthResponse:
@@ -35,4 +43,25 @@ components:
       required:
         - status
       additionalProperties: false
-
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            statusCode:
+              type: integer
+              example: 500
+            code:
+              type: string
+              example: INTERNAL_SERVER_ERROR
+            message:
+              type: string
+              example: An error occurred
+          required:
+            - statusCode
+            - code
+            - message
+      required:
+        - error
+      additionalProperties: false
