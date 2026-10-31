@@ -1,0 +1,38 @@
+openapi: 3.1.0
+info:
+  title: Moody Orange API
+  description: >-
+    Authoritative REST API specification for Moody Orange boutique quick-commerce
+    ordering platform.
+  version: 1.0.0
+servers:
+  - url: /api/v1
+    description: Current API version root
+  - url: http://localhost:4000/api/v1
+    description: Local development backend server
+paths:
+  /health:
+    get:
+      summary: Health check endpoint
+      description: Returns service health status.
+      operationId: getHealth
+      responses:
+        '200':
+          description: Service is healthy and operational.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+components:
+  schemas:
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [ok]
+          example: ok
+      required:
+        - status
+      additionalProperties: false
+

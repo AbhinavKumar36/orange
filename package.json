@@ -1,0 +1,23 @@
+{
+  "name": "orange",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "typecheck": "turbo run typecheck",
+    "contracts:lint": "turbo run lint --filter=@orange/api-contracts",
+    "secret-scan": "node scripts/secret-scan.mjs"
+  },
+  "devDependencies": {
+    "turbo": "^2.4.4"
+  }
+}
+

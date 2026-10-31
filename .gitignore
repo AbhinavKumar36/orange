@@ -16,13 +16,33 @@ local.properties
 node_modules/
 .pnpm-store/
 
+# Turborepo
+.turbo/
+
 # Build Outputs
 .next/
 dist/
 build/
 out/
+
+# Android Generated Files
+.gradle/
+captures/
+.externalNativeBuild/
+.cxx/
 *.apk
 *.aab
+
+# Testing and Coverage
+coverage/
+.nyc_output/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
 
 # IDEs
 .idea/
@@ -30,6 +50,6 @@ out/
 *.swp
 *.swo
 
-# Supabase
+# Supabase Local
 .supabase/
 supabase/.temp/

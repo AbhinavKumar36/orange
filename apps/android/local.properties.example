@@ -1,0 +1,12 @@
+sdk.dir=/Users/username/Library/Android/sdk
+
+# Backend API Endpoint (10.0.2.2 maps to host machine in Android Emulator)
+API_BASE_URL=http://10.0.2.2:4000/api/v1/
+
+# Supabase Public Keys
+SUPABASE_URL=http://10.0.2.2:54321
+SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.example_anon_key
+
+# Razorpay Public Merchant ID (Secret key is NEVER present in Android)
+RAZORPAY_KEY_ID=rzp_test_exampleKeyId1234
+
