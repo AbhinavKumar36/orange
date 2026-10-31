@@ -28,12 +28,12 @@ SELECT has_table('public', 'audit_logs', 'Table public.audit_logs must exist');
 -- Setup Hermetic Test Users, Categories & Products
 -- Ensures foreign keys are satisfied for all subsequent tests
 -- ------------------------------------------------------------------------------
-INSERT INTO auth.users (id, email)
+INSERT INTO auth.users (id, aud, role, email)
 VALUES 
-    ('00000000-0000-0000-0000-000000000001', 'customer@moodyorange.local'),
-    ('00000000-0000-0000-0000-000000000002', 'staff@moodyorange.local'),
-    ('00000000-0000-0000-0000-000000000003', 'manager@moodyorange.local'),
-    ('00000000-0000-0000-0000-000000000004', 'admin@moodyorange.local')
+    ('00000000-0000-0000-0000-000000000001', 'authenticated', 'authenticated', 'customer@moodyorange.local'),
+    ('00000000-0000-0000-0000-000000000002', 'authenticated', 'authenticated', 'staff@moodyorange.local'),
+    ('00000000-0000-0000-0000-000000000003', 'authenticated', 'authenticated', 'manager@moodyorange.local'),
+    ('00000000-0000-0000-0000-000000000004', 'authenticated', 'authenticated', 'admin@moodyorange.local')
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO public.profiles (id, phone, full_name, email)

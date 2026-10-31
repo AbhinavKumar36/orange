@@ -7,14 +7,6 @@
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
--- In pure PostgreSQL / standalone test environments, ensure auth schema and auth.users exist
-CREATE SCHEMA IF NOT EXISTS auth;
-CREATE TABLE IF NOT EXISTS auth.users (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    email VARCHAR(255) UNIQUE,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT TIMEZONE('utc', NOW())
-);
-
 -- 2. Enumerated Types
 DO $$ BEGIN
     CREATE TYPE order_status_enum AS ENUM (
