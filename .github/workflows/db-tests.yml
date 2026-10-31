@@ -1,0 +1,40 @@
+name: Database Tests & Invariants
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'supabase/**'
+      - '.github/workflows/db-tests.yml'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'supabase/**'
+      - '.github/workflows/db-tests.yml'
+
+jobs:
+  db-tests:
+    name: Supabase Migrations & pgTAP Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Start local Supabase Stack
+        run: supabase start
+
+      - name: Apply Database Migrations & Seeds
+        run: supabase db reset
+
+      - name: Execute pgTAP Database Tests
+        run: supabase test db
+
+      - name: Stop Supabase Stack
+        if: always()
+        run: supabase stop
+
