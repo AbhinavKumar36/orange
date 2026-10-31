@@ -26,7 +26,7 @@ jobs:
           version: latest
 
       - name: Start Database
-        run: supabase start
+        run: supabase start --debug --exclude studio,realtime,storage-api,imgproxy,inbucket,edge-runtime
 
       - name: Execute pgTAP Database Tests
         run: supabase test db --debug
