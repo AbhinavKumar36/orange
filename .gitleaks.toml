@@ -1,0 +1,30 @@
+# Gitleaks Configuration for Moody Orange
+title = "Moody Orange Gitleaks Configuration"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Allowlist documented sanitized environment templates, seed files, and test mocks"
+paths = [
+  '''(?i)\.env\.example$''',
+  '''(?i)local\.properties\.example$''',
+  '''(?i)docs/.*''',
+  '''(?i)supabase/seed\.sql$''',
+  '''(?i)tests/.*''',
+  '''(?i)apps/.*/tests/.*''',
+  '''(?i)scripts/secret-scan\.mjs$'''
+]
+regexes = [
+  '''(?i)example_service_role_key''',
+  '''(?i)example_anon_key''',
+  '''(?i)exampleSecretKeyString''',
+  '''(?i)whsec_exampleWebhookSecretString''',
+  '''(?i)rzp_test_exampleKeyId1234''',
+  '''(?i)mock_dev_service_role_key''',
+  '''(?i)real_secret_token_12345''',
+  '''(?i)secret_key_abcdef''',
+  '''(?i)webhook_secret_xyz''',
+  '''(?i)password123'''
+]
+

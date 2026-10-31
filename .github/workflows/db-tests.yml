@@ -25,16 +25,15 @@ jobs:
         with:
           version: latest
 
-      - name: Start local Supabase Stack
-        run: supabase start
+      - name: Start Database
+        run: supabase db start
 
       - name: Apply Database Migrations & Seeds
         run: supabase db reset
 
       - name: Execute pgTAP Database Tests
-        run: supabase test db
+        run: supabase test db --debug
 
-      - name: Stop Supabase Stack
+      - name: Stop Database
         if: always()
         run: supabase stop
-
