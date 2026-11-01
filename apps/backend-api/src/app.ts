@@ -3,6 +3,7 @@ import cors from '@fastify/cors';
 import { type AppConfig, loadConfig } from './config/env.js';
 import { setupErrorHandler } from './plugins/errorHandler.js';
 import { healthRoutes } from './routes/health.js';
+import { catalogRoutes } from './routes/catalog.js';
 
 export interface BuildAppOptions {
   config?: AppConfig;
@@ -39,6 +40,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
 
   // Register routes
   await app.register(healthRoutes);
+  await app.register(catalogRoutes, { config });
 
   return app;
 }

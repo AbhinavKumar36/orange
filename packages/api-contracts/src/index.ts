@@ -72,3 +72,72 @@ export const RefundStatusEnum = [
 ] as const;
 export const RefundStatusSchema = z.enum(RefundStatusEnum);
 export type RefundStatus = z.infer<typeof RefundStatusSchema>;
+
+// ============================================================================
+// Catalog Domain Contracts (Phase 3: Customer Web Catalog)
+// ============================================================================
+
+export const CategorySchema = z.object({
+  id: z.string().uuid(),
+  name: z.string().min(1),
+  slug: z.string().min(1),
+  description: z.string().nullable().optional(),
+  display_order: z.number().int().default(0),
+});
+export type Category = z.infer<typeof CategorySchema>;
+
+export const CategoryListResponseSchema = z.object({
+  categories: z.array(CategorySchema),
+});
+export type CategoryListResponse = z.infer<typeof CategoryListResponseSchema>;
+
+export const ProductSchema = z.object({
+  id: z.string().uuid(),
+  categoryId: z.string().uuid(),
+  categoryName: z.string().min(1),
+  categorySlug: z.string().min(1),
+  name: z.string().min(1),
+  slug: z.string().min(1),
+  description: z.string().nullable().optional(),
+  basePrice: MoneyInPaiseSchema,
+  taxRatePct: z.number().nonnegative().default(5.0),
+  isVeg: z.boolean().default(true),
+  allergens: z.array(z.string()).default([]),
+  prepTimeMinutes: z.number().int().nonnegative().default(15),
+  imageUrl: z.string().nullable().optional(),
+  isInStock: z.boolean(),
+});
+export type Product = z.infer<typeof ProductSchema>;
+
+export const ProductListResponseSchema = z.object({
+  products: z.array(ProductSchema),
+});
+export type ProductListResponse = z.infer<typeof ProductListResponseSchema>;
+
+export const ProductDetailResponseSchema = z.object({
+  product: ProductSchema,
+});
+export type ProductDetailResponse = z.infer<typeof ProductDetailResponseSchema>;
+
+/**
+ * Format integer paise into displayable INR currency string.
+ * Example: 65000 paise -> "₹650" (or "₹650.00" if showDecimals: true).
+ */
+export function formatPaiseToRupees(
+  paise: number,
+  options?: { showDecimals?: boolean }
+): string {
+  const rupees = paise / 100;
+  if (options?.showDecimals) {
+    return `₹${rupees.toLocaleString('en-IN', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })}`;
+  }
+  return Number.isInteger(rupees)
+    ? `₹${rupees.toLocaleString('en-IN')}`
+    : `₹${rupees.toLocaleString('en-IN', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      })}`;
+}

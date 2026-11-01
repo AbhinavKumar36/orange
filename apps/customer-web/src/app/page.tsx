@@ -1,10 +1,123 @@
-export default function HomePage() {
+'use client';
+
+import { useState, useEffect, useCallback, useMemo, type ReactElement } from 'react';
+import type { Category, Product } from '@orange/api-contracts';
+import { fetchCategories, fetchProducts } from '../lib/api';
+import { Header } from '../components/Header';
+import { Hero } from '../components/Hero';
+import { CategoryNav } from '../components/CategoryNav';
+import { SearchBar } from '../components/SearchBar';
+import { ProductGrid } from '../components/ProductGrid';
+import { BrandValues } from '../components/BrandValues';
+import { Footer } from '../components/Footer';
+import { CartDrawer } from '../components/CartDrawer';
+
+export default function HomePage(): ReactElement {
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [selectedCategorySlug, setSelectedCategorySlug] = useState<string>('');
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [error, setError] = useState<Error | null>(null);
+  const [isCartOpen, setIsCartOpen] = useState<boolean>(false);
+
+  const loadData = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const [cats, prods] = await Promise.all([
+        fetchCategories().catch((e) => {
+          console.warn('Could not load categories:', e);
+          return [] as Category[];
+        }),
+        fetchProducts(),
+      ]);
+      setCategories(cats);
+      setProducts(prods);
+    } catch (err) {
+      setError(err instanceof Error ? err : new Error('Failed to load menu'));
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  // Client-side filtering across current catalog dataset
+  const filteredProducts = useMemo(() => {
+    let result = products;
+
+    if (selectedCategorySlug) {
+      const target = selectedCategorySlug.toLowerCase();
+      result = result.filter((p) => p.categorySlug.toLowerCase() === target);
+    }
+
+    if (searchQuery.trim()) {
+      const q = searchQuery.trim().toLowerCase();
+      result = result.filter(
+        (p) =>
+          p.name.toLowerCase().includes(q) ||
+          (p.description && p.description.toLowerCase().includes(q)) ||
+          p.categoryName.toLowerCase().includes(q)
+      );
+    }
+
+    return result;
+  }, [products, selectedCategorySlug, searchQuery]);
+
+  const handleResetFilters = () => {
+    setSelectedCategorySlug('');
+    setSearchQuery('');
+  };
+
+  const hasActiveFilters = Boolean(selectedCategorySlug || searchQuery.trim());
+
   return (
-    <main style={{ padding: '2rem', fontFamily: 'system-ui, sans-serif' }}>
-      <h1>Moody Orange</h1>
-      <p>Boutique quick-commerce ordering platform for artisanal cakes, fresh juices, and gourmet chocolates.</p>
-      <p><em>Customer Storefront — Foundation established in Phase 1. Complete catalog planned in Phase 3.</em></p>
-    </main>
+    <>
+      <Header onCategorySelect={(slug) => setSelectedCategorySlug(slug)} />
+
+      <main id="main-content">
+        <Hero />
+
+        <section id="menu" className="category-nav-section" aria-label="Menu Catalog">
+          <div className="container">
+            <div className="section-header" style={{ marginBottom: '1.5rem', textAlign: 'left' }}>
+              <div className="section-subtitle">Freshly Made Everyday</div>
+              <h2 className="section-title">Explore Our Artisan Menu</h2>
+            </div>
+
+            <CategoryNav
+              categories={categories}
+              selectedSlug={selectedCategorySlug}
+              onSelectCategory={(slug) => setSelectedCategorySlug(slug)}
+            />
+
+            <SearchBar
+              query={searchQuery}
+              onChange={(q) => setSearchQuery(q)}
+              resultCount={isLoading || error ? undefined : filteredProducts.length}
+            />
+
+            <ProductGrid
+              products={filteredProducts}
+              isLoading={isLoading}
+              error={error}
+              onRetry={loadData}
+              onResetFilters={handleResetFilters}
+              hasActiveFilters={hasActiveFilters}
+              onOpenCart={() => setIsCartOpen(true)}
+            />
+          </div>
+        </section>
+
+        <BrandValues />
+      </main>
+
+      <Footer />
+
+      <CartDrawer isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} />
+    </>
   );
 }
-
