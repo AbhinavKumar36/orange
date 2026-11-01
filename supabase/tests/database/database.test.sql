@@ -8,10 +8,10 @@ BEGIN;
 
 CREATE EXTENSION IF NOT EXISTS pgtap;
 
-SELECT * FROM no_plan();
+SELECT plan(50);
 
 -- ------------------------------------------------------------------------------
--- 1. Schema Existence & Structure Verification
+-- 1. Schema Existence & Structure Verification (Tests 1 - 11)
 -- ------------------------------------------------------------------------------
 SELECT has_table('public', 'profiles', 'Table public.profiles must exist');
 SELECT has_table('public', 'staff_roles', 'Table public.staff_roles must exist');
@@ -54,8 +54,8 @@ VALUES
 ON CONFLICT (user_id) DO NOTHING;
 
 INSERT INTO public.categories (id, name, slug) 
-VALUES ('11111111-1111-1111-1111-111111111111', 'Test Category', 'test-category')
-ON CONFLICT (id) DO NOTHING;
+VALUES ('11111111-1111-1111-1111-111111111111', 'Constraint Test Category', 'constraint-test-category')
+ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, slug = EXCLUDED.slug;
 
 INSERT INTO public.products (id, category_id, name, slug, base_price)
 VALUES 
@@ -65,7 +65,7 @@ VALUES
 ON CONFLICT (id) DO NOTHING;
 
 -- ------------------------------------------------------------------------------
--- 2. Constraints: Stock Balance, Currency Types & Negative Values
+-- 2. Constraints: Stock Balance, Currency Types & Negative Values (Tests 12 - 16)
 -- ------------------------------------------------------------------------------
 SELECT throws_matching(
     $$ INSERT INTO public.products (category_id, name, slug, base_price) VALUES ('11111111-1111-1111-1111-111111111111', 'Bad Price Cake', 'bad-price-cake', -1000) $$,
@@ -106,7 +106,7 @@ SELECT throws_matching(
 );
 
 -- ------------------------------------------------------------------------------
--- 3. Stored Procedures Existence & Execution Permissions
+-- 3. Stored Procedures Existence & Execution Permissions (Tests 17 - 23)
 -- ------------------------------------------------------------------------------
 SELECT has_function('rpc_reserve_order_stock', 'rpc_reserve_order_stock must exist');
 SELECT has_function('rpc_release_expired_reservations', 'rpc_release_expired_reservations must exist');
@@ -117,7 +117,7 @@ SELECT has_function('rpc_cancel_order', 'rpc_cancel_order must exist');
 SELECT has_function('rpc_issue_refund', 'rpc_issue_refund must exist');
 
 -- ------------------------------------------------------------------------------
--- 4. Inventory Privacy & Availability View Verification
+-- 4. Inventory Privacy & Availability View Verification (Tests 24 - 25)
 -- ------------------------------------------------------------------------------
 SELECT results_eq(
     'SELECT count(*)::INT FROM public.product_availability WHERE product_id = ''e1111111-1111-1111-1111-111111111111''',
@@ -125,16 +125,17 @@ SELECT results_eq(
     'product_availability view is accessible and returns record for product'
 );
 
--- Anonymous role cannot query raw inventory
-SELECT throws_matching(
-    $$ SET LOCAL ROLE anon; SELECT * FROM public.inventory; $$,
-    'permission denied for table inventory',
+-- Anonymous role has zero table privileges on raw inventory
+SELECT table_privs_are(
+    'public',
+    'inventory',
+    'anon',
+    ARRAY[]::text[],
     'Anonymous role cannot query raw inventory table'
 );
-RESET ROLE;
 
 -- ------------------------------------------------------------------------------
--- 5. Test RPC: Inventory Reservation, Upper Bounds & Customer Verification
+-- 5. Test RPC: Inventory Reservation, Upper Bounds & Customer Verification (Tests 26 - 31)
 -- ------------------------------------------------------------------------------
 DELETE FROM public.refunds WHERE idempotency_key LIKE 'ref-%';
 DELETE FROM public.payments WHERE provider_payment_id LIKE 'pay_%';
@@ -145,54 +146,54 @@ DELETE FROM public.products WHERE id = 'p0000000-0000-0000-0000-000000000001';
 DELETE FROM public.categories WHERE id = 'c0000000-0000-0000-0000-000000000001';
 
 INSERT INTO public.categories (id, name, slug) 
-VALUES ('c0000000-0000-0000-0000-000000000001', 'Test Category', 'test-cat')
-ON CONFLICT (id) DO NOTHING;
+VALUES ('c0000000-0000-0000-0000-000000000001', 'Order Test Category', 'order-test-category')
+ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, slug = EXCLUDED.slug;
 
 INSERT INTO public.products (id, category_id, name, slug, base_price, tax_rate_pct, prep_time_minutes)
-VALUES ('p0000000-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-000000000001', 'Choco Cake', 'choco-cake', 50000, 5.00, 15)
-ON CONFLICT (id) DO NOTHING;
+VALUES ('p0000000-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-000000000001', 'Order Test Cake', 'order-test-cake', 50000, 5.00, 15)
+ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, slug = EXCLUDED.slug, base_price = EXCLUDED.base_price;
 
 INSERT INTO public.inventory (product_id, physical_stock, reserved_stock)
 VALUES ('p0000000-0000-0000-0000-000000000001', 50, 0)
 ON CONFLICT (product_id) DO UPDATE SET physical_stock = 50, reserved_stock = 0;
 
--- 5a: Customer ID spoofing rejection
+-- 26: Customer ID spoofing rejection
 SELECT throws_matching(
     $$ SELECT * FROM public.rpc_reserve_order_stock(
         '99999999-9999-9999-9999-999999999999'::UUID, '+919876543210', 'Spoofed Customer',
         jsonb_build_array(jsonb_build_object('product_id', 'p0000000-0000-0000-0000-000000000001', 'quantity', 1)),
-        'immediate', NULL, 'online_razorpay', 'idemp-spoof', 'hash-spoof', NULL
+        'immediate'::VARCHAR, NULL::TIMESTAMPTZ, 'online_razorpay'::payment_method_enum, 'idemp-spoof'::VARCHAR, 'hash-spoof'::VARCHAR, NULL::TEXT
     ) $$,
     'does not exist in auth\.users',
     'Customer ID spoofing must be rejected'
 );
 
--- 5b: Quantity bounds and large quantity rejection (> 100 per line)
+-- 27: Quantity bounds and large quantity rejection (> 100 per line)
 SELECT throws_matching(
     $$ SELECT * FROM public.rpc_reserve_order_stock(
         '00000000-0000-0000-0000-000000000001'::UUID, '+919876543210', 'Customer A',
         jsonb_build_array(jsonb_build_object('product_id', 'p0000000-0000-0000-0000-000000000001', 'quantity', 150)),
-        'immediate', NULL, 'online_razorpay', 'idemp-overflow', 'hash-overflow', NULL
+        'immediate'::VARCHAR, NULL::TIMESTAMPTZ, 'online_razorpay'::payment_method_enum, 'idemp-overflow'::VARCHAR, 'hash-overflow'::VARCHAR, NULL::TEXT
     ) $$,
     'Product quantity must be between 1 and 100',
     'Excessive line quantity must be rejected'
 );
 
--- 5c: Empty cart rejection
+-- 28: Empty cart rejection
 SELECT throws_matching(
     $$ SELECT * FROM public.rpc_reserve_order_stock(
         '00000000-0000-0000-0000-000000000001'::UUID, '+919876543210', 'Customer A',
-        '[]'::jsonb, 'immediate', NULL, 'online_razorpay', 'idemp-empty', 'hash', NULL
+        '[]'::jsonb, 'immediate'::VARCHAR, NULL::TIMESTAMPTZ, 'online_razorpay'::payment_method_enum, 'idemp-empty'::VARCHAR, 'hash'::VARCHAR, NULL::TEXT
     ) $$,
     'Cart cannot be empty',
     'Empty cart reservation must abort with exception'
 );
 
--- 5d: Valid Online Reservation: 2 units (2 * 50000 + 5% tax = 105000 paise)
+-- 29 & 30: Valid Online Reservation: 2 units (2 * 50000 + 5% tax = 105000 paise)
 SELECT * FROM public.rpc_reserve_order_stock(
-    '00000000-0000-0000-0000-000000000001', '+919876543210', 'Customer A',
+    '00000000-0000-0000-0000-000000000001'::UUID, '+919876543210', 'Customer A',
     jsonb_build_array(jsonb_build_object('product_id', 'p0000000-0000-0000-0000-000000000001', 'quantity', 2)),
-    'immediate', NULL, 'online_razorpay', 'idemp-001', 'hash-001', 'Extra candles'
+    'immediate'::VARCHAR, NULL::TIMESTAMPTZ, 'online_razorpay'::payment_method_enum, 'idemp-001'::VARCHAR, 'hash-001'::VARCHAR, 'Extra candles'::TEXT
 );
 
 SELECT results_eq(
@@ -207,11 +208,11 @@ SELECT results_eq(
     'Authoritative server pricing calculates total in integer paise'
 );
 
--- 5e: Concurrent Idempotency Replay (Returns existing order safely)
+-- 31: Concurrent Idempotency Replay (Returns existing order safely)
 SELECT * FROM public.rpc_reserve_order_stock(
-    '00000000-0000-0000-0000-000000000001', '+919876543210', 'Customer A',
+    '00000000-0000-0000-0000-000000000001'::UUID, '+919876543210', 'Customer A',
     jsonb_build_array(jsonb_build_object('product_id', 'p0000000-0000-0000-0000-000000000001', 'quantity', 2)),
-    'immediate', NULL, 'online_razorpay', 'idemp-001', 'hash-001', 'Extra candles'
+    'immediate'::VARCHAR, NULL::TIMESTAMPTZ, 'online_razorpay'::payment_method_enum, 'idemp-001'::VARCHAR, 'hash-001'::VARCHAR, 'Extra candles'::TEXT
 );
 
 SELECT results_eq(
@@ -221,7 +222,7 @@ SELECT results_eq(
 );
 
 -- ------------------------------------------------------------------------------
--- 6. Test RPC: Expiration Worker Releases Exactly Once
+-- 6. Test RPC: Expiration Worker Releases Exactly Once (Tests 32 - 34)
 -- ------------------------------------------------------------------------------
 UPDATE public.orders SET expires_at = NOW() - INTERVAL '1 minute' WHERE client_idempotency_key = 'idemp-001';
 
@@ -242,32 +243,32 @@ SELECT results_eq(
 SELECT is(public.rpc_release_expired_reservations(), 0, 'Second run of expiration worker processes zero orders');
 
 -- ------------------------------------------------------------------------------
--- 7. Test RPC: Payment Reconciliation, Currency Verification & Late Capture Tree
+-- 7. Test RPC: Payment Reconciliation, Currency Verification & Late Capture Tree (Tests 35 - 39)
 -- ------------------------------------------------------------------------------
--- 7a: Payment with NULL currency must be rejected
+-- 35: Payment with NULL currency must be rejected
 SELECT throws_matching(
     $$ SELECT * FROM public.rpc_reconcile_late_payment(
         (SELECT id FROM public.orders WHERE client_idempotency_key = 'idemp-001'),
-        'pay_razor_test_null', 'order_razor_test_001', 105000::BIGINT, NULL, '{}'::jsonb
+        'pay_razor_test_null'::VARCHAR, 'order_razor_test_001'::VARCHAR, 105000::BIGINT, NULL::VARCHAR, '{}'::jsonb
     ) $$,
     'Must be exactly INR',
     'NULL payment currency must be rejected'
 );
 
--- 7b: Payment with non-INR currency must be rejected
+-- 36: Payment with non-INR currency must be rejected
 SELECT throws_matching(
     $$ SELECT * FROM public.rpc_reconcile_late_payment(
         (SELECT id FROM public.orders WHERE client_idempotency_key = 'idemp-001'),
-        'pay_razor_test_usd', 'order_razor_test_001', 105000::BIGINT, 'USD', '{}'::jsonb
+        'pay_razor_test_usd'::VARCHAR, 'order_razor_test_001'::VARCHAR, 105000::BIGINT, 'USD'::VARCHAR, '{}'::jsonb
     ) $$,
     'Must be exactly INR',
     'Non-INR payment currency must be rejected'
 );
 
--- 7c: Late payment after reservation expiry triggers atomic re-allocation if stock available
+-- 37: Late payment after reservation expiry triggers atomic re-allocation if stock available
 SELECT * FROM public.rpc_reconcile_late_payment(
     (SELECT id FROM public.orders WHERE client_idempotency_key = 'idemp-001'),
-    'pay_razor_late_001', 'order_razor_test_001', 105000::BIGINT, 'INR', '{}'::jsonb
+    'pay_razor_late_001'::VARCHAR, 'order_razor_test_001'::VARCHAR, 105000::BIGINT, 'INR'::VARCHAR, '{}'::jsonb
 );
 
 SELECT results_eq(
@@ -276,36 +277,36 @@ SELECT results_eq(
     'Late payment re-allocates available stock and confirms order'
 );
 
--- 7d: Duplicate payment webhook with identical provider ID handled idempotently
+-- 38: Duplicate payment webhook with identical provider ID handled idempotently
 SELECT results_eq(
     'SELECT out_action FROM public.rpc_reconcile_late_payment(
         (SELECT id FROM public.orders WHERE client_idempotency_key = ''idemp-001''),
-        ''pay_razor_late_001'', ''order_razor_test_001'', 105000::BIGINT, ''INR'', ''{}''::jsonb
+        ''pay_razor_late_001''::VARCHAR, ''order_razor_test_001''::VARCHAR, 105000::BIGINT, ''INR''::VARCHAR, ''{}''::jsonb
     )',
     'VALUES (''DUPLICATE_EVENT''::VARCHAR)',
     'Duplicate payment webhook returns DUPLICATE_EVENT without error'
 );
 
--- 7e: Reusing provider payment ID on a different order rejected
+-- 39: Reusing provider payment ID on a different order rejected
 SELECT * FROM public.rpc_reserve_order_stock(
-    '00000000-0000-0000-0000-000000000005', '+919876543214', 'Customer 2',
+    '00000000-0000-0000-0000-000000000005'::UUID, '+919876543214', 'Customer 2',
     jsonb_build_array(jsonb_build_object('product_id', 'p0000000-0000-0000-0000-000000000001', 'quantity', 2)),
-    'immediate', NULL, 'online_razorpay', 'idemp-diff-order', 'hash-diff', NULL
+    'immediate'::VARCHAR, NULL::TIMESTAMPTZ, 'online_razorpay'::payment_method_enum, 'idemp-diff-order'::VARCHAR, 'hash-diff'::VARCHAR, NULL::TEXT
 );
 
 SELECT throws_matching(
     $$ SELECT * FROM public.rpc_reconcile_late_payment(
         (SELECT id FROM public.orders WHERE client_idempotency_key = 'idemp-diff-order'),
-        'pay_razor_late_001', 'order_razor_test_002', 105000::BIGINT, 'INR', '{}'::jsonb
+        'pay_razor_late_001'::VARCHAR, 'order_razor_test_002'::VARCHAR, 105000::BIGINT, 'INR'::VARCHAR, '{}'::jsonb
     ) $$,
     'already exists for different order',
     'Reusing provider payment ID on different order is rejected'
 );
 
 -- ------------------------------------------------------------------------------
--- 8. Test RPC: Role-Verified Order Cancellation (No Caller-Controlled Flag)
+-- 8. Test RPC: Role-Verified Order Cancellation (Tests 40 - 42)
 -- ------------------------------------------------------------------------------
--- 8a: Customer cannot cancel order once preparation begins (kitchen prep protection)
+-- 40: Customer cannot cancel order once preparation begins (kitchen prep protection)
 UPDATE public.orders SET order_status = 'preparing' WHERE client_idempotency_key = 'idemp-001';
 
 SELECT throws_matching(
@@ -318,10 +319,10 @@ SELECT throws_matching(
     'Customer cannot cancel order during preparation'
 );
 
--- 8b: Staff member can cancel order during preparation (role verified from DB)
+-- 41: Staff member can cancel order during preparation (role verified from DB)
 SELECT public.rpc_cancel_order(
     (SELECT id FROM public.orders WHERE client_idempotency_key = 'idemp-001'),
-    '00000000-0000-0000-0000-000000000002',
+    '00000000-0000-0000-0000-000000000002'::UUID,
     'Counter staff cancellation'
 );
 
@@ -331,30 +332,34 @@ SELECT results_eq(
     'Staff cancellation sets status to cancelled_by_staff and marks payment refund_pending'
 );
 
--- 8c: Repeated cancellation call is idempotent
-SELECT public.rpc_cancel_order(
-    (SELECT id FROM public.orders WHERE client_idempotency_key = 'idemp-001'),
-    '00000000-0000-0000-0000-000000000002',
-    'Staff cancellation repeated'
+-- 42: Repeated cancellation call is idempotent
+SELECT is(
+    public.rpc_cancel_order(
+        (SELECT id FROM public.orders WHERE client_idempotency_key = 'idemp-001'),
+        '00000000-0000-0000-0000-000000000002'::UUID,
+        'Staff cancellation repeated'
+    ),
+    true,
+    'Repeated cancellation call is idempotent'
 );
 
 -- ------------------------------------------------------------------------------
--- 9. Test RPC: Refunds, Staff Spoofing & Cash Order Immunity
+-- 9. Test RPC: Refunds, Staff Spoofing & Cash Order Immunity (Tests 43 - 45)
 -- ------------------------------------------------------------------------------
--- 9a: Staff ID spoofing rejection (Customer attempting refund)
+-- 43: Staff ID spoofing rejection (Customer attempting refund)
 SELECT throws_matching(
     $$ SELECT * FROM public.rpc_issue_refund(
         (SELECT id FROM public.orders WHERE client_idempotency_key = 'idemp-001'),
-        20000::BIGINT, '00000000-0000-0000-0000-000000000001'::UUID, 'Spoofed refund', 'ref-spoof'
+        20000::BIGINT, '00000000-0000-0000-0000-000000000001'::UUID, 'Spoofed refund', 'ref-spoof'::VARCHAR
     ) $$,
     'not authorized to issue refunds',
     'Customer cannot issue refund'
 );
 
--- 9b: Valid partial refund by manager
+-- 44: Valid partial refund by manager
 SELECT * FROM public.rpc_issue_refund(
     (SELECT id FROM public.orders WHERE client_idempotency_key = 'idemp-001'),
-    50000::BIGINT, '00000000-0000-0000-0000-000000000003', 'Manager partial refund', 'ref-mgr-01'
+    50000::BIGINT, '00000000-0000-0000-0000-000000000003'::UUID, 'Manager partial refund', 'ref-mgr-01'::VARCHAR
 );
 
 SELECT results_eq(
@@ -363,24 +368,24 @@ SELECT results_eq(
     'Valid refund created in refund_pending status'
 );
 
--- 9c: Cash order cannot enter online gateway refund
+-- 45: Cash order cannot enter online gateway refund
 SELECT * FROM public.rpc_reserve_order_stock(
-    '00000000-0000-0000-0000-000000000001', '+919876543210', 'Customer A',
+    '00000000-0000-0000-0000-000000000001'::UUID, '+919876543210', 'Customer A',
     jsonb_build_array(jsonb_build_object('product_id', 'p0000000-0000-0000-0000-000000000001', 'quantity', 1)),
-    'immediate', NULL, 'cash_at_pickup', 'idemp-cash-refund-test', 'hash-cash', NULL
+    'immediate'::VARCHAR, NULL::TIMESTAMPTZ, 'cash_at_pickup'::payment_method_enum, 'idemp-cash-refund-test'::VARCHAR, 'hash-cash'::VARCHAR, NULL::TEXT
 );
 
 SELECT throws_matching(
     $$ SELECT * FROM public.rpc_issue_refund(
         (SELECT id FROM public.orders WHERE client_idempotency_key = 'idemp-cash-refund-test'),
-        52500::BIGINT, '00000000-0000-0000-0000-000000000003'::UUID, 'Attempt online refund on cash', 'ref-cash-bad'
+        52500::BIGINT, '00000000-0000-0000-0000-000000000003'::UUID, 'Attempt online refund on cash', 'ref-cash-bad'::VARCHAR
     ) $$,
     'Cannot issue online gateway refund for cash-at-pickup order',
     'Cash orders cannot enter online refund flow'
 );
 
 -- ------------------------------------------------------------------------------
--- 10. Test RPC: Order Handover & Cancellation of Completed Order
+-- 10. Test RPC: Order Handover & Cancellation of Completed Order (Tests 46 - 48)
 -- ------------------------------------------------------------------------------
 UPDATE public.orders 
 SET order_status = 'ready_for_pickup', payment_status = 'captured' 
@@ -413,7 +418,7 @@ SELECT throws_matching(
 );
 
 -- ------------------------------------------------------------------------------
--- 11. Test RPC: Inventory Write-Off Authorization
+-- 11. Test RPC: Inventory Write-Off Authorization (Tests 49 - 50)
 -- ------------------------------------------------------------------------------
 SELECT throws_matching(
     $$ SELECT * FROM public.rpc_write_off_inventory(
@@ -426,11 +431,10 @@ SELECT throws_matching(
     'Counter staff cannot write off inventory'
 );
 
-SELECT * FROM public.rpc_write_off_inventory(
-    'p0000000-0000-0000-0000-000000000001'::UUID,
-    1,
-    '00000000-0000-0000-0000-000000000003'::UUID,
-    'Manager valid write off'
+SELECT results_eq(
+    'SELECT out_physical_stock, out_reserved_stock, out_available_stock FROM public.rpc_write_off_inventory(''p0000000-0000-0000-0000-000000000001''::UUID, 1, ''00000000-0000-0000-0000-000000000003''::UUID, ''Manager valid write off'')',
+    'VALUES (49, 0, 49)',
+    'Manager valid write-off decrements physical stock'
 );
 
 SELECT * FROM finish();
