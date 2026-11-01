@@ -12,6 +12,15 @@ const IGNORED_DIRS = new Set([
   'coverage',
 ]);
 
+const IGNORED_FILES = new Set([
+  '.env',
+  '.env.local',
+  '.env.development.local',
+  '.env.test.local',
+  '.env.production.local',
+  'local.properties',
+]);
+
 const BINARY_EXTENSIONS = new Set([
   '.png', '.jpg', '.jpeg', '.gif', '.ico', '.webp', '.svg',
   '.woff', '.woff2', '.ttf', '.eot', '.apk', '.aab', '.jar',
@@ -61,7 +70,7 @@ function scanDirectory(dir) {
   }
 
   for (const entry of entries) {
-    if (IGNORED_DIRS.has(entry)) continue;
+    if (IGNORED_DIRS.has(entry) || IGNORED_FILES.has(entry)) continue;
     const fullPath = join(dir, entry);
 
     let stat;

@@ -38,3 +38,4 @@ class CatalogRepositoryImpl(
         return apiClient.getProductByIdOrSlug(idOrSlug)
     }
 }
+

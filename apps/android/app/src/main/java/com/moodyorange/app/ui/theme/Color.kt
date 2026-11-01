@@ -25,3 +25,4 @@ val InStockBg = Color(0xFFE8F5E9)
 
 val OutOfStockRed = Color(0xFFB71C1C)
 val OutOfStockBg = Color(0xFFFFEBEE)
+

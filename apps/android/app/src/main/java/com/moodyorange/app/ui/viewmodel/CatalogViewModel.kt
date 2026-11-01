@@ -131,3 +131,4 @@ class CatalogViewModel(
         _productDetailState.value = UiState.Idle
     }
 }
+

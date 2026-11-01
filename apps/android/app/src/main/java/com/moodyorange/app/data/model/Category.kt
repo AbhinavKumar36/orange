@@ -10,3 +10,4 @@ data class Category(
     val description: String? = null,
     val displayOrder: Int = 0
 )
+

@@ -25,3 +25,4 @@ data class Product(
     val formattedPrice: String
         get() = CurrencyFormatter.formatPaiseToInr(basePrice)
 }
+

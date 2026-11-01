@@ -194,3 +194,4 @@ class CatalogParsingTest {
         assertTrue(products.isEmpty())
     }
 }
+
