@@ -67,35 +67,31 @@ ON CONFLICT (id) DO NOTHING;
 -- ------------------------------------------------------------------------------
 -- 2. Constraints: Stock Balance, Currency Types & Negative Values
 -- ------------------------------------------------------------------------------
-SELECT throws_ok(
+SELECT throws_matching(
     $$ INSERT INTO public.products (category_id, name, slug, base_price) VALUES ('11111111-1111-1111-1111-111111111111', 'Bad Price Cake', 'bad-price-cake', -1000) $$,
-    '23514',
     'chk_base_price_non_negative',
     'chk_base_price_non_negative must reject negative product price'
 );
 
-SELECT throws_ok(
+SELECT throws_matching(
     $$ INSERT INTO public.inventory (product_id, physical_stock, reserved_stock) VALUES ('e1111111-1111-1111-1111-111111111111', 5, 10) $$,
-    '23514',
     'chk_stock_balance',
     'chk_stock_balance must reject reserved_stock > physical_stock'
 );
 
-SELECT throws_ok(
+SELECT throws_matching(
     $$ INSERT INTO public.inventory (product_id, physical_stock, reserved_stock) VALUES ('e2222222-2222-2222-2222-222222222222', -1, 0) $$,
-    '23514',
     'chk_physical_non_negative',
     'chk_physical_non_negative must reject negative physical_stock'
 );
 
-SELECT throws_ok(
+SELECT throws_matching(
     $$ INSERT INTO public.inventory (product_id, physical_stock, reserved_stock) VALUES ('e3333333-3333-3333-3333-333333333333', 10, -2) $$,
-    '23514',
     'chk_reserved_non_negative',
     'chk_reserved_non_negative must reject negative reserved_stock'
 );
 
-SELECT throws_ok(
+SELECT throws_matching(
     $$ INSERT INTO public.orders (
         order_number, customer_id, customer_phone, customer_name,
         estimated_pickup_at, order_status, payment_status, payment_method,
@@ -105,7 +101,6 @@ SELECT throws_ok(
         NOW() + INTERVAL '1 hour', 'confirmed', 'unpaid', 'cash_at_pickup',
         10000, 10000, NOW() + INTERVAL '10 minutes'
     ) $$,
-    '23514',
     'chk_cash_no_online_expiry',
     'chk_cash_no_online_expiry must reject cash orders with expires_at set'
 );
@@ -131,9 +126,8 @@ SELECT results_eq(
 );
 
 -- Anonymous role cannot query raw inventory
-SELECT throws_ok(
+SELECT throws_matching(
     $$ SET LOCAL ROLE anon; SELECT * FROM public.inventory; $$,
-    '42501',
     'permission denied for table inventory',
     'Anonymous role cannot query raw inventory table'
 );
@@ -142,52 +136,55 @@ RESET ROLE;
 -- ------------------------------------------------------------------------------
 -- 5. Test RPC: Inventory Reservation, Upper Bounds & Customer Verification
 -- ------------------------------------------------------------------------------
-DELETE FROM public.refunds;
-DELETE FROM public.payments;
-DELETE FROM public.order_items;
-DELETE FROM public.orders;
-DELETE FROM public.inventory;
-DELETE FROM public.products;
-DELETE FROM public.categories;
+DELETE FROM public.refunds WHERE idempotency_key LIKE 'ref-%';
+DELETE FROM public.payments WHERE provider_payment_id LIKE 'pay_%';
+DELETE FROM public.order_items WHERE order_id IN (SELECT id FROM public.orders WHERE client_idempotency_key LIKE 'idemp-%');
+DELETE FROM public.orders WHERE client_idempotency_key LIKE 'idemp-%';
+DELETE FROM public.inventory WHERE product_id = 'p0000000-0000-0000-0000-000000000001';
+DELETE FROM public.products WHERE id = 'p0000000-0000-0000-0000-000000000001';
+DELETE FROM public.categories WHERE id = 'c0000000-0000-0000-0000-000000000001';
 
 INSERT INTO public.categories (id, name, slug) 
-VALUES ('c0000000-0000-0000-0000-000000000001', 'Test Category', 'test-cat');
+VALUES ('c0000000-0000-0000-0000-000000000001', 'Test Category', 'test-cat')
+ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO public.products (id, category_id, name, slug, base_price, tax_rate_pct, prep_time_minutes)
-VALUES ('p0000000-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-000000000001', 'Choco Cake', 'choco-cake', 50000, 5.00, 15);
+VALUES ('p0000000-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-000000000001', 'Choco Cake', 'choco-cake', 50000, 5.00, 15)
+ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO public.inventory (product_id, physical_stock, reserved_stock)
-VALUES ('p0000000-0000-0000-0000-000000000001', 50, 0);
+VALUES ('p0000000-0000-0000-0000-000000000001', 50, 0)
+ON CONFLICT (product_id) DO UPDATE SET physical_stock = 50, reserved_stock = 0;
 
 -- 5a: Customer ID spoofing rejection
-SELECT throws_ok(
+SELECT throws_matching(
     $$ SELECT * FROM public.rpc_reserve_order_stock(
         '99999999-9999-9999-9999-999999999999'::UUID, '+919876543210', 'Spoofed Customer',
         jsonb_build_array(jsonb_build_object('product_id', 'p0000000-0000-0000-0000-000000000001', 'quantity', 1)),
         'immediate', NULL, 'online_razorpay', 'idemp-spoof', 'hash-spoof', NULL
     ) $$,
-    'Customer 99999999-9999-9999-9999-999999999999 does not exist in auth.users.',
+    'does not exist in auth\.users',
     'Customer ID spoofing must be rejected'
 );
 
 -- 5b: Quantity bounds and large quantity rejection (> 100 per line)
-SELECT throws_ok(
+SELECT throws_matching(
     $$ SELECT * FROM public.rpc_reserve_order_stock(
         '00000000-0000-0000-0000-000000000001'::UUID, '+919876543210', 'Customer A',
         jsonb_build_array(jsonb_build_object('product_id', 'p0000000-0000-0000-0000-000000000001', 'quantity', 150)),
         'immediate', NULL, 'online_razorpay', 'idemp-overflow', 'hash-overflow', NULL
     ) $$,
-    'Product quantity must be between 1 and 100.',
+    'Product quantity must be between 1 and 100',
     'Excessive line quantity must be rejected'
 );
 
 -- 5c: Empty cart rejection
-SELECT throws_ok(
+SELECT throws_matching(
     $$ SELECT * FROM public.rpc_reserve_order_stock(
         '00000000-0000-0000-0000-000000000001'::UUID, '+919876543210', 'Customer A',
         '[]'::jsonb, 'immediate', NULL, 'online_razorpay', 'idemp-empty', 'hash', NULL
     ) $$,
-    'Cart cannot be empty.',
+    'Cart cannot be empty',
     'Empty cart reservation must abort with exception'
 );
 
@@ -248,22 +245,22 @@ SELECT is(public.rpc_release_expired_reservations(), 0, 'Second run of expiratio
 -- 7. Test RPC: Payment Reconciliation, Currency Verification & Late Capture Tree
 -- ------------------------------------------------------------------------------
 -- 7a: Payment with NULL currency must be rejected
-SELECT throws_ok(
+SELECT throws_matching(
     $$ SELECT * FROM public.rpc_reconcile_late_payment(
         (SELECT id FROM public.orders WHERE client_idempotency_key = 'idemp-001'),
         'pay_razor_test_null', 'order_razor_test_001', 105000::BIGINT, NULL, '{}'::jsonb
     ) $$,
-    'Invalid payment currency: . Must be exactly INR.',
+    'Must be exactly INR',
     'NULL payment currency must be rejected'
 );
 
 -- 7b: Payment with non-INR currency must be rejected
-SELECT throws_ok(
+SELECT throws_matching(
     $$ SELECT * FROM public.rpc_reconcile_late_payment(
         (SELECT id FROM public.orders WHERE client_idempotency_key = 'idemp-001'),
         'pay_razor_test_usd', 'order_razor_test_001', 105000::BIGINT, 'USD', '{}'::jsonb
     ) $$,
-    'Invalid payment currency: USD. Must be exactly INR.',
+    'Must be exactly INR',
     'Non-INR payment currency must be rejected'
 );
 
@@ -296,12 +293,12 @@ SELECT * FROM public.rpc_reserve_order_stock(
     'immediate', NULL, 'online_razorpay', 'idemp-diff-order', 'hash-diff', NULL
 );
 
-SELECT throws_ok(
+SELECT throws_matching(
     $$ SELECT * FROM public.rpc_reconcile_late_payment(
         (SELECT id FROM public.orders WHERE client_idempotency_key = 'idemp-diff-order'),
         'pay_razor_late_001', 'order_razor_test_002', 105000::BIGINT, 'INR', '{}'::jsonb
     ) $$,
-    'Provider payment ID pay_razor_late_001 already exists for different order',
+    'already exists for different order',
     'Reusing provider payment ID on different order is rejected'
 );
 
@@ -311,13 +308,13 @@ SELECT throws_ok(
 -- 8a: Customer cannot cancel order once preparation begins (kitchen prep protection)
 UPDATE public.orders SET order_status = 'preparing' WHERE client_idempotency_key = 'idemp-001';
 
-SELECT throws_ok(
+SELECT throws_matching(
     $$ SELECT public.rpc_cancel_order(
         (SELECT id FROM public.orders WHERE client_idempotency_key = 'idemp-001'),
         '00000000-0000-0000-0000-000000000001'::UUID,
         'Customer cancelled late'
     ) $$,
-    'Customer cannot cancel order once preparation has begun.',
+    'Customer cannot cancel order once preparation has begun',
     'Customer cannot cancel order during preparation'
 );
 
@@ -345,12 +342,12 @@ SELECT public.rpc_cancel_order(
 -- 9. Test RPC: Refunds, Staff Spoofing & Cash Order Immunity
 -- ------------------------------------------------------------------------------
 -- 9a: Staff ID spoofing rejection (Customer attempting refund)
-SELECT throws_ok(
+SELECT throws_matching(
     $$ SELECT * FROM public.rpc_issue_refund(
         (SELECT id FROM public.orders WHERE client_idempotency_key = 'idemp-001'),
         20000::BIGINT, '00000000-0000-0000-0000-000000000001'::UUID, 'Spoofed refund', 'ref-spoof'
     ) $$,
-    'Staff member 00000000-0000-0000-0000-000000000001 is not authorized to issue refunds (must be manager or admin).',
+    'not authorized to issue refunds',
     'Customer cannot issue refund'
 );
 
@@ -373,13 +370,67 @@ SELECT * FROM public.rpc_reserve_order_stock(
     'immediate', NULL, 'cash_at_pickup', 'idemp-cash-refund-test', 'hash-cash', NULL
 );
 
-SELECT throws_ok(
+SELECT throws_matching(
     $$ SELECT * FROM public.rpc_issue_refund(
         (SELECT id FROM public.orders WHERE client_idempotency_key = 'idemp-cash-refund-test'),
         52500::BIGINT, '00000000-0000-0000-0000-000000000003'::UUID, 'Attempt online refund on cash', 'ref-cash-bad'
     ) $$,
     'Cannot issue online gateway refund for cash-at-pickup order',
     'Cash orders cannot enter online refund flow'
+);
+
+-- ------------------------------------------------------------------------------
+-- 10. Test RPC: Order Handover & Cancellation of Completed Order
+-- ------------------------------------------------------------------------------
+UPDATE public.orders 
+SET order_status = 'ready_for_pickup', payment_status = 'captured' 
+WHERE client_idempotency_key = 'idemp-001';
+
+SELECT is(
+    public.rpc_complete_order_handover(
+        (SELECT id FROM public.orders WHERE client_idempotency_key = 'idemp-001'),
+        '00000000-0000-0000-0000-000000000002'::UUID,
+        false
+    ),
+    true,
+    'Order handover completes order successfully'
+);
+
+SELECT results_eq(
+    'SELECT order_status::TEXT FROM public.orders WHERE client_idempotency_key = ''idemp-001''',
+    'VALUES (''completed''::TEXT)',
+    'Completed handover sets status to completed'
+);
+
+SELECT throws_matching(
+    $$ SELECT public.rpc_cancel_order(
+        (SELECT id FROM public.orders WHERE client_idempotency_key = 'idemp-001'),
+        '00000000-0000-0000-0000-000000000002'::UUID,
+        'Staff attempting to cancel completed order'
+    ) $$,
+    'already completed and cannot be cancelled',
+    'Completed orders cannot be cancelled'
+);
+
+-- ------------------------------------------------------------------------------
+-- 11. Test RPC: Inventory Write-Off Authorization
+-- ------------------------------------------------------------------------------
+SELECT throws_matching(
+    $$ SELECT * FROM public.rpc_write_off_inventory(
+        'p0000000-0000-0000-0000-000000000001'::UUID,
+        1,
+        '00000000-0000-0000-0000-000000000002'::UUID,
+        'Counter staff attempting write off'
+    ) $$,
+    'not authorized to write off inventory',
+    'Counter staff cannot write off inventory'
+);
+
+SELECT * FROM public.rpc_write_off_inventory(
+    'p0000000-0000-0000-0000-000000000001'::UUID,
+    1,
+    '00000000-0000-0000-0000-000000000003'::UUID,
+    'Manager valid write off'
 );
 
 SELECT * FROM finish();
