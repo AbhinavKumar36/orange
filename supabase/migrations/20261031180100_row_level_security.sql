@@ -133,13 +133,18 @@ CREATE POLICY "Deny direct client inventory delete" ON public.inventory
 
 -- Narrowly scoped public product availability view (boolean in-stock only)
 -- Exposes whether an active product is in stock without revealing raw quantities
-CREATE OR REPLACE VIEW public.product_availability AS
+-- security_barrier = true prevents leaky user-defined functions from inferring underlying values
+CREATE OR REPLACE VIEW public.product_availability
+WITH (security_barrier = true) AS
 SELECT 
     p.id AS product_id,
     (p.is_active AND (COALESCE(i.physical_stock, 0) - COALESCE(i.reserved_stock, 0)) > 0) AS is_in_stock
 FROM public.products p
 LEFT JOIN public.inventory i ON p.id = i.product_id
 WHERE p.is_active = true;
+
+REVOKE ALL ON public.product_availability FROM PUBLIC;
+GRANT SELECT ON public.product_availability TO anon, authenticated, service_role;
 
 -- Table 6: ORDERS
 DROP POLICY IF EXISTS "Customers view own orders" ON public.orders;
