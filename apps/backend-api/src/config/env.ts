@@ -17,14 +17,16 @@ export const ConfigSchema = z
       .default(false)
       .transform((val) => val === true || val === 'true' || val === '1'),
     SUPABASE_URL: z.string().url().default('http://localhost:54321'),
-    // No fake default. Optional in dev/test, required in production.
+    // Privileged key for authoritative DB access. Optional in dev/test, required in production.
     SUPABASE_SERVICE_ROLE_KEY: z.string().min(1).optional(),
+    // Public anon key. Can be used in dev for public catalog reading if service role key is absent.
+    SUPABASE_ANON_KEY: z.string().min(1).optional(),
     RAZORPAY_KEY_ID: z.string().min(1).optional(),
     RAZORPAY_KEY_SECRET: z.string().min(1).optional(),
     RAZORPAY_WEBHOOK_SECRET: z.string().min(1).optional(),
     ALLOWED_ORIGINS: z
       .string()
-      .default('http://localhost:3000,http://localhost:3001'),
+      .default('http://localhost:3000,http://localhost:3001,http://127.0.0.1:3000,http://127.0.0.1:3001'),
   })
   .superRefine((data, ctx) => {
     if (data.NODE_ENV === 'production') {

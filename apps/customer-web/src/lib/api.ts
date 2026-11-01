@@ -29,11 +29,16 @@ export async function fetchCategories(): Promise<Category[]> {
     });
 
     if (!res.ok) {
-      throw new ApiError(
-        res.status,
-        'CATEGORIES_FETCH_FAILED',
-        `Failed to fetch categories (status ${res.status})`
-      );
+      let message = `Failed to fetch categories (status ${res.status})`;
+      try {
+        const errJson = (await res.json()) as { error?: { message?: string } };
+        if (errJson?.error?.message) {
+          message = errJson.error.message;
+        }
+      } catch {
+        // Fallback to HTTP status message
+      }
+      throw new ApiError(res.status, 'CATEGORIES_FETCH_FAILED', message);
     }
 
     const data = await res.json();
@@ -41,7 +46,11 @@ export async function fetchCategories(): Promise<Category[]> {
     return parsed.categories;
   } catch (err) {
     if (err instanceof ApiError) throw err;
-    throw new ApiError(503, 'BACKEND_UNAVAILABLE', 'Store server is currently unreachable.');
+    throw new ApiError(
+      503,
+      'BACKEND_UNAVAILABLE',
+      `Store server is unreachable at ${API_BASE_URL}. Ensure the backend API is running on port 4000.`
+    );
   }
 }
 
@@ -67,11 +76,16 @@ export async function fetchProducts(params: FetchProductsParams = {}): Promise<P
     });
 
     if (!res.ok) {
-      throw new ApiError(
-        res.status,
-        'PRODUCTS_FETCH_FAILED',
-        `Failed to fetch products (status ${res.status})`
-      );
+      let message = `Failed to fetch products (status ${res.status})`;
+      try {
+        const errJson = (await res.json()) as { error?: { message?: string } };
+        if (errJson?.error?.message) {
+          message = errJson.error.message;
+        }
+      } catch {
+        // Fallback to HTTP status message
+      }
+      throw new ApiError(res.status, 'PRODUCTS_FETCH_FAILED', message);
     }
 
     const data = await res.json();
@@ -79,7 +93,11 @@ export async function fetchProducts(params: FetchProductsParams = {}): Promise<P
     return parsed.products;
   } catch (err) {
     if (err instanceof ApiError) throw err;
-    throw new ApiError(503, 'BACKEND_UNAVAILABLE', 'Store server is currently unreachable.');
+    throw new ApiError(
+      503,
+      'BACKEND_UNAVAILABLE',
+      `Store server is unreachable at ${API_BASE_URL}. Ensure the backend API is running on port 4000.`
+    );
   }
 }
 
@@ -95,11 +113,16 @@ export async function fetchProductByIdOrSlug(idOrSlug: string): Promise<Product 
     }
 
     if (!res.ok) {
-      throw new ApiError(
-        res.status,
-        'PRODUCT_FETCH_FAILED',
-        `Failed to fetch product (status ${res.status})`
-      );
+      let message = `Failed to fetch product (status ${res.status})`;
+      try {
+        const errJson = (await res.json()) as { error?: { message?: string } };
+        if (errJson?.error?.message) {
+          message = errJson.error.message;
+        }
+      } catch {
+        // Fallback to HTTP status message
+      }
+      throw new ApiError(res.status, 'PRODUCT_FETCH_FAILED', message);
     }
 
     const data = await res.json();
@@ -107,7 +130,11 @@ export async function fetchProductByIdOrSlug(idOrSlug: string): Promise<Product 
     return parsed.product;
   } catch (err) {
     if (err instanceof ApiError) throw err;
-    throw new ApiError(503, 'BACKEND_UNAVAILABLE', 'Store server is currently unreachable.');
+    throw new ApiError(
+      503,
+      'BACKEND_UNAVAILABLE',
+      `Store server is unreachable at ${API_BASE_URL}. Ensure the backend API is running on port 4000.`
+    );
   }
 }
 

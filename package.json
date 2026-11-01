@@ -11,6 +11,9 @@
   "scripts": {
     "build": "turbo run build",
     "dev": "turbo run dev",
+    "dev:backend": "turbo run dev --filter=@orange/backend-api",
+    "dev:customer": "turbo run dev --filter=@orange/customer-web",
+    "dev:admin": "turbo run dev --filter=@orange/admin-web",
     "lint": "turbo run lint",
     "test": "turbo run test",
     "typecheck": "turbo run typecheck",

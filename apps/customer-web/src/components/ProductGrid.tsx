@@ -76,8 +76,7 @@ export function ProductGrid({
         </div>
         <h3 className="state-title">Store Server Unavailable</h3>
         <p className="state-copy">
-          We are having trouble connecting to the boutique catalog. Please verify your connection
-          or try again.
+          {error.message || 'We are having trouble connecting to the boutique catalog. Please verify your connection or try again.'}
         </p>
         <button type="button" className="btn-primary" onClick={onRetry}>
           Try Again

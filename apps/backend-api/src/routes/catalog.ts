@@ -119,13 +119,15 @@ interface SupabaseAvailabilityRow {
 }
 
 async function fetchFromSupabase<T>(config: AppConfig, path: string): Promise<T | null> {
-  const url = `${config.SUPABASE_URL}/rest/v1/${path}`;
+  const baseUrl = config.SUPABASE_URL.replace(/\/+$/, '');
+  const url = `${baseUrl}/rest/v1/${path}`;
   const headers: Record<string, string> = {
     Accept: 'application/json',
   };
-  if (config.SUPABASE_SERVICE_ROLE_KEY) {
-    headers.apikey = config.SUPABASE_SERVICE_ROLE_KEY;
-    headers.Authorization = `Bearer ${config.SUPABASE_SERVICE_ROLE_KEY}`;
+  const apiKey = config.SUPABASE_SERVICE_ROLE_KEY || config.SUPABASE_ANON_KEY;
+  if (apiKey) {
+    headers.apikey = apiKey;
+    headers.Authorization = `Bearer ${apiKey}`;
   }
 
   const controller = new AbortController();
@@ -135,11 +137,20 @@ async function fetchFromSupabase<T>(config: AppConfig, path: string): Promise<T 
     const res = await fetch(url, { headers, signal: controller.signal });
     clearTimeout(timeoutId);
     if (!res.ok) {
+      const errorText = await res.text().catch(() => '');
+      // Log structured error in non-test environments to aid troubleshooting
+      if (config.NODE_ENV !== 'test') {
+        console.warn(`[Supabase REST Error] ${res.status} ${res.statusText} at ${url}: ${errorText}`);
+      }
       return null;
     }
     return (await res.json()) as T;
-  } catch {
+  } catch (err) {
     clearTimeout(timeoutId);
+    if (config.NODE_ENV !== 'test') {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn(`[Supabase Connection Failed] Unable to reach ${url}: ${msg}`);
+    }
     return null;
   }
 }
