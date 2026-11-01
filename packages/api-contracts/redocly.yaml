@@ -5,4 +5,5 @@ rules:
   operation-4xx-response: off
   no-server-example.com: off
   security-defined: error
+  no-unused-components: off
 

@@ -33,6 +33,11 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
 components:
   schemas:
+    MoneyInPaise:
+      type: integer
+      minimum: 0
+      description: Monetary amount in integer INR paise (e.g. 65000 paise = 650.00 INR). Floating-point currency is prohibited.
+      example: 65000
     HealthResponse:
       type: object
       properties:

@@ -38,10 +38,20 @@ CREATE POLICY "Users can view own profile" ON public.profiles
     FOR SELECT TO authenticated
     USING (id = auth.uid());
 
+DROP POLICY IF EXISTS "Users can insert own profile" ON public.profiles;
+CREATE POLICY "Users can insert own profile" ON public.profiles
+    FOR INSERT TO authenticated
+    WITH CHECK (id = auth.uid());
+
 DROP POLICY IF EXISTS "Users can update own profile" ON public.profiles;
 CREATE POLICY "Users can update own profile" ON public.profiles
     FOR UPDATE TO authenticated
-    USING (id = auth.uid());
+    USING (id = auth.uid())
+    WITH CHECK (id = auth.uid());
+
+DROP POLICY IF EXISTS "Deny direct profile delete" ON public.profiles;
+CREATE POLICY "Deny direct profile delete" ON public.profiles
+    FOR DELETE USING (false);
 
 DROP POLICY IF EXISTS "Staff can view customer profiles" ON public.profiles;
 CREATE POLICY "Staff can view customer profiles" ON public.profiles
@@ -49,20 +59,22 @@ CREATE POLICY "Staff can view customer profiles" ON public.profiles
     USING (public.get_staff_role() IS NOT NULL);
 
 -- Table 2: STAFF ROLES
+-- Prevent customers from modifying or escalating their own staff roles.
+-- Role assignment is strictly restricted to trusted administrative backend operations.
 DROP POLICY IF EXISTS "Staff can view their own role" ON public.staff_roles;
+DROP POLICY IF EXISTS "Admins can view all staff roles" ON public.staff_roles;
+DROP POLICY IF EXISTS "Admins can manage staff roles" ON public.staff_roles;
+
 CREATE POLICY "Staff can view their own role" ON public.staff_roles
     FOR SELECT TO authenticated
     USING (user_id = auth.uid());
 
-DROP POLICY IF EXISTS "Admins can view all staff roles" ON public.staff_roles;
 CREATE POLICY "Admins can view all staff roles" ON public.staff_roles
     FOR SELECT TO authenticated
     USING (public.get_staff_role() = 'admin');
 
-DROP POLICY IF EXISTS "Admins can manage staff roles" ON public.staff_roles;
-CREATE POLICY "Admins can manage staff roles" ON public.staff_roles
-    FOR ALL TO authenticated
-    USING (public.get_staff_role() = 'admin');
+CREATE POLICY "Deny direct client staff roles write" ON public.staff_roles
+    FOR ALL WITH CHECK (false);
 
 -- Table 3: CATEGORIES
 DROP POLICY IF EXISTS "Public categories are viewable" ON public.categories;
@@ -96,16 +108,20 @@ CREATE POLICY "Managers can manage products" ON public.products
     FOR ALL TO authenticated
     USING (public.get_staff_role() IN ('manager', 'admin'));
 
--- Table 5: INVENTORY
+-- Table 5: INVENTORY (Inventory Privacy)
+-- Anonymous and ordinary customer roles cannot query physical or reserved stock quantities.
+-- Only authenticated staff members may view raw inventory records.
 DROP POLICY IF EXISTS "Public can view inventory" ON public.inventory;
-CREATE POLICY "Public can view inventory" ON public.inventory
-    FOR SELECT
-    USING (true);
+DROP POLICY IF EXISTS "Staff can view inventory" ON public.inventory;
+CREATE POLICY "Staff can view inventory" ON public.inventory
+    FOR SELECT TO authenticated
+    USING (public.get_staff_role() IS NOT NULL);
 
 DROP POLICY IF EXISTS "Managers can update inventory" ON public.inventory;
 CREATE POLICY "Managers can update inventory" ON public.inventory
     FOR UPDATE TO authenticated
-    USING (public.get_staff_role() IN ('manager', 'admin'));
+    USING (public.get_staff_role() IN ('manager', 'admin'))
+    WITH CHECK (public.get_staff_role() IN ('manager', 'admin'));
 
 DROP POLICY IF EXISTS "Deny direct client inventory insert" ON public.inventory;
 CREATE POLICY "Deny direct client inventory insert" ON public.inventory
@@ -114,6 +130,16 @@ CREATE POLICY "Deny direct client inventory insert" ON public.inventory
 DROP POLICY IF EXISTS "Deny direct client inventory delete" ON public.inventory;
 CREATE POLICY "Deny direct client inventory delete" ON public.inventory
     FOR DELETE USING (false);
+
+-- Narrowly scoped public product availability view (boolean in-stock only)
+-- Exposes whether an active product is in stock without revealing raw quantities
+CREATE OR REPLACE VIEW public.product_availability AS
+SELECT 
+    p.id AS product_id,
+    (p.is_active AND (COALESCE(i.physical_stock, 0) - COALESCE(i.reserved_stock, 0)) > 0) AS is_in_stock
+FROM public.products p
+LEFT JOIN public.inventory i ON p.id = i.product_id
+WHERE p.is_active = true;
 
 -- Table 6: ORDERS
 DROP POLICY IF EXISTS "Customers view own orders" ON public.orders;
@@ -209,11 +235,15 @@ CREATE POLICY "Deny client audit logs write" ON public.audit_logs
 -- Ensure anon and authenticated roles have only necessary table privileges
 GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
 
--- Public read access to catalog and inventory
-GRANT SELECT ON public.categories, public.products, public.inventory TO anon, authenticated;
+-- Public read access to catalog categories, products, and boolean availability view
+GRANT SELECT ON public.categories, public.products, public.product_availability TO anon, authenticated;
+
+-- Inventory raw numbers are never accessible anonymously
+REVOKE ALL ON public.inventory FROM anon;
+GRANT SELECT ON public.inventory TO authenticated;
 
 -- Authenticated user permissions
-GRANT SELECT, UPDATE ON public.profiles TO authenticated;
+GRANT SELECT, INSERT, UPDATE ON public.profiles TO authenticated;
 GRANT SELECT ON public.staff_roles, public.orders, public.order_items, public.payments, public.refunds, public.audit_logs TO authenticated;
 
 -- Service role retains full privileged access for authoritative backend operations
@@ -222,6 +252,8 @@ GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO service_role;
 GRANT ALL ON ALL ROUTINES IN SCHEMA public TO service_role;
 
 -- Explicitly revoke write access to sensitive transaction tables from untrusted client roles
+REVOKE INSERT, UPDATE, DELETE ON public.staff_roles FROM anon, authenticated;
 REVOKE INSERT, UPDATE, DELETE ON public.orders, public.order_items, public.payments, public.refunds, public.audit_logs FROM anon, authenticated;
-REVOKE INSERT, DELETE ON public.inventory FROM anon, authenticated;
+REVOKE INSERT, UPDATE, DELETE ON public.inventory FROM anon;
+REVOKE INSERT, DELETE ON public.inventory FROM authenticated;
 

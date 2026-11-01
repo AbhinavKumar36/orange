@@ -113,21 +113,21 @@ describe('Supabase Database Migrations & Security Invariants', () => {
     expect(searchPathMatches?.length).toBeGreaterThanOrEqual(8);
   });
 
-  it('should contain comprehensive pgTAP test suite in supabase/tests/', () => {
-    expect(existsSync(testsDir)).toBe(true);
-    const testFiles = readdirSync(testsDir).filter((f) => f.endsWith('.sql'));
-    expect(testFiles.length).toBeGreaterThanOrEqual(1);
+  it('should contain comprehensive canonical pgTAP test suite in supabase/tests/database/', () => {
+    const canonicalTestFile = join(testsDir, 'database/database.test.sql');
+    expect(existsSync(canonicalTestFile)).toBe(true);
 
-    const testFilePath = existsSync(join(testsDir, 'database/database.test.sql'))
-      ? join(testsDir, 'database/database.test.sql')
-      : join(testsDir, 'database.test.sql');
-    const testSql = readFileSync(testFilePath, 'utf-8');
+    const testSql = readFileSync(canonicalTestFile, 'utf-8');
     expect(testSql).toContain('plan(');
     expect(testSql).toContain('chk_stock_balance');
+    expect(testSql).toContain('product_availability');
     expect(testSql).toContain('rpc_reserve_order_stock');
     expect(testSql).toContain('rpc_release_expired_reservations');
+    expect(testSql).toContain('rpc_reconcile_late_payment');
     expect(testSql).toContain('rpc_complete_order_handover');
     expect(testSql).toContain('rpc_write_off_inventory');
+    expect(testSql).toContain('rpc_cancel_order');
+    expect(testSql).toContain('rpc_issue_refund');
   });
 });
 

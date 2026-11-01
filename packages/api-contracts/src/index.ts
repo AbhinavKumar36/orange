@@ -8,6 +8,15 @@ export type HealthResponse = z.infer<typeof HealthResponseSchema>;
 
 export const API_VERSION_PREFIX = '/api/v1' as const;
 
+// Authoritative Currency & Money Representation
+// All monetary values are represented as integer INR paise (1 INR = 100 paise)
+// Floating point representation for currency is strictly prohibited across API contracts
+export const MoneyInPaiseSchema = z
+  .number()
+  .int('Monetary amounts must be integer paise.')
+  .nonnegative('Monetary amounts cannot be negative.');
+export type MoneyInPaise = z.infer<typeof MoneyInPaiseSchema>;
+
 // Authoritative Database Enums Parity
 export const OrderStatusEnum = [
   'draft',

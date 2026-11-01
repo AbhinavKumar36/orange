@@ -145,9 +145,9 @@ ON CONFLICT (id) DO NOTHING;
 -- 6. Products
 INSERT INTO public.products (id, category_id, name, slug, description, base_price, tax_rate_pct, is_veg, allergens, prep_time_minutes, is_active)
 VALUES 
-    ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '11111111-1111-1111-1111-111111111111', 'Dark Chocolate Truffle Cake (500g)', 'dark-chocolate-truffle-cake-500g', '70% Belgian dark chocolate sponge with silky ganache', 650.00, 5.00, true, ARRAY['dairy', 'gluten'], 20, true),
-    ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', '22222222-2222-2222-2222-222222222222', 'Valencia Orange Cold-Pressed (300ml)', 'valencia-orange-cold-pressed-300ml', 'Pure Valencia orange juice freshly pressed daily', 180.00, 5.00, true, ARRAY[]::TEXT[], 5, true),
-    ('cccccccc-cccc-cccc-cccc-cccccccccccc', '33333333-3333-3333-3333-333333333333', 'Artisanal Praline Box (6 pcs)', 'artisanal-praline-box-6-pcs', 'Assorted roasted hazelnut and almond pralines', 350.00, 5.00, true, ARRAY['nuts', 'dairy'], 10, true)
+    ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '11111111-1111-1111-1111-111111111111', 'Dark Chocolate Truffle Cake (500g)', 'dark-chocolate-truffle-cake-500g', '70% Belgian dark chocolate sponge with silky ganache', 65000, 5.00, true, ARRAY['dairy', 'gluten'], 20, true),
+    ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', '22222222-2222-2222-2222-222222222222', 'Valencia Orange Cold-Pressed (300ml)', 'valencia-orange-cold-pressed-300ml', 'Pure Valencia orange juice freshly pressed daily', 18000, 5.00, true, ARRAY[]::TEXT[], 5, true),
+    ('cccccccc-cccc-cccc-cccc-cccccccccccc', '33333333-3333-3333-3333-333333333333', 'Artisanal Praline Box (6 pcs)', 'artisanal-praline-box-6-pcs', 'Assorted roasted hazelnut and almond pralines', 35000, 5.00, true, ARRAY['nuts', 'dairy'], 10, true)
 ON CONFLICT (id) DO NOTHING;
 
 -- 7. Initial Inventory
