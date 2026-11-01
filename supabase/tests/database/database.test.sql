@@ -141,8 +141,8 @@ DELETE FROM public.refunds WHERE idempotency_key LIKE 'ref-%';
 DELETE FROM public.payments WHERE provider_payment_id LIKE 'pay_%';
 DELETE FROM public.order_items WHERE order_id IN (SELECT id FROM public.orders WHERE client_idempotency_key LIKE 'idemp-%');
 DELETE FROM public.orders WHERE client_idempotency_key LIKE 'idemp-%';
-DELETE FROM public.inventory WHERE product_id = 'p0000000-0000-0000-0000-000000000001';
-DELETE FROM public.products WHERE id = 'p0000000-0000-0000-0000-000000000001';
+DELETE FROM public.inventory WHERE product_id = 'a0000000-0000-0000-0000-000000000001';
+DELETE FROM public.products WHERE id = 'a0000000-0000-0000-0000-000000000001';
 DELETE FROM public.categories WHERE id = 'c0000000-0000-0000-0000-000000000001';
 
 INSERT INTO public.categories (id, name, slug) 
@@ -150,18 +150,18 @@ VALUES ('c0000000-0000-0000-0000-000000000001', 'Order Test Category', 'order-te
 ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, slug = EXCLUDED.slug;
 
 INSERT INTO public.products (id, category_id, name, slug, base_price, tax_rate_pct, prep_time_minutes)
-VALUES ('p0000000-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-000000000001', 'Order Test Cake', 'order-test-cake', 50000, 5.00, 15)
+VALUES ('a0000000-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-000000000001', 'Order Test Cake', 'order-test-cake', 50000, 5.00, 15)
 ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, slug = EXCLUDED.slug, base_price = EXCLUDED.base_price;
 
 INSERT INTO public.inventory (product_id, physical_stock, reserved_stock)
-VALUES ('p0000000-0000-0000-0000-000000000001', 50, 0)
+VALUES ('a0000000-0000-0000-0000-000000000001', 50, 0)
 ON CONFLICT (product_id) DO UPDATE SET physical_stock = 50, reserved_stock = 0;
 
 -- 26: Customer ID spoofing rejection
 SELECT throws_matching(
     $$ SELECT * FROM public.rpc_reserve_order_stock(
         '99999999-9999-9999-9999-999999999999'::UUID, '+919876543210', 'Spoofed Customer',
-        jsonb_build_array(jsonb_build_object('product_id', 'p0000000-0000-0000-0000-000000000001', 'quantity', 1)),
+        jsonb_build_array(jsonb_build_object('product_id', 'a0000000-0000-0000-0000-000000000001', 'quantity', 1)),
         'immediate'::VARCHAR, NULL::TIMESTAMPTZ, 'online_razorpay'::payment_method_enum, 'idemp-spoof'::VARCHAR, 'hash-spoof'::VARCHAR, NULL::TEXT
     ) $$,
     'does not exist in auth\.users',
@@ -172,7 +172,7 @@ SELECT throws_matching(
 SELECT throws_matching(
     $$ SELECT * FROM public.rpc_reserve_order_stock(
         '00000000-0000-0000-0000-000000000001'::UUID, '+919876543210', 'Customer A',
-        jsonb_build_array(jsonb_build_object('product_id', 'p0000000-0000-0000-0000-000000000001', 'quantity', 150)),
+        jsonb_build_array(jsonb_build_object('product_id', 'a0000000-0000-0000-0000-000000000001', 'quantity', 150)),
         'immediate'::VARCHAR, NULL::TIMESTAMPTZ, 'online_razorpay'::payment_method_enum, 'idemp-overflow'::VARCHAR, 'hash-overflow'::VARCHAR, NULL::TEXT
     ) $$,
     'Product quantity must be between 1 and 100',
@@ -192,12 +192,12 @@ SELECT throws_matching(
 -- 29 & 30: Valid Online Reservation: 2 units (2 * 50000 + 5% tax = 105000 paise)
 SELECT * FROM public.rpc_reserve_order_stock(
     '00000000-0000-0000-0000-000000000001'::UUID, '+919876543210', 'Customer A',
-    jsonb_build_array(jsonb_build_object('product_id', 'p0000000-0000-0000-0000-000000000001', 'quantity', 2)),
+    jsonb_build_array(jsonb_build_object('product_id', 'a0000000-0000-0000-0000-000000000001', 'quantity', 2)),
     'immediate'::VARCHAR, NULL::TIMESTAMPTZ, 'online_razorpay'::payment_method_enum, 'idemp-001'::VARCHAR, 'hash-001'::VARCHAR, 'Extra candles'::TEXT
 );
 
 SELECT results_eq(
-    'SELECT physical_stock, reserved_stock FROM public.inventory WHERE product_id = ''p0000000-0000-0000-0000-000000000001''',
+    'SELECT physical_stock, reserved_stock FROM public.inventory WHERE product_id = ''a0000000-0000-0000-0000-000000000001''',
     'VALUES (50, 2)',
     'Online reservation increments reserved_stock'
 );
@@ -211,12 +211,12 @@ SELECT results_eq(
 -- 31: Concurrent Idempotency Replay (Returns existing order safely)
 SELECT * FROM public.rpc_reserve_order_stock(
     '00000000-0000-0000-0000-000000000001'::UUID, '+919876543210', 'Customer A',
-    jsonb_build_array(jsonb_build_object('product_id', 'p0000000-0000-0000-0000-000000000001', 'quantity', 2)),
+    jsonb_build_array(jsonb_build_object('product_id', 'a0000000-0000-0000-0000-000000000001', 'quantity', 2)),
     'immediate'::VARCHAR, NULL::TIMESTAMPTZ, 'online_razorpay'::payment_method_enum, 'idemp-001'::VARCHAR, 'hash-001'::VARCHAR, 'Extra candles'::TEXT
 );
 
 SELECT results_eq(
-    'SELECT reserved_stock FROM public.inventory WHERE product_id = ''p0000000-0000-0000-0000-000000000001''',
+    'SELECT reserved_stock FROM public.inventory WHERE product_id = ''a0000000-0000-0000-0000-000000000001''',
     'VALUES (2)',
     'Idempotent duplicate request does not alter stock'
 );
@@ -235,7 +235,7 @@ SELECT results_eq(
 );
 
 SELECT results_eq(
-    'SELECT reserved_stock FROM public.inventory WHERE product_id = ''p0000000-0000-0000-0000-000000000001''',
+    'SELECT reserved_stock FROM public.inventory WHERE product_id = ''a0000000-0000-0000-0000-000000000001''',
     'VALUES (0)',
     'Reserved stock accurately released for expired online order'
 );
@@ -290,7 +290,7 @@ SELECT results_eq(
 -- 39: Reusing provider payment ID on a different order rejected
 SELECT * FROM public.rpc_reserve_order_stock(
     '00000000-0000-0000-0000-000000000005'::UUID, '+919876543214', 'Customer 2',
-    jsonb_build_array(jsonb_build_object('product_id', 'p0000000-0000-0000-0000-000000000001', 'quantity', 2)),
+    jsonb_build_array(jsonb_build_object('product_id', 'a0000000-0000-0000-0000-000000000001', 'quantity', 2)),
     'immediate'::VARCHAR, NULL::TIMESTAMPTZ, 'online_razorpay'::payment_method_enum, 'idemp-diff-order'::VARCHAR, 'hash-diff'::VARCHAR, NULL::TEXT
 );
 
@@ -371,7 +371,7 @@ SELECT results_eq(
 -- 45: Cash order cannot enter online gateway refund
 SELECT * FROM public.rpc_reserve_order_stock(
     '00000000-0000-0000-0000-000000000001'::UUID, '+919876543210', 'Customer A',
-    jsonb_build_array(jsonb_build_object('product_id', 'p0000000-0000-0000-0000-000000000001', 'quantity', 1)),
+    jsonb_build_array(jsonb_build_object('product_id', 'a0000000-0000-0000-0000-000000000001', 'quantity', 1)),
     'immediate'::VARCHAR, NULL::TIMESTAMPTZ, 'cash_at_pickup'::payment_method_enum, 'idemp-cash-refund-test'::VARCHAR, 'hash-cash'::VARCHAR, NULL::TEXT
 );
 
@@ -420,9 +420,21 @@ SELECT throws_matching(
 -- ------------------------------------------------------------------------------
 -- 11. Test RPC: Inventory Write-Off Authorization (Tests 49 - 50)
 -- ------------------------------------------------------------------------------
+INSERT INTO public.categories (id, name, slug) 
+VALUES ('c0000000-0000-0000-0000-000000000002', 'Write-Off Category', 'write-off-category')
+ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, slug = EXCLUDED.slug;
+
+INSERT INTO public.products (id, category_id, name, slug, base_price, tax_rate_pct, prep_time_minutes)
+VALUES ('a0000000-0000-0000-0000-000000000002', 'c0000000-0000-0000-0000-000000000002', 'Write-Off Cake', 'write-off-cake', 30000, 5.00, 10)
+ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, slug = EXCLUDED.slug, base_price = EXCLUDED.base_price;
+
+INSERT INTO public.inventory (product_id, physical_stock, reserved_stock)
+VALUES ('a0000000-0000-0000-0000-000000000002', 50, 0)
+ON CONFLICT (product_id) DO UPDATE SET physical_stock = 50, reserved_stock = 0;
+
 SELECT throws_matching(
     $$ SELECT * FROM public.rpc_write_off_inventory(
-        'p0000000-0000-0000-0000-000000000001'::UUID,
+        'a0000000-0000-0000-0000-000000000002'::UUID,
         1,
         '00000000-0000-0000-0000-000000000002'::UUID,
         'Counter staff attempting write off'
@@ -432,7 +444,7 @@ SELECT throws_matching(
 );
 
 SELECT results_eq(
-    'SELECT out_physical_stock, out_reserved_stock, out_available_stock FROM public.rpc_write_off_inventory(''p0000000-0000-0000-0000-000000000001''::UUID, 1, ''00000000-0000-0000-0000-000000000003''::UUID, ''Manager valid write off'')',
+    'SELECT out_physical_stock, out_reserved_stock, out_available_stock FROM public.rpc_write_off_inventory(''a0000000-0000-0000-0000-000000000002''::UUID, 1, ''00000000-0000-0000-0000-000000000003''::UUID, ''Manager valid write off'')',
     'VALUES (49, 0, 49)',
     'Manager valid write-off decrements physical stock'
 );
