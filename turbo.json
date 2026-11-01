@@ -11,9 +11,11 @@
       "outputs": ["coverage/**"]
     },
     "lint": {
+      "dependsOn": ["^build"],
       "outputs": []
     },
     "typecheck": {
+      "dependsOn": ["^build"],
       "outputs": []
     },
     "dev": {

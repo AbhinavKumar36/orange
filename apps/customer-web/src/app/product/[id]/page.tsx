@@ -191,7 +191,7 @@ export default function ProductDetailPage(): ReactElement {
                     <span className="spec-value">
                       {product.allergens && product.allergens.length > 0 ? (
                         <span className="allergen-pills">
-                          {product.allergens.map((allergen) => (
+                          {product.allergens.map((allergen: string) => (
                             <span key={allergen} className="allergen-pill">
                               {allergen}
                             </span>
