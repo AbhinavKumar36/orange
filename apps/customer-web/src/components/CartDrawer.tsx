@@ -38,7 +38,7 @@ export function CartDrawer({ isOpen, onClose }: CartDrawerProps): ReactElement |
             <span className="brand-logo-mark" style={{ width: '1.5rem', height: '1.5rem' }}>
               🍊
             </span>
-            <h2 className="drawer-title">Shopping Bag</h2>
+            <h2 className="drawer-title">Shopping Bag Coming Soon</h2>
           </div>
           <button
             type="button"
@@ -69,12 +69,12 @@ export function CartDrawer({ isOpen, onClose }: CartDrawerProps): ReactElement |
             </svg>
           </div>
 
-          <div className="phase-notice-badge">Phase 3 Catalog Preview</div>
+          <div className="phase-notice-badge">Online Ordering in Phase 5</div>
 
-          <h3 className="state-title">Your Bag is Empty</h3>
+          <h3 className="state-title">Ordering Activates in Phase 5</h3>
           <p className="state-copy" style={{ fontSize: '0.875rem' }}>
-            Full checkout, order reservations, and digital pickup tokens will be activated in
-            Phase 5. Explore our live artisanal menu today!
+            Shopping bag checkout, order reservations, and pickup scheduling will be activated in
+            Phase 5. In this phase, explore our live menu catalog.
           </p>
 
           <button

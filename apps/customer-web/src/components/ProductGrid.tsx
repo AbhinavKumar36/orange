@@ -11,7 +11,6 @@ interface ProductGridProps {
   onRetry: () => void;
   onResetFilters: () => void;
   hasActiveFilters: boolean;
-  onOpenCart?: () => void;
 }
 
 export function ProductGrid({
@@ -21,7 +20,6 @@ export function ProductGrid({
   onRetry,
   onResetFilters,
   hasActiveFilters,
-  onOpenCart,
 }: ProductGridProps): ReactElement {
   // 1. Loading Skeleton
   if (isLoading) {
@@ -127,10 +125,9 @@ export function ProductGrid({
         <div className="state-icon-circle">
           <span style={{ fontSize: '1.5rem' }}>🍊</span>
         </div>
-        <h3 className="state-title">Menu Under Preparation</h3>
+        <h3 className="state-title">Catalog Currently Updating</h3>
         <p className="state-copy">
-          Our pastry chefs are preparing the daily fresh batch. Please check back shortly to browse
-          our freshly baked cakes, juices, and chocolates.
+          No menu items are currently listed. Please check back shortly or refresh the catalog.
         </p>
         <button type="button" className="btn-primary" onClick={onRetry}>
           Refresh Menu
@@ -146,7 +143,6 @@ export function ProductGrid({
         <ProductCard
           key={product.id}
           product={product}
-          onOpenCart={onOpenCart}
         />
       ))}
     </div>

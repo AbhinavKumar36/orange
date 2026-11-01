@@ -2,11 +2,11 @@ import type { ReactElement } from 'react';
 
 export function BrandValues(): ReactElement {
   return (
-    <section id="about" className="brand-values-section" aria-label="Our Values & Standards">
+    <section id="about" className="brand-values-section" aria-label="Our Offerings">
       <div className="container">
         <div className="section-header">
-          <div className="section-subtitle">Craft & Integrity</div>
-          <h2 className="section-title">The Moody Orange Standard</h2>
+          <div className="section-subtitle">Store Offerings</div>
+          <h2 className="section-title">The Moody Orange Selection</h2>
         </div>
 
         <div className="values-grid">
@@ -14,10 +14,10 @@ export function BrandValues(): ReactElement {
             <div className="value-icon-box" aria-hidden="true">
               <span>🎂</span>
             </div>
-            <h3 className="value-heading">Handcrafted Small Batches</h3>
+            <h3 className="value-heading">Artisanal Cakes</h3>
             <p className="value-text">
-              Every morning our pastry chefs craft small batches using 70% single-origin Belgian
-              chocolate, rich dairy cream, and unbleached flours. We prioritize pure flavor over mass production.
+              A curated selection of cakes and confections with vegetarian and eggless options
+              clearly marked for your convenience.
             </p>
           </div>
 
@@ -25,10 +25,9 @@ export function BrandValues(): ReactElement {
             <div className="value-icon-box" aria-hidden="true">
               <span>🍊</span>
             </div>
-            <h3 className="value-heading">100% Cold-Pressed Juices</h3>
+            <h3 className="value-heading">Refreshing Juices</h3>
             <p className="value-text">
-              We extract raw fruit juices using hydraulic cold-pressing to preserve vitamins,
-              enzymes, and natural sweetness. Never heat-pasteurized, diluted with water, or sweetened with syrups.
+              Chilled fruit juices and refreshments packaged and ready for in-store counter pickup.
             </p>
           </div>
 
@@ -36,10 +35,10 @@ export function BrandValues(): ReactElement {
             <div className="value-icon-box" aria-hidden="true">
               <span>🛍️</span>
             </div>
-            <h3 className="value-heading">Boutique Counter Pickup</h3>
+            <h3 className="value-heading">In-Store Counter Pickup</h3>
             <p className="value-text">
-              Browse our live catalog, track fulfillment times, and collect your delicacies freshly
-              boxed directly from our shop pickup counter in just 15 to 20 minutes.
+              Browse current availability across all menu categories and visit our counter to collect
+              your order.
             </p>
           </div>
         </div>

@@ -10,17 +10,16 @@ export function Hero(): ReactElement {
           <div>
             <div className="hero-pill">
               <span>🍊</span>
-              <span>Boutique Quick-Commerce Confectionery</span>
+              <span>Artisanal Confectionery & Drinks</span>
             </div>
 
             <h1 className="hero-title">
-              Artisanal Cakes & Fresh{' '}
-              <span className="hero-title-highlight">Cold-Pressed</span> Juices
+              Artisanal Cakes, Juices & <span className="hero-title-highlight">Chocolates</span>
             </h1>
 
             <p className="hero-copy">
-              Handcrafted in small batches every morning using single-origin Belgian chocolate and
-              orchard-fresh produce. Browse our live menu and collect your treats fresh at the shop counter.
+              Explore our selection of cakes, juices, and gourmet chocolates.
+              Browse our live catalog and view available items for in-store pickup.
             </p>
 
             <div className="hero-cta-group">
@@ -29,7 +28,7 @@ export function Hero(): ReactElement {
                 <span aria-hidden="true">→</span>
               </Link>
               <Link href="#about" className="btn-secondary">
-                Our Story & Freshness
+                Our Offerings
               </Link>
             </div>
 
@@ -38,19 +37,19 @@ export function Hero(): ReactElement {
                 <span className="hero-feature-icon" aria-hidden="true">
                   ✓
                 </span>
-                <span>Eggless & Veg Options</span>
+                <span>Vegetarian Options</span>
               </div>
               <div className="hero-feature-item">
                 <span className="hero-feature-icon" aria-hidden="true">
                   ✓
                 </span>
-                <span>Zero Artificial Additives</span>
+                <span>Counter Pickup</span>
               </div>
               <div className="hero-feature-item">
                 <span className="hero-feature-icon" aria-hidden="true">
                   ✓
                 </span>
-                <span>Ready in 15–20 Mins</span>
+                <span>Live Menu Availability</span>
               </div>
             </div>
           </div>
@@ -62,7 +61,7 @@ export function Hero(): ReactElement {
 
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div>
-                <span className="category-tag">Chef's Signature</span>
+                <span className="category-tag">Featured Item</span>
                 <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--color-text-main)' }}>
                   Dark Chocolate Truffle Cake
                 </h3>
@@ -85,7 +84,7 @@ export function Hero(): ReactElement {
                 marginTop: '0.5rem',
               }}
             >
-              70% Belgian chocolate sponge with silky dark ganache and fresh orchard orange glaze.
+              Rich dark chocolate cake layered with silky chocolate ganache.
             </p>
           </div>
         </div>

@@ -41,7 +41,7 @@ export const CANONICAL_PRODUCTS: Product[] = [
     categorySlug: 'artisanal-cakes',
     name: 'Dark Chocolate Truffle Cake (500g)',
     slug: 'dark-chocolate-truffle-cake-500g',
-    description: '70% Belgian dark chocolate sponge with silky ganache',
+    description: 'Rich dark chocolate cake layered with chocolate ganache',
     basePrice: 65000, // integer INR paise (₹650)
     taxRatePct: 5.0,
     isVeg: true,
@@ -57,7 +57,7 @@ export const CANONICAL_PRODUCTS: Product[] = [
     categorySlug: 'cold-pressed-juices',
     name: 'Valencia Orange Cold-Pressed (300ml)',
     slug: 'valencia-orange-cold-pressed-300ml',
-    description: 'Pure Valencia orange juice freshly pressed daily',
+    description: 'Refreshing chilled orange juice',
     basePrice: 18000, // integer INR paise (₹180)
     taxRatePct: 5.0,
     isVeg: true,
@@ -160,8 +160,8 @@ async function loadCategories(config: AppConfig): Promise<Category[] | null> {
     }));
   }
 
-  // If database is unreachable in test or mock service mode, return canonical seed categories
-  if (config.ALLOW_MOCK_SERVICES || config.NODE_ENV === 'test') {
+  // In production, NEVER return mock/sample categories: return null to trigger 503 DATABASE_UNAVAILABLE
+  if (config.NODE_ENV !== 'production' && (config.ALLOW_MOCK_SERVICES || config.NODE_ENV === 'test')) {
     return CANONICAL_CATEGORIES;
   }
 
@@ -181,10 +181,16 @@ async function loadProducts(config: AppConfig): Promise<Product[] | null> {
     const availabilityMap = new Map<string, boolean>();
     if (availabilityRows && Array.isArray(availabilityRows)) {
       availabilityRows.forEach((row) => {
-        availabilityMap.set(row.product_id, row.is_in_stock);
+        availabilityMap.set(row.product_id, Boolean(row.is_in_stock));
       });
     }
 
+    // CRITICAL AVAILABILITY SAFETY:
+    // 1. Never default missing availability data to true.
+    // 2. If a product has no matching availability record, treat it as unavailable (false).
+    // 3. If the availability endpoint fails entirely (availabilityRows is null), availabilityMap is empty,
+    //    so every product is conservatively marked unavailable (false).
+    // 4. Do not expose physical or reserved stock counts.
     return productRows.map((row) => ({
       id: row.id,
       categoryId: row.category_id,
@@ -200,12 +206,12 @@ async function loadProducts(config: AppConfig): Promise<Product[] | null> {
       allergens: Array.isArray(row.allergens) ? row.allergens : [],
       prepTimeMinutes: row.prep_time_minutes,
       imageUrl: row.image_url,
-      isInStock: availabilityMap.get(row.id) ?? true,
+      isInStock: availabilityMap.get(row.id) ?? false,
     }));
   }
 
-  // If database is unreachable in test or mock service mode, return canonical seed products
-  if (config.ALLOW_MOCK_SERVICES || config.NODE_ENV === 'test') {
+  // In production, NEVER return mock/sample products: return null to trigger 503 DATABASE_UNAVAILABLE
+  if (config.NODE_ENV !== 'production' && (config.ALLOW_MOCK_SERVICES || config.NODE_ENV === 'test')) {
     return CANONICAL_PRODUCTS;
   }
 

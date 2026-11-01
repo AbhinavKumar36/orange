@@ -7,13 +7,10 @@ import { ProductIllustration } from './ProductIllustration';
 
 interface ProductCardProps {
   product: Product;
-  onSelectProduct?: (product: Product) => void;
-  onOpenCart?: () => void;
 }
 
 export function ProductCard({
   product,
-  onOpenCart,
 }: ProductCardProps): ReactElement {
   const formattedPrice = formatPaiseToRupees(product.basePrice);
 
@@ -69,10 +66,10 @@ export function ProductCard({
           </Link>
         </h3>
 
-        <p className="product-description">{product.description || 'Artisanal freshly prepared delicacy.'}</p>
+        <p className="product-description">{product.description || 'Artisanal delicacy.'}</p>
 
         <div className="card-meta-row">
-          <span>⏱️ Ready in ~{product.prepTimeMinutes} mins</span>
+          <span>⏱️ Est. prep: {product.prepTimeMinutes}m</span>
           {product.allergens && product.allergens.length > 0 && (
             <span>• Contains {product.allergens.slice(0, 2).join(', ')}</span>
           )}
@@ -82,26 +79,13 @@ export function ProductCard({
           <div className="product-price">{formattedPrice}</div>
 
           {product.isInStock ? (
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
-              <Link
-                href={`/product/${encodeURIComponent(product.slug)}`}
-                className="btn-card-action btn-view-details"
-                aria-label={`View details for ${product.name}`}
-              >
-                Details
-              </Link>
-              {onOpenCart && (
-                <button
-                  type="button"
-                  className="btn-card-action btn-primary"
-                  onClick={onOpenCart}
-                  style={{ padding: '0.5rem 0.875rem' }}
-                  aria-label={`Add ${product.name} to bag`}
-                >
-                  + Add
-                </button>
-              )}
-            </div>
+            <Link
+              href={`/product/${encodeURIComponent(product.slug)}`}
+              className="btn-card-action btn-view-details"
+              aria-label={`View details for ${product.name}`}
+            >
+              View Details
+            </Link>
           ) : (
             <button
               type="button"

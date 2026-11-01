@@ -22,7 +22,7 @@ export function Header({ onCategorySelect }: HeaderProps): ReactElement {
   return (
     <>
       <div className="announcement-bar">
-        ✨ Fresh batches baked daily • In-store counter pickup in 15–20 mins • Handcrafted with love
+        Moody Orange • Counter Pickup Available • Cakes, Juices & Chocolates
       </div>
 
       <header className="site-header">

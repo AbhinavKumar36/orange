@@ -84,8 +84,8 @@ export default function HomePage(): ReactElement {
         <section id="menu" className="category-nav-section" aria-label="Menu Catalog">
           <div className="container">
             <div className="section-header" style={{ marginBottom: '1.5rem', textAlign: 'left' }}>
-              <div className="section-subtitle">Freshly Made Everyday</div>
-              <h2 className="section-title">Explore Our Artisan Menu</h2>
+              <div className="section-subtitle">Store Menu</div>
+              <h2 className="section-title">Explore Our Catalog</h2>
             </div>
 
             <CategoryNav
@@ -107,7 +107,6 @@ export default function HomePage(): ReactElement {
               onRetry={loadData}
               onResetFilters={handleResetFilters}
               hasActiveFilters={hasActiveFilters}
-              onOpenCart={() => setIsCartOpen(true)}
             />
           </div>
         </section>

@@ -20,7 +20,7 @@ const MOCK_PRODUCTS: Product[] = [
     categorySlug: 'artisanal-cakes',
     name: 'Dark Chocolate Truffle Cake (500g)',
     slug: 'dark-chocolate-truffle-cake-500g',
-    description: '70% Belgian dark chocolate sponge with silky ganache',
+    description: 'Dark chocolate sponge with silky ganache',
     basePrice: 65000, // 65000 paise = 650 INR
     taxRatePct: 5.0,
     isVeg: true,
@@ -36,7 +36,7 @@ const MOCK_PRODUCTS: Product[] = [
     categorySlug: 'cold-pressed-juices',
     name: 'Valencia Orange Cold-Pressed (300ml)',
     slug: 'valencia-orange-cold-pressed-300ml',
-    description: 'Pure Valencia orange juice freshly pressed daily',
+    description: 'Pure Valencia orange juice',
     basePrice: 18000, // 18000 paise = 180 INR
     taxRatePct: 5.0,
     isVeg: true,

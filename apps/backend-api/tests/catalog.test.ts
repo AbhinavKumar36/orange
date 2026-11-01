@@ -145,5 +145,39 @@ describe('Catalog Routes (GET /api/v1/categories & /api/v1/products)', () => {
     expect(body.error.code).toBe('PRODUCT_NOT_FOUND');
     expect(body.error.statusCode).toBe(404);
   });
+
+  it('Production mode: rejects sample fallback and returns 503 DATABASE_UNAVAILABLE when database is down', async () => {
+    const prodConfig: AppConfig = ConfigSchema.parse({
+      PORT: 4002,
+      HOST: '127.0.0.1',
+      NODE_ENV: 'production',
+      ALLOW_MOCK_SERVICES: false,
+      SUPABASE_URL: 'https://prod-unreachable-db.supabase.co',
+      SUPABASE_SERVICE_ROLE_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.realProdKeyString1234567890',
+    });
+
+    const prodApp = await buildApp({ config: prodConfig });
+    await prodApp.ready();
+
+    try {
+      const catRes = await prodApp.inject({
+        method: 'GET',
+        url: '/api/v1/categories',
+      });
+      expect(catRes.statusCode).toBe(503);
+      const catBody = JSON.parse(catRes.payload);
+      expect(catBody.error.code).toBe('DATABASE_UNAVAILABLE');
+
+      const prodRes = await prodApp.inject({
+        method: 'GET',
+        url: '/api/v1/products',
+      });
+      expect(prodRes.statusCode).toBe(503);
+      const prodBody = JSON.parse(prodRes.payload);
+      expect(prodBody.error.code).toBe('DATABASE_UNAVAILABLE');
+    } finally {
+      await prodApp.close();
+    }
+  });
 });
 

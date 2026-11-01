@@ -9,8 +9,7 @@ export function Footer(): ReactElement {
           <div>
             <div className="footer-brand-title">🍊 Moody Orange</div>
             <p className="footer-brand-copy">
-              Boutique quick-commerce ordering platform for handcrafted artisanal cakes, fresh
-              raw cold-pressed juices, and gourmet chocolate confections.
+              Boutique storefront for handcrafted artisanal cakes, fresh juices, and gourmet chocolate confections.
             </p>
           </div>
 
@@ -29,7 +28,7 @@ export function Footer(): ReactElement {
               </li>
               <li>
                 <Link href="/#menu" className="footer-link">
-                  Cold-Pressed Juices
+                  Fresh Juices
                 </Link>
               </li>
               <li>
@@ -43,8 +42,7 @@ export function Footer(): ReactElement {
           <div>
             <div className="footer-heading">Pickup Information</div>
             <p style={{ fontSize: '0.875rem', lineHeight: '1.6', color: '#A8A29E' }}>
-              Orders are freshly assembled upon confirmation for shop counter collection. Standard
-              preparation lead time is 15–20 minutes.
+              Orders are available for counter collection at the store. Preparation lead times vary by product.
             </p>
           </div>
         </div>

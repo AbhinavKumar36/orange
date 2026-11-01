@@ -170,7 +170,7 @@ export default function ProductDetailPage(): ReactElement {
 
                 <p className="detail-description">
                   {product.description ||
-                    'Artisanal delicacy prepared fresh daily using genuine single-origin ingredients.'}
+                    'Artisanal confectionery crafted with quality ingredients.'}
                 </p>
 
                 <div className="detail-specs-table">
@@ -212,13 +212,17 @@ export default function ProductDetailPage(): ReactElement {
                   {product.isInStock ? (
                     <button
                       type="button"
+                      disabled
                       className="btn-primary"
-                      onClick={() => setIsCartOpen(true)}
-                      style={{ flexGrow: 1 }}
+                      style={{
+                        flexGrow: 1,
+                        opacity: 0.75,
+                        cursor: 'not-allowed',
+                        boxShadow: 'none',
+                      }}
+                      aria-disabled="true"
                     >
-                      <span>Add to Bag</span>
-                      <span aria-hidden="true">•</span>
-                      <span>{formatPaiseToRupees(product.basePrice)}</span>
+                      Online Ordering Coming Soon (Phase 5)
                     </button>
                   ) : (
                     <button
