@@ -39,7 +39,7 @@ fun SearchBar(
     modifier: Modifier = Modifier,
     placeholderText: String = "Search cakes, cold juices, pralines..."
 ) {
-    val focusManager = LocalFocusManager()
+    val focusManager = LocalFocusManager.current
 
     Box(
         modifier = modifier

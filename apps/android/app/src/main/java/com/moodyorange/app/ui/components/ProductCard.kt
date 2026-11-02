@@ -58,14 +58,16 @@ fun ProductCard(
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Column {
-            // Product image area with placeholder
+            // Product image area with Coil loader and placeholder fallback
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(140.dp)
             ) {
-                ProductPlaceholder(
+                ProductImage(
+                    imageUrl = product.imageUrl,
                     categorySlug = product.categorySlug,
+                    contentDescription = product.name,
                     modifier = Modifier.fillMaxWidth().height(140.dp)
                 )
 

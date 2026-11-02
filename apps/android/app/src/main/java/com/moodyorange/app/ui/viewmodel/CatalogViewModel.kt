@@ -6,6 +6,7 @@ import com.moodyorange.app.data.model.Category
 import com.moodyorange.app.data.model.Product
 import com.moodyorange.app.data.repository.CatalogRepository
 import com.moodyorange.app.data.repository.CatalogRepositoryImpl
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -20,9 +21,21 @@ sealed interface UiState<out T> {
     data class Error(val message: String) : UiState<Nothing>
 }
 
+sealed interface ProductDetailUiState {
+    object Idle : ProductDetailUiState
+    object Loading : ProductDetailUiState
+    data class Success(val product: Product) : ProductDetailUiState
+    object NotFound : ProductDetailUiState
+    data class Error(val message: String) : ProductDetailUiState
+}
+
 class CatalogViewModel(
-    private val repository: CatalogRepository = CatalogRepositoryImpl()
+    private val repository: CatalogRepository = CatalogRepositoryImpl(),
+    private val coroutineScope: CoroutineScope? = null
 ) : ViewModel() {
+
+    private val scope: CoroutineScope
+        get() = coroutineScope ?: viewModelScope
 
     private val _categoriesState = MutableStateFlow<UiState<List<Category>>>(UiState.Loading)
     val categoriesState: StateFlow<UiState<List<Category>>> = _categoriesState.asStateFlow()
@@ -36,9 +49,11 @@ class CatalogViewModel(
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
 
-    private val _productDetailState = MutableStateFlow<UiState<Product?>>(UiState.Idle)
-    val productDetailState: StateFlow<UiState<Product?>> = _productDetailState.asStateFlow()
+    private val _productDetailState = MutableStateFlow<ProductDetailUiState>(ProductDetailUiState.Idle)
+    val productDetailState: StateFlow<ProductDetailUiState> = _productDetailState.asStateFlow()
 
+    private var currentDetailIdOrSlug: String? = null
+    private var loadProductDetailJob: Job? = null
     private var searchJob: Job? = null
     private var loadProductsJob: Job? = null
 
@@ -52,7 +67,7 @@ class CatalogViewModel(
     }
 
     fun loadCategories() {
-        viewModelScope.launch {
+        scope.launch {
             _categoriesState.value = UiState.Loading
             repository.getCategories()
                 .onSuccess { categories ->
@@ -76,7 +91,7 @@ class CatalogViewModel(
     fun onSearchQueryChanged(newQuery: String) {
         _searchQuery.value = newQuery
         searchJob?.cancel()
-        searchJob = viewModelScope.launch {
+        searchJob = scope.launch {
             // Debounce user input by 300ms
             delay(300)
             loadProducts()
@@ -85,7 +100,7 @@ class CatalogViewModel(
 
     fun loadProducts() {
         loadProductsJob?.cancel()
-        loadProductsJob = viewModelScope.launch {
+        loadProductsJob = scope.launch {
             _productsState.value = UiState.Loading
 
             val categoryId = _selectedCategory.value?.id
@@ -108,19 +123,26 @@ class CatalogViewModel(
         }
     }
 
-    fun loadProductDetail(idOrSlug: String) {
-        viewModelScope.launch {
-            _productDetailState.value = UiState.Loading
+    fun loadProductDetail(idOrSlug: String, force: Boolean = false) {
+        if (!force && currentDetailIdOrSlug == idOrSlug && _productDetailState.value is ProductDetailUiState.Success) {
+            // Avoid redundant request when this product is already loaded
+            return
+        }
+
+        currentDetailIdOrSlug = idOrSlug
+        loadProductDetailJob?.cancel()
+        loadProductDetailJob = scope.launch {
+            _productDetailState.value = ProductDetailUiState.Loading
             repository.getProductByIdOrSlug(idOrSlug)
                 .onSuccess { product ->
                     if (product != null) {
-                        _productDetailState.value = UiState.Success(product)
+                        _productDetailState.value = ProductDetailUiState.Success(product)
                     } else {
-                        _productDetailState.value = UiState.Error("Product not found.")
+                        _productDetailState.value = ProductDetailUiState.NotFound
                     }
                 }
                 .onFailure { error ->
-                    _productDetailState.value = UiState.Error(
+                    _productDetailState.value = ProductDetailUiState.Error(
                         error.message ?: "Failed to load product details."
                     )
                 }
@@ -128,7 +150,9 @@ class CatalogViewModel(
     }
 
     fun clearProductDetail() {
-        _productDetailState.value = UiState.Idle
+        loadProductDetailJob?.cancel()
+        currentDetailIdOrSlug = null
+        _productDetailState.value = ProductDetailUiState.Idle
     }
 }
 

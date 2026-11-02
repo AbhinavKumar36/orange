@@ -22,15 +22,21 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.moodyorange.app.data.model.Product
-import com.moodyorange.app.ui.components.ProductPlaceholder
+import com.moodyorange.app.ui.components.ErrorStateView
+import com.moodyorange.app.ui.components.LoadingStateView
+import com.moodyorange.app.ui.components.ProductImage
 import com.moodyorange.app.ui.theme.BorderMuted
 import com.moodyorange.app.ui.theme.CardBackground
 import com.moodyorange.app.ui.theme.CreamBackground
@@ -45,9 +51,187 @@ import com.moodyorange.app.ui.theme.TextMuted
 import com.moodyorange.app.ui.theme.TextPrimary
 import com.moodyorange.app.ui.theme.TextSecondary
 import com.moodyorange.app.ui.theme.VegGreen
+import com.moodyorange.app.ui.viewmodel.CatalogViewModel
+import com.moodyorange.app.ui.viewmodel.ProductDetailUiState
 
 @Composable
 fun ProductDetailScreen(
+    productIdOrSlug: String,
+    viewModel: CatalogViewModel,
+    onBackClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val detailState by viewModel.productDetailState.collectAsState()
+
+    LaunchedEffect(productIdOrSlug) {
+        viewModel.loadProductDetail(productIdOrSlug)
+    }
+
+    when (val state = detailState) {
+        is ProductDetailUiState.Loading, ProductDetailUiState.Idle -> {
+            Column(
+                modifier = modifier
+                    .fillMaxSize()
+                    .background(CreamBackground)
+            ) {
+                DetailTopBar(
+                    title = "Loading...",
+                    subtitle = "Boutique Catalog",
+                    onBackClick = onBackClick
+                )
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    LoadingStateView(message = "Fetching confection details...")
+                }
+            }
+        }
+        is ProductDetailUiState.NotFound -> {
+            Column(
+                modifier = modifier
+                    .fillMaxSize()
+                    .background(CreamBackground)
+            ) {
+                DetailTopBar(
+                    title = "Not Found",
+                    subtitle = "Boutique Catalog",
+                    onBackClick = onBackClick
+                )
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(56.dp)
+                            .clip(CircleShape)
+                            .background(OrangeLight),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(text = "🍰", fontSize = 26.sp)
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    Text(
+                        text = "Confection Not Found",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = TextPrimary
+                    )
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    Text(
+                        text = "The requested product is no longer available in the boutique catalog.",
+                        fontSize = 14.sp,
+                        color = TextMuted,
+                        textAlign = TextAlign.Center
+                    )
+
+                    Spacer(modifier = Modifier.height(20.dp))
+
+                    Button(
+                        onClick = onBackClick,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = OrangePrimary,
+                            contentColor = Color.White
+                        ),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Text(text = "Back to Catalog", fontWeight = FontWeight.SemiBold)
+                    }
+                }
+            }
+        }
+        is ProductDetailUiState.Error -> {
+            Column(
+                modifier = modifier
+                    .fillMaxSize()
+                    .background(CreamBackground)
+            ) {
+                DetailTopBar(
+                    title = "Error",
+                    subtitle = "Boutique Catalog",
+                    onBackClick = onBackClick
+                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(16.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    ErrorStateView(
+                        message = state.message,
+                        onRetry = { viewModel.loadProductDetail(productIdOrSlug, force = true) }
+                    )
+                }
+            }
+        }
+        is ProductDetailUiState.Success -> {
+            ProductDetailContent(
+                product = state.product,
+                onBackClick = onBackClick,
+                modifier = modifier
+            )
+        }
+    }
+}
+
+@Composable
+private fun DetailTopBar(
+    title: String,
+    subtitle: String,
+    onBackClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(CardBackground)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(38.dp)
+                .clip(CircleShape)
+                .background(OrangeLight)
+                .clickable(onClick = onBackClick),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = "←",
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold,
+                color = OrangePrimary
+            )
+        }
+
+        Spacer(modifier = Modifier.width(14.dp))
+
+        Column {
+            Text(
+                text = title,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold,
+                color = TextPrimary,
+                maxLines = 1
+            )
+            Text(
+                text = subtitle,
+                fontSize = 12.sp,
+                color = TextSecondary
+            )
+        }
+    }
+}
+
+@Composable
+private fun ProductDetailContent(
     product: Product,
     onBackClick: () -> Unit,
     modifier: Modifier = Modifier
@@ -60,46 +244,11 @@ fun ProductDetailScreen(
             .background(CreamBackground)
     ) {
         // 1. Top Bar with Back Button
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(CardBackground)
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(38.dp)
-                    .clip(CircleShape)
-                    .background(OrangeLight)
-                    .clickable(onClick = onBackClick),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "←",
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = OrangePrimary
-                )
-            }
-
-            Spacer(modifier = Modifier.width(14.dp))
-
-            Column {
-                Text(
-                    text = product.name,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = TextPrimary,
-                    maxLines = 1
-                )
-                Text(
-                    text = product.categoryName,
-                    fontSize = 12.sp,
-                    color = TextSecondary
-                )
-            }
-        }
+        DetailTopBar(
+            title = product.name,
+            subtitle = product.categoryName,
+            onBackClick = onBackClick
+        )
 
         // 2. Scrollable Product Details Content
         Column(
@@ -108,7 +257,7 @@ fun ProductDetailScreen(
                 .verticalScroll(scrollState)
                 .padding(20.dp)
         ) {
-            // Hero Illustration Area
+            // Hero Image Area with Coil loading & fallback placeholder
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -116,8 +265,10 @@ fun ProductDetailScreen(
                     .clip(RoundedCornerShape(20.dp))
                     .border(1.dp, BorderMuted, RoundedCornerShape(20.dp))
             ) {
-                ProductPlaceholder(
+                ProductImage(
+                    imageUrl = product.imageUrl,
                     categorySlug = product.categorySlug,
+                    contentDescription = product.name,
                     modifier = Modifier.fillMaxSize()
                 )
             }
@@ -324,4 +475,3 @@ fun ProductDetailScreen(
         }
     }
 }
-

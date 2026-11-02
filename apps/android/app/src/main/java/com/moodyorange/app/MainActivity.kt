@@ -13,7 +13,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import com.moodyorange.app.data.model.Product
 import com.moodyorange.app.ui.screens.HomeScreen
 import com.moodyorange.app.ui.screens.ProductDetailScreen
 import com.moodyorange.app.ui.theme.CreamBackground
@@ -22,7 +21,7 @@ import com.moodyorange.app.ui.viewmodel.CatalogViewModel
 
 sealed class AppDestination {
     object Home : AppDestination()
-    data class ProductDetail(val product: Product) : AppDestination()
+    data class ProductDetail(val productIdOrSlug: String) : AppDestination()
 }
 
 class MainActivity : ComponentActivity() {
@@ -55,17 +54,20 @@ fun MoodyOrangeApp(
             HomeScreen(
                 viewModel = viewModel,
                 onProductClick = { product ->
-                    currentDestination = AppDestination.ProductDetail(product)
+                    currentDestination = AppDestination.ProductDetail(product.id)
                 }
             )
         }
         is AppDestination.ProductDetail -> {
             BackHandler {
+                viewModel.clearProductDetail()
                 currentDestination = AppDestination.Home
             }
             ProductDetailScreen(
-                product = dest.product,
+                productIdOrSlug = dest.productIdOrSlug,
+                viewModel = viewModel,
                 onBackClick = {
+                    viewModel.clearProductDetail()
                     currentDestination = AppDestination.Home
                 }
             )

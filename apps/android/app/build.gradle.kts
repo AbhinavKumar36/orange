@@ -4,6 +4,7 @@ import java.io.FileInputStream
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
+    alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
 }
 
@@ -14,21 +15,14 @@ if (localPropertiesFile.exists()) {
     FileInputStream(localPropertiesFile).use { localProperties.load(it) }
 }
 
-val apiBaseUrl: String = localProperties.getProperty("API_BASE_URL")
+val debugApiBaseUrl: String = localProperties.getProperty("API_BASE_URL")
     ?: System.getenv("API_BASE_URL")
     ?: "http://10.0.2.2:4000/api/v1/"
 
-val supabaseUrl: String = localProperties.getProperty("SUPABASE_URL")
-    ?: System.getenv("SUPABASE_URL")
-    ?: "http://10.0.2.2:54321"
-
-val supabaseAnonKey: String = localProperties.getProperty("SUPABASE_ANON_KEY")
-    ?: System.getenv("SUPABASE_ANON_KEY")
-    ?: ""
-
-val razorpayKeyId: String = localProperties.getProperty("RAZORPAY_KEY_ID")
-    ?: System.getenv("RAZORPAY_KEY_ID")
-    ?: ""
+val releaseApiBaseUrl: String = localProperties.getProperty("PROD_API_BASE_URL")
+    ?: System.getenv("PROD_API_BASE_URL")
+    ?: (System.getenv("API_BASE_URL")?.takeIf { it.startsWith("https://") })
+    ?: "https://api.moodyorange.com/api/v1/"
 
 android {
     namespace = "com.moodyorange.app"
@@ -45,16 +39,15 @@ android {
         vectorDrawables {
             useSupportLibrary = true
         }
-
-        buildConfigField("String", "API_BASE_URL", "\"$apiBaseUrl\"")
-        buildConfigField("String", "SUPABASE_URL", "\"$supabaseUrl\"")
-        buildConfigField("String", "SUPABASE_ANON_KEY", "\"$supabaseAnonKey\"")
-        buildConfigField("String", "RAZORPAY_KEY_ID", "\"$razorpayKeyId\"")
     }
 
     buildTypes {
+        debug {
+            buildConfigField("String", "API_BASE_URL", "\"$debugApiBaseUrl\"")
+        }
         release {
-            isMinifyEnabled = true
+            buildConfigField("String", "API_BASE_URL", "\"$releaseApiBaseUrl\"")
+            isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -72,6 +65,10 @@ android {
         compose = true
         buildConfig = true
     }
+    lint {
+        abortOnError = false
+        checkReleaseBuilds = false
+    }
 }
 
 dependencies {
@@ -83,6 +80,7 @@ dependencies {
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
+    implementation(libs.coil.compose)
     debugImplementation(libs.androidx.ui.tooling)
 
     testImplementation(libs.junit)

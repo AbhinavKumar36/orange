@@ -56,10 +56,11 @@ class MoodyOrangeApiClient(
     suspend fun getProductByIdOrSlug(idOrSlug: String): Result<Product?> = withContext(Dispatchers.IO) {
         val encoded = URLEncoder.encode(idOrSlug, "UTF-8")
         val endpoint = "$sanitizedBaseUrl/products/$encoded"
+        var connection: HttpURLConnection? = null
 
         try {
             val url = URL(endpoint)
-            val connection = (url.openConnection() as HttpURLConnection).apply {
+            connection = (url.openConnection() as HttpURLConnection).apply {
                 requestMethod = "GET"
                 connectTimeout = 10_000
                 readTimeout = 10_000
@@ -82,13 +83,16 @@ class MoodyOrangeApiClient(
             }
         } catch (e: Exception) {
             Result.failure(e)
+        } finally {
+            connection?.disconnect()
         }
     }
 
     private fun <T> executeRequest(endpoint: String, parser: (String) -> T): Result<T> {
+        var connection: HttpURLConnection? = null
         return try {
             val url = URL(endpoint)
-            val connection = (url.openConnection() as HttpURLConnection).apply {
+            connection = (url.openConnection() as HttpURLConnection).apply {
                 requestMethod = "GET"
                 connectTimeout = 10_000
                 readTimeout = 10_000
@@ -106,6 +110,8 @@ class MoodyOrangeApiClient(
             }
         } catch (e: Exception) {
             Result.failure(e)
+        } finally {
+            connection?.disconnect()
         }
     }
 
@@ -120,7 +126,7 @@ class MoodyOrangeApiClient(
                     id = obj.getString("id"),
                     name = obj.getString("name"),
                     slug = obj.getString("slug"),
-                    description = if (obj.isNull("description")) null else obj.optString("description", null),
+                    description = if (obj.isNull("description")) null else obj.getString("description"),
                     displayOrder = obj.optInt("display_order", 0)
                 )
             )
@@ -168,13 +174,13 @@ class MoodyOrangeApiClient(
             categorySlug = obj.optString("categorySlug", "boutique"),
             name = obj.getString("name"),
             slug = obj.getString("slug"),
-            description = if (obj.isNull("description")) null else obj.optString("description", null),
+            description = if (obj.isNull("description")) null else obj.getString("description"),
             basePrice = obj.getLong("basePrice"), // Preserved in integer INR paise
             taxRatePct = obj.optDouble("taxRatePct", 5.0),
             isVeg = obj.optBoolean("isVeg", true),
             allergens = allergensList,
             prepTimeMinutes = obj.optInt("prepTimeMinutes", 15),
-            imageUrl = if (obj.isNull("imageUrl")) null else obj.optString("imageUrl", null),
+            imageUrl = if (obj.isNull("imageUrl")) null else obj.getString("imageUrl"),
             isInStock = isInStock
         )
     }
@@ -183,8 +189,8 @@ class MoodyOrangeApiClient(
         return try {
             val json = JSONObject(errorBody)
             val errorObj = json.optJSONObject("error")
-            errorObj?.optString("message")?.takeIf { it.isNotBlank() }
-                ?: json.optString("message")?.takeIf { it.isNotBlank() }
+            errorObj?.optString("message", "")?.takeIf { it.isNotBlank() }
+                ?: json.optString("message", "")?.takeIf { it.isNotBlank() }
                 ?: fallback
         } catch (_: Exception) {
             fallback
