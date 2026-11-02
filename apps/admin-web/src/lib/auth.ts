@@ -1,82 +1,262 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import type { AdminStaffProfile, StaffRole } from '@orange/api-contracts';
-import { fetchAdminMe } from './api';
+import { fetchAdminMe, AdminApiError } from './api';
 
-const ADMIN_STORAGE_KEY = 'moody_orange_admin_token';
+const STORAGE_KEY = 'moody_orange_admin_session';
 
-export interface AdminSession {
-  token: string;
+function getValidatedAuthEnv(): { url: string; anonKey: string } {
+  const isProd = process.env.NODE_ENV === 'production';
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || (isProd ? '' : 'http://localhost:54321');
+  const anonKey =
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+    (isProd ? '' : 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.example_anon_key');
+
+  return { url, anonKey };
+}
+
+const { url: SUPABASE_URL, anonKey: SUPABASE_ANON_KEY } = getValidatedAuthEnv();
+
+export interface AdminStaffSession {
+  accessToken: string;
+  refreshToken?: string;
+  expiresAt: number;
   staff: AdminStaffProfile;
 }
 
-let inMemoryToken: string | null = null;
+let inMemorySession: AdminStaffSession | null = null;
 
-export function getStoredAdminToken(): string | null {
-  if (inMemoryToken) return inMemoryToken;
+export function getStoredAdminSession(): AdminStaffSession | null {
+  if (inMemorySession) {
+    if (inMemorySession.expiresAt && inMemorySession.expiresAt < Date.now()) {
+      clearAdminSession();
+      return null;
+    }
+    return inMemorySession;
+  }
   if (typeof window === 'undefined') return null;
   try {
-    const token = sessionStorage.getItem(ADMIN_STORAGE_KEY);
-    inMemoryToken = token;
-    return token;
+    const raw = sessionStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    const session = JSON.parse(raw) as AdminStaffSession;
+    if (session.expiresAt && session.expiresAt < Date.now()) {
+      clearAdminSession();
+      return null;
+    }
+    inMemorySession = session;
+    return session;
   } catch {
     return null;
   }
 }
 
-export function saveAdminToken(token: string): void {
-  inMemoryToken = token;
+export function saveAdminSession(session: AdminStaffSession): void {
+  inMemorySession = session;
   if (typeof window === 'undefined') return;
   try {
-    sessionStorage.setItem(ADMIN_STORAGE_KEY, token);
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(session));
     window.dispatchEvent(new Event('moody_orange_admin_auth_change'));
   } catch {
     // SessionStorage restricted
   }
 }
 
-export function clearAdminToken(): void {
-  inMemoryToken = null;
+export function clearAdminSession(): void {
+  inMemorySession = null;
   if (typeof window === 'undefined') return;
   try {
-    sessionStorage.removeItem(ADMIN_STORAGE_KEY);
+    sessionStorage.removeItem(STORAGE_KEY);
     window.dispatchEvent(new Event('moody_orange_admin_auth_change'));
   } catch {
     // Ignore
   }
 }
 
+/**
+ * Performs email/password authentication against Supabase Auth,
+ * then validates staff authorization through server-side /admin/me.
+ * Discards credentials and denies access if the authenticated account is not staff.
+ */
+export async function loginStaffWithCredentials(
+  email: string,
+  password: string
+): Promise<{ success: boolean; session?: AdminStaffSession; error?: string }> {
+  const cleanEmail = email.trim();
+  if (!cleanEmail || !password) {
+    return { success: false, error: 'Please enter both staff email and password.' };
+  }
+
+  try {
+    const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        apikey: SUPABASE_ANON_KEY,
+      },
+      body: JSON.stringify({
+        email: cleanEmail,
+        password,
+      }),
+    });
+
+    if (!res.ok) {
+      const errJson = (await res.json().catch(() => null)) as {
+        msg?: string;
+        message?: string;
+        error_description?: string;
+      } | null;
+      const message =
+        errJson?.msg ||
+        errJson?.message ||
+        errJson?.error_description ||
+        `Authentication failed (HTTP ${res.status})`;
+      return { success: false, error: message };
+    }
+
+    const tokenData = (await res.json()) as {
+      access_token: string;
+      refresh_token?: string;
+      expires_in?: number;
+    };
+
+    if (!tokenData.access_token) {
+      return { success: false, error: 'No access token received from authentication provider.' };
+    }
+
+    // Step 2: Authoritative Server-Side Staff Verification (/admin/me)
+    try {
+      const meResponse = await fetchAdminMe(tokenData.access_token);
+      if (!meResponse?.staff?.role) {
+        return {
+          success: false,
+          error: 'Access denied: Account is authenticated but possesses no staff role.',
+        };
+      }
+
+      const session: AdminStaffSession = {
+        accessToken: tokenData.access_token,
+        refreshToken: tokenData.refresh_token,
+        expiresAt: tokenData.expires_in
+          ? Date.now() + tokenData.expires_in * 1000
+          : Date.now() + 3600 * 1000,
+        staff: meResponse.staff,
+      };
+
+      saveAdminSession(session);
+      return { success: true, session };
+    } catch (apiErr: unknown) {
+      if (apiErr instanceof AdminApiError && apiErr.statusCode === 403) {
+        return {
+          success: false,
+          error: 'Access denied: Your account is authenticated, but is not authorized as store staff. Customers cannot access the staff portal.',
+        };
+      }
+      return {
+        success: false,
+        error: apiErr instanceof Error ? apiErr.message : 'Failed to verify staff permissions.',
+      };
+    }
+  } catch (err: unknown) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : 'Network error connecting to authentication service.',
+    };
+  }
+}
+
+/**
+ * Attempts to refresh an existing staff session using the refresh token.
+ */
+export async function refreshStaffSession(): Promise<AdminStaffSession | null> {
+  const current = getStoredAdminSession();
+  if (!current?.refreshToken) {
+    clearAdminSession();
+    return null;
+  }
+
+  try {
+    const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        apikey: SUPABASE_ANON_KEY,
+      },
+      body: JSON.stringify({
+        refresh_token: current.refreshToken,
+      }),
+    });
+
+    if (!res.ok) {
+      clearAdminSession();
+      return null;
+    }
+
+    const tokenData = (await res.json()) as {
+      access_token: string;
+      refresh_token?: string;
+      expires_in?: number;
+    };
+
+    const meResponse = await fetchAdminMe(tokenData.access_token);
+    const updated: AdminStaffSession = {
+      accessToken: tokenData.access_token,
+      refreshToken: tokenData.refresh_token || current.refreshToken,
+      expiresAt: tokenData.expires_in
+        ? Date.now() + tokenData.expires_in * 1000
+        : Date.now() + 3600 * 1000,
+      staff: meResponse.staff,
+    };
+
+    saveAdminSession(updated);
+    return updated;
+  } catch {
+    clearAdminSession();
+    return null;
+  }
+}
+
 export function useAdminAuth() {
-  const [token, setToken] = useState<string | null>(null);
-  const [staff, setStaff] = useState<AdminStaffProfile | null>(null);
+  const [session, setSession] = useState<AdminStaffSession | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const checkAuth = async () => {
+  const checkAuth = useCallback(async () => {
     setIsLoading(true);
     setError(null);
-    const stored = getStoredAdminToken();
+    const stored = getStoredAdminSession();
     if (!stored) {
-      setToken(null);
-      setStaff(null);
+      setSession(null);
       setIsLoading(false);
       return;
     }
 
+    // Verify token validity against /admin/me
     try {
-      const res = await fetchAdminMe(stored);
-      setToken(stored);
-      setStaff(res.staff);
+      const me = await fetchAdminMe(stored.accessToken);
+      const activeSession: AdminStaffSession = {
+        ...stored,
+        staff: me.staff,
+      };
+      setSession(activeSession);
     } catch (err: unknown) {
-      clearAdminToken();
-      setToken(null);
-      setStaff(null);
-      setError(err instanceof Error ? err.message : 'Invalid or expired session');
+      // If expired, attempt token refresh
+      const refreshed = await refreshStaffSession();
+      if (refreshed) {
+        setSession(refreshed);
+      } else {
+        clearAdminSession();
+        setSession(null);
+        setError(
+          err instanceof AdminApiError && err.statusCode === 403
+            ? 'Access denied: Staff authorization revoked or account is not staff.'
+            : 'Session expired. Please sign in again.'
+        );
+      }
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     checkAuth();
@@ -89,36 +269,44 @@ export function useAdminAuth() {
     return () => {
       window.removeEventListener('moody_orange_admin_auth_change', handleAuthChange);
     };
-  }, []);
+  }, [checkAuth]);
 
-  const loginWithToken = async (newToken: string) => {
-    saveAdminToken(newToken);
-    await checkAuth();
+  const login = async (email: string, pass: string) => {
+    setIsLoading(true);
+    setError(null);
+    const result = await loginStaffWithCredentials(email, pass);
+    if (!result.success) {
+      setError(result.error || 'Authentication failed');
+      setIsLoading(false);
+      return false;
+    }
+    setSession(result.session || null);
+    setIsLoading(false);
+    return true;
   };
 
   const logout = () => {
-    clearAdminToken();
-    setToken(null);
-    setStaff(null);
+    clearAdminSession();
+    setSession(null);
+    setError(null);
   };
 
   const hasRole = (allowedRoles: StaffRole[]): boolean => {
-    if (!staff) return false;
-    return allowedRoles.includes(staff.role);
+    if (!session?.staff) return false;
+    return allowedRoles.includes(session.staff.role);
   };
 
   return {
-    token,
-    staff,
-    isAuthenticated: !!staff,
+    token: session?.accessToken || null,
+    staff: session?.staff || null,
+    isAuthenticated: !!session?.staff,
     isLoading,
     error,
-    loginWithToken,
+    login,
     logout,
     hasRole,
-    isStaff: !!staff,
-    isManager: staff?.role === 'manager' || staff?.role === 'admin',
-    isAdmin: staff?.role === 'admin',
+    isStaff: !!session?.staff,
+    isManager: session?.staff?.role === 'manager' || session?.staff?.role === 'admin',
+    isAdmin: session?.staff?.role === 'admin',
   };
 }
-

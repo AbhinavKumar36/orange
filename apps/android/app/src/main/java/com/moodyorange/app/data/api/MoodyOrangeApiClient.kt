@@ -29,20 +29,49 @@ import java.net.UnknownHostException
  * In DEBUG mode, automatically falls back across local dev hosts (LAN IP, Android Emulator 10.0.2.2, USB reverse 127.0.0.1).
  */
 class MoodyOrangeApiClient(
-    baseUrl: String = BuildConfig.API_BASE_URL
+    baseUrl: String = BuildConfig.API_BASE_URL,
+    candidateHosts: List<String>? = null,
+    private val isDebug: Boolean = BuildConfig.DEBUG
 ) {
-    val configuredBaseUrl = baseUrl.trimEnd('/')
+    val configuredBaseUrl: String
+
+    init {
+        val trimmed = baseUrl.trimEnd('/')
+        if (!isDebug) {
+            check(trimmed.startsWith("https://")) {
+                "Production release builds require HTTPS API base URL. Found: $trimmed"
+            }
+            check(!trimmed.contains("localhost") && !trimmed.contains("127.0.0.1") && !trimmed.contains("10.0.2.2")) {
+                "Production release builds cannot point to local development hosts. Found: $trimmed"
+            }
+        }
+        configuredBaseUrl = trimmed
+    }
 
     @Volatile
     var activeBaseUrl: String = configuredBaseUrl
 
-    private val debugCandidateHosts = listOf(
-        configuredBaseUrl,
-        "http://127.0.0.1:4000/api/v1",
-        "http://192.168.29.197:4000/api/v1",
-        "http://10.0.2.2:4000/api/v1",
-        "http://localhost:4000/api/v1"
-    ).distinct()
+    // For DEBUG builds only: fallback across standard local development hosts
+    // (configured URL / LAN IP, USB reverse 127.0.0.1, Android emulator 10.0.2.2, localhost)
+    // Never rely on hardcoded individual LAN IPs.
+    val debugCandidateHosts: List<String> = if (isDebug) {
+        (candidateHosts ?: listOf(
+            configuredBaseUrl,
+            "http://127.0.0.1:4000/api/v1",
+            "http://10.0.2.2:4000/api/v1",
+            "http://localhost:4000/api/v1"
+        )).map { it.trimEnd('/') }.distinct()
+    } else {
+        emptyList()
+    }
+
+    fun getCandidateEndpoints(): List<String> {
+        return if (isDebug) {
+            listOf(activeBaseUrl).plus(debugCandidateHosts).distinct()
+        } else {
+            listOf(activeBaseUrl)
+        }
+    }
 
     suspend fun getCategories(): Result<List<Category>> = withContext(Dispatchers.IO) {
         executeWithFallback("/categories", "GET") { body ->
@@ -180,11 +209,7 @@ class MoodyOrangeApiClient(
         allow404AsNull: Boolean = false,
         parser: (String) -> T
     ): Result<T> {
-        val candidates = if (BuildConfig.DEBUG) {
-            listOf(activeBaseUrl).plus(debugCandidateHosts).distinct()
-        } else {
-            listOf(activeBaseUrl)
-        }
+        val candidates = getCandidateEndpoints()
 
         var lastException: Exception? = null
 
@@ -231,7 +256,7 @@ class MoodyOrangeApiClient(
                 lastException = e
                 // Only fallback on network unreachable/timeout errors
                 val isNetworkError = e is ConnectException || e is SocketTimeoutException || e is UnknownHostException
-                if (!BuildConfig.DEBUG || !isNetworkError) {
+                if (!isDebug || !isNetworkError) {
                     return Result.failure(e)
                 }
             } finally {

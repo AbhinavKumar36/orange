@@ -70,16 +70,18 @@ This document outlines the security, identity, and role-based access control (RB
 
 ## 4. Provisioning Staff Roles
 
-### Option A: Using the CLI Provisioning Utility
+### Option A: Using the Hardened CLI Provisioning Utility
+
+The provisioning utility enforces target environment selection, identifier validation, role constraints, and production safeguards:
+
 ```bash
-# Provision a Counter Staff member
-node scripts/provision-admin.mjs --email staff@moodyorange.local --role counter_staff
+# 1. Local Development Provisioning:
+node scripts/provision-admin.mjs --env local --email staff@moodyorange.local --role counter_staff
+node scripts/provision-admin.mjs --env local --email manager@moodyorange.local --role manager
+node scripts/provision-admin.mjs --env local --email admin@moodyorange.local --role admin
 
-# Provision a Store Manager
-node scripts/provision-admin.mjs --email manager@moodyorange.local --role manager
-
-# Provision an Administrator
-node scripts/provision-admin.mjs --email admin@moodyorange.local --role admin
+# 2. Production Provisioning (Requires explicit --confirm-production flag):
+node scripts/provision-admin.mjs --env production --email lead-admin@company.com --role admin --confirm-production
 ```
 
 ### Option B: Direct SQL Execution (Supabase Studio / psql)

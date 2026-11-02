@@ -279,6 +279,7 @@ export const AdminStaffProfileSchema = z.object({
   fullName: z.string().nullable().optional(),
   email: z.string().nullable().optional(),
   role: StaffRoleSchema,
+  isActive: z.boolean().default(true),
 });
 export type AdminStaffProfile = z.infer<typeof AdminStaffProfileSchema>;
 

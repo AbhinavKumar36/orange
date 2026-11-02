@@ -8,7 +8,7 @@ BEGIN;
 
 CREATE EXTENSION IF NOT EXISTS pgtap;
 
-SELECT plan(50);
+SELECT plan(55);
 
 -- ------------------------------------------------------------------------------
 -- 1. Schema Existence & Structure Verification (Tests 1 - 11)
@@ -447,6 +447,67 @@ SELECT results_eq(
     'SELECT out_physical_stock, out_reserved_stock, out_available_stock FROM public.rpc_write_off_inventory(''a0000000-0000-0000-0000-000000000002''::UUID, 1, ''00000000-0000-0000-0000-000000000003''::UUID, ''Manager valid write off'')',
     'VALUES (49, 0, 49)',
     'Manager valid write-off decrements physical stock'
+);
+
+-- ------------------------------------------------------------------------------
+-- 12. Test Concurrency & Invariant Procedures (Tests 51 - 55)
+-- ------------------------------------------------------------------------------
+SELECT throws_matching(
+    $$ SELECT * FROM public.rpc_adjust_inventory(
+        'a0000000-0000-0000-0000-000000000002'::UUID,
+        -100,
+        '00000000-0000-0000-0000-000000000003'::UUID,
+        'Manager negative adjust exceeding stock'
+    ) $$,
+    'INVALID_STOCK_ADJUSTMENT',
+    'rpc_adjust_inventory must reject adjustment causing negative physical stock'
+);
+
+SELECT results_eq(
+    'SELECT out_physical_stock, out_reserved_stock, out_available_stock FROM public.rpc_adjust_inventory(''a0000000-0000-0000-0000-000000000002''::UUID, 5, ''00000000-0000-0000-0000-000000000003''::UUID, ''Manager valid restock'')',
+    'VALUES (54, 0, 54)',
+    'Manager valid inventory adjust increments physical stock'
+);
+
+SELECT throws_matching(
+    $$ SELECT public.rpc_complete_order_handover(
+        (SELECT id FROM public.orders WHERE client_idempotency_key = 'idemp-001'),
+        '00000000-0000-0000-0000-000000000002'::UUID,
+        false
+    ) $$,
+    'already completed',
+    'Duplicate handover on completed order is rejected'
+);
+
+INSERT INTO public.orders (
+    id, order_number, customer_id, customer_phone, customer_name,
+    estimated_pickup_at, order_status, payment_status, payment_method,
+    subtotal_amount, total_amount, client_idempotency_key
+) VALUES (
+    'd0000000-0000-0000-0000-000000000001', 'MO-TEST-ADVANCE',
+    '00000000-0000-0000-0000-000000000001', '+919876543210', 'Advance Customer',
+    NOW() + INTERVAL '1 hour', 'confirmed', 'captured', 'online_upi',
+    10000, 10000, 'idemp-advance-01'
+) ON CONFLICT (id) DO NOTHING;
+
+SELECT is(
+    public.rpc_advance_order_status(
+        'd0000000-0000-0000-0000-000000000001'::UUID,
+        'preparing'::order_status_enum,
+        '00000000-0000-0000-0000-000000000002'::UUID
+    ),
+    true,
+    'rpc_advance_order_status advances confirmed order to preparing'
+);
+
+SELECT throws_matching(
+    $$ SELECT public.rpc_advance_order_status(
+        'd0000000-0000-0000-0000-000000000001'::UUID,
+        'completed'::order_status_enum,
+        '00000000-0000-0000-0000-000000000002'::UUID
+    ) $$,
+    'INVALID_ORDER_TRANSITION',
+    'rpc_advance_order_status rejects invalid skips (preparing -> completed)'
 );
 
 SELECT * FROM finish();

@@ -37,7 +37,7 @@ export default function AdminDashboardPage(): ReactElement {
     isAuthenticated,
     isLoading: isAuthLoading,
     error: authError,
-    loginWithToken,
+    login,
     logout,
     isManager,
     isAdmin,
@@ -90,8 +90,11 @@ export default function AdminDashboardPage(): ReactElement {
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [isActionLoading, setIsActionLoading] = useState(false);
 
-  // Manual token input for login screen
-  const [inputToken, setInputToken] = useState('');
+  // Staff Supabase Auth credentials for login screen
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [loginErrorMessage, setLoginErrorMessage] = useState<string | null>(null);
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
 
   const loadData = useCallback(async () => {
     if (!token) return;
@@ -127,10 +130,40 @@ export default function AdminDashboardPage(): ReactElement {
     }
   }, [isAuthenticated, loadData]);
 
-  // Handle Quick Login for local development
-  const handleDevLogin = (role: 'counter_staff' | 'manager' | 'admin') => {
-    const mockToken = `mock_${role}_:dev-${role}-uuid:+919876500000:${role.replace('_', ' ').toUpperCase()}`;
-    loginWithToken(mockToken);
+  // Handle Real Supabase Auth Login
+  const handleStaffLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!loginEmail.trim() || !loginPassword) return;
+    setIsLoggingIn(true);
+    setLoginErrorMessage(null);
+    try {
+      const ok = await login(loginEmail.trim(), loginPassword);
+      if (!ok) {
+        setLoginErrorMessage(authError || 'Failed to authenticate staff credentials.');
+      }
+    } catch (err: unknown) {
+      setLoginErrorMessage(err instanceof Error ? err.message : 'Authentication failed.');
+    } finally {
+      setIsLoggingIn(false);
+    }
+  };
+
+  // Quick dev login using standard local Supabase seeded staff accounts
+  const handleQuickSeedLogin = async (email: string) => {
+    setLoginEmail(email);
+    setLoginPassword('password123');
+    setIsLoggingIn(true);
+    setLoginErrorMessage(null);
+    try {
+      const ok = await login(email, 'password123');
+      if (!ok) {
+        setLoginErrorMessage(authError || 'Failed to authenticate staff credentials.');
+      }
+    } catch (err: unknown) {
+      setLoginErrorMessage(err instanceof Error ? err.message : 'Authentication failed.');
+    } finally {
+      setIsLoggingIn(false);
+    }
   };
 
   if (isAuthLoading) {
@@ -143,6 +176,7 @@ export default function AdminDashboardPage(): ReactElement {
 
   // Login View
   if (!isAuthenticated) {
+    const displayError = loginErrorMessage || authError;
     return (
       <main style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.5rem' }}>
         <div style={{ maxWidth: '440px', width: '100%', background: '#FFF', borderRadius: '12px', padding: '2rem', border: '1px solid #E8E2D9', boxShadow: 'var(--shadow-md)' }}>
@@ -152,68 +186,101 @@ export default function AdminDashboardPage(): ReactElement {
             <p style={{ fontSize: '0.9rem', color: 'var(--color-text-muted)' }}>Staff & Counter Administration Portal</p>
           </div>
 
-          {authError && (
-            <div style={{ padding: '0.75rem', background: 'var(--color-danger-bg)', color: 'var(--color-danger-text)', borderRadius: '6px', fontSize: '0.85rem', marginBottom: '1rem' }}>
-              {authError}
+          {displayError && (
+            <div style={{ padding: '0.75rem', background: 'var(--color-danger-bg)', color: 'var(--color-danger-text)', borderRadius: '6px', fontSize: '0.85rem', marginBottom: '1rem', lineHeight: '1.4' }}>
+              {displayError}
             </div>
           )}
 
-          <div style={{ marginBottom: '1.5rem' }}>
-            <p style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--color-text-muted)', marginBottom: '0.5rem' }}>
-              Quick Local Dev Access:
+          <form onSubmit={handleStaffLogin}>
+            <div style={{ marginBottom: '1rem' }}>
+              <label htmlFor="staff-email" style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '0.3rem' }}>
+                Staff Email
+              </label>
+              <input
+                id="staff-email"
+                type="email"
+                required
+                placeholder="staff@moodyorange.local"
+                value={loginEmail}
+                onChange={(e) => setLoginEmail(e.target.value)}
+                autoComplete="username"
+              />
+            </div>
+
+            <div style={{ marginBottom: '1.25rem' }}>
+              <label htmlFor="staff-password" style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '0.3rem' }}>
+                Password
+              </label>
+              <input
+                id="staff-password"
+                type="password"
+                required
+                placeholder="••••••••"
+                value={loginPassword}
+                onChange={(e) => setLoginPassword(e.target.value)}
+                autoComplete="current-password"
+              />
+            </div>
+
+            <button
+              type="submit"
+              className="btn-primary"
+              disabled={isLoggingIn}
+              style={{ width: '100%', justifyContent: 'center', opacity: isLoggingIn ? 0.7 : 1 }}
+            >
+              {isLoggingIn ? 'Authenticating...' : 'Sign In to Staff Portal'}
+            </button>
+          </form>
+
+          <div style={{ marginTop: '1.5rem', paddingTop: '1.25rem', borderTop: '1px solid var(--color-border)' }}>
+            <p style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--color-text-muted)', marginBottom: '0.5rem' }}>
+              Local Dev Seed Accounts (Supabase Auth):
             </p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
               <button
                 type="button"
                 className="btn-secondary"
-                style={{ justifyContent: 'space-between', display: 'flex' }}
-                onClick={() => handleDevLogin('counter_staff')}
+                disabled={isLoggingIn}
+                style={{ justifyContent: 'space-between', display: 'flex', fontSize: '0.8rem' }}
+                onClick={() => handleQuickSeedLogin('staff@moodyorange.local')}
               >
-                <span>Counter Staff</span>
+                <span>staff@moodyorange.local</span>
                 <span className="badge badge-role-staff">counter_staff</span>
               </button>
               <button
                 type="button"
                 className="btn-secondary"
-                style={{ justifyContent: 'space-between', display: 'flex' }}
-                onClick={() => handleDevLogin('manager')}
+                disabled={isLoggingIn}
+                style={{ justifyContent: 'space-between', display: 'flex', fontSize: '0.8rem' }}
+                onClick={() => handleQuickSeedLogin('manager@moodyorange.local')}
               >
-                <span>Store Manager</span>
+                <span>manager@moodyorange.local</span>
                 <span className="badge badge-role-manager">manager</span>
               </button>
               <button
                 type="button"
                 className="btn-secondary"
-                style={{ justifyContent: 'space-between', display: 'flex' }}
-                onClick={() => handleDevLogin('admin')}
+                disabled={isLoggingIn}
+                style={{ justifyContent: 'space-between', display: 'flex', fontSize: '0.8rem' }}
+                onClick={() => handleQuickSeedLogin('admin@moodyorange.local')}
               >
-                <span>System Administrator</span>
+                <span>admin@moodyorange.local</span>
                 <span className="badge badge-role-admin">admin</span>
+              </button>
+              <button
+                type="button"
+                className="btn-secondary"
+                disabled={isLoggingIn}
+                style={{ justifyContent: 'space-between', display: 'flex', fontSize: '0.8rem', color: '#c0392b' }}
+                onClick={() => handleQuickSeedLogin('customer@moodyorange.local')}
+                title="Verify that customer account is denied access"
+              >
+                <span>customer@moodyorange.local</span>
+                <span className="badge" style={{ background: '#fce4e4', color: '#c0392b' }}>customer (denied)</span>
               </button>
             </div>
           </div>
-
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              if (inputToken.trim()) loginWithToken(inputToken.trim());
-            }}
-          >
-            <div style={{ marginBottom: '1rem' }}>
-              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '0.3rem' }}>
-                Or enter Supabase Staff Bearer Token:
-              </label>
-              <input
-                type="text"
-                placeholder="eyJhbGciOiJIUzI1Ni..."
-                value={inputToken}
-                onChange={(e) => setInputToken(e.target.value)}
-              />
-            </div>
-            <button type="submit" className="btn-primary" style={{ width: '100%', justifyContent: 'center' }}>
-              Authenticate Staff Session
-            </button>
-          </form>
         </div>
       </main>
     );

@@ -2,7 +2,6 @@ import type { FastifyPluginAsync } from 'fastify';
 import { randomUUID } from 'node:crypto';
 import {
   type Order,
-  type StaffRole,
   AdminProductCreateSchema,
   AdminProductUpdateSchema,
   AdminCategoryCreateSchema,
@@ -21,6 +20,10 @@ import {
   type MockProductEntry,
 } from './catalog.js';
 import { mockOrdersStore, mockStockStore } from './orders.js';
+
+// Concurrency mutex locks for atomic state transitions in mock memory
+const inProgressHandovers = new Set<string>();
+const inProgressStockOperations = new Set<string>();
 
 export interface AdminRoutesOptions {
   config?: AppConfig;
@@ -114,6 +117,7 @@ export const adminRoutes: FastifyPluginAsync<AdminRoutesOptions> = async (app, o
           fullName: user.fullName || null,
           email: user.email || null,
           role: user.staffRole!,
+          isActive: true,
         },
       });
     }
@@ -630,7 +634,7 @@ export const adminRoutes: FastifyPluginAsync<AdminRoutesOptions> = async (app, o
         });
       }
 
-      const res = await supabaseRest(`products?id=eq.${encodeURIComponent(id)}`, {
+      await supabaseRest(`products?id=eq.${encodeURIComponent(id)}`, {
         method: 'PATCH',
         body: JSON.stringify({ is_active: isActive }),
       });
@@ -1083,6 +1087,7 @@ export const adminRoutes: FastifyPluginAsync<AdminRoutesOptions> = async (app, o
     { preHandler: [createStaffAuthPreHandler(config)] },
     async (request, reply) => {
       const { id } = request.params as { id: string };
+      const staffUser = request.user!;
       const parseResult = AdminOrderStatusUpdateSchema.safeParse(request.body);
       if (!parseResult.success) {
         return reply.status(400).send({
@@ -1123,32 +1128,23 @@ export const adminRoutes: FastifyPluginAsync<AdminRoutesOptions> = async (app, o
         return reply.send({ order });
       }
 
-      // Live Supabase
-      const orderRows = await supabaseRest<Array<{ order_status: Order['orderStatus'] }>>(`orders?id=eq.${encodeURIComponent(id)}&select=order_status`);
-      if (!orderRows || orderRows.length === 0) {
-        return reply.status(404).send({
-          error: { statusCode: 404, code: 'ORDER_NOT_FOUND', message: 'Order not found.' },
-        });
-      }
-      const current = orderRows[0].order_status;
-      const isValid =
-        (current === 'confirmed' && targetStatus === 'preparing') ||
-        (current === 'preparing' && targetStatus === 'ready_for_pickup');
+      // Live Supabase: call atomic procedure with row-level locking
+      const { error } = await supabaseRpc<boolean>('rpc_advance_order_status', {
+        p_order_id: id,
+        p_target_status: targetStatus,
+        p_staff_id: staffUser.id,
+      });
 
-      if (!isValid) {
-        return reply.status(400).send({
+      if (error) {
+        const isNotFound = error.includes('not found');
+        return reply.status(isNotFound ? 404 : 400).send({
           error: {
-            statusCode: 400,
-            code: 'INVALID_ORDER_TRANSITION',
-            message: `Cannot transition order from status '${current}' to '${targetStatus}'.`,
+            statusCode: isNotFound ? 404 : 400,
+            code: isNotFound ? 'ORDER_NOT_FOUND' : 'INVALID_ORDER_TRANSITION',
+            message: error,
           },
         });
       }
-
-      await supabaseRest(`orders?id=eq.${encodeURIComponent(id)}`, {
-        method: 'PATCH',
-        body: JSON.stringify({ order_status: targetStatus, updated_at: new Date().toISOString() }),
-      });
 
       return reply.send({ success: true, orderStatus: targetStatus });
     }
@@ -1164,71 +1160,87 @@ export const adminRoutes: FastifyPluginAsync<AdminRoutesOptions> = async (app, o
       const cashCollected = parseResult.success ? parseResult.data.cashCollected : false;
 
       if (config.NODE_ENV !== 'production' && (config.ALLOW_MOCK_SERVICES || config.NODE_ENV === 'test')) {
-        const order = mockOrdersStore.get(id);
-        if (!order) {
-          return reply.status(404).send({
-            error: { statusCode: 404, code: 'ORDER_NOT_FOUND', message: 'Order not found.' },
-          });
-        }
-
-        if (order.orderStatus === 'completed') {
+        // Concurrency guard: reject if handover already in-flight or completed
+        if (inProgressHandovers.has(id)) {
           return reply.status(409).send({
             error: {
               statusCode: 409,
               code: 'ORDER_ALREADY_COMPLETED',
-              message: `Order ${order.orderNumber} is already completed.`,
+              message: `Order ${id} handover is already in progress or completed.`,
             },
           });
         }
+        inProgressHandovers.add(id);
 
-        if (order.orderStatus !== 'ready_for_pickup') {
-          return reply.status(400).send({
-            error: {
-              statusCode: 400,
-              code: 'ORDER_NOT_READY',
-              message: `Order must be in 'ready_for_pickup' status before handover. Current: ${order.orderStatus}`,
-            },
-          });
-        }
+        try {
+          const order = mockOrdersStore.get(id);
+          if (!order) {
+            return reply.status(404).send({
+              error: { statusCode: 404, code: 'ORDER_NOT_FOUND', message: 'Order not found.' },
+            });
+          }
 
-        // Cash verification assertion
-        if (order.paymentMethod === 'cash_at_pickup') {
-          if (!cashCollected) {
-            return reply.status(400).send({
+          if (order.orderStatus === 'completed') {
+            return reply.status(409).send({
               error: {
-                statusCode: 400,
-                code: 'CASH_NOT_COLLECTED',
-                message: 'Staff must confirm physical receipt of cash before completing handover.',
+                statusCode: 409,
+                code: 'ORDER_ALREADY_COMPLETED',
+                message: `Order ${order.orderNumber} is already completed.`,
               },
             });
           }
-          order.paymentStatus = 'captured';
-        } else {
-          if (order.paymentStatus !== 'captured') {
+
+          if (order.orderStatus !== 'ready_for_pickup') {
             return reply.status(400).send({
               error: {
                 statusCode: 400,
-                code: 'PAYMENT_NOT_CAPTURED',
-                message: `Cannot complete handover: online payment status is '${order.paymentStatus}', expected 'captured'.`,
+                code: 'ORDER_NOT_READY',
+                message: `Order must be in 'ready_for_pickup' status before handover. Current: ${order.orderStatus}`,
               },
             });
           }
-        }
 
-        // Atomically decrement physical stock and release reserved stock
-        for (const item of order.items) {
-          const stock = mockStockStore.get(item.productId) || { physical: 50, reserved: 0 };
-          stock.physical = Math.max(0, stock.physical - item.quantity);
-          stock.reserved = Math.max(0, stock.reserved - item.quantity);
-          mockStockStore.set(item.productId, stock);
-        }
+          // Cash verification assertion
+          if (order.paymentMethod === 'cash_at_pickup') {
+            if (!cashCollected) {
+              return reply.status(400).send({
+                error: {
+                  statusCode: 400,
+                  code: 'CASH_NOT_COLLECTED',
+                  message: 'Staff must confirm physical receipt of cash before completing handover.',
+                },
+              });
+            }
+            order.paymentStatus = 'captured';
+          } else {
+            if (order.paymentStatus !== 'captured') {
+              return reply.status(400).send({
+                error: {
+                  statusCode: 400,
+                  code: 'PAYMENT_NOT_CAPTURED',
+                  message: `Cannot complete handover: online payment status is '${order.paymentStatus}', expected 'captured'.`,
+                },
+              });
+            }
+          }
 
-        order.orderStatus = 'completed';
-        return reply.send({ order });
+          // Atomically decrement physical stock and release reserved stock
+          for (const item of order.items) {
+            const stock = mockStockStore.get(item.productId) || { physical: 50, reserved: 0 };
+            stock.physical = Math.max(0, stock.physical - item.quantity);
+            stock.reserved = Math.max(0, stock.reserved - item.quantity);
+            mockStockStore.set(item.productId, stock);
+          }
+
+          order.orderStatus = 'completed';
+          return reply.send({ order });
+        } finally {
+          inProgressHandovers.delete(id);
+        }
       }
 
       // In Live Supabase: call security-definer RPC `rpc_complete_order_handover`
-      const { data, error } = await supabaseRpc<boolean>('rpc_complete_order_handover', {
+      const { error } = await supabaseRpc<boolean>('rpc_complete_order_handover', {
         p_order_id: id,
         p_staff_id: staffUser.id,
         p_cash_collected: cashCollected,
@@ -1236,10 +1248,15 @@ export const adminRoutes: FastifyPluginAsync<AdminRoutesOptions> = async (app, o
 
       if (error) {
         const isConflict = error.includes('already completed');
+        const isCashError = error.includes('confirmation of cash');
         return reply.status(isConflict ? 409 : 400).send({
           error: {
             statusCode: isConflict ? 409 : 400,
-            code: isConflict ? 'ORDER_ALREADY_COMPLETED' : 'HANDOVER_FAILED',
+            code: isConflict
+              ? 'ORDER_ALREADY_COMPLETED'
+              : isCashError
+              ? 'CASH_NOT_COLLECTED'
+              : 'HANDOVER_FAILED',
             message: error,
           },
         });
@@ -1400,33 +1417,43 @@ export const adminRoutes: FastifyPluginAsync<AdminRoutesOptions> = async (app, o
       const { productId, damagedQuantity, reason } = parseResult.data;
 
       if (config.NODE_ENV !== 'production' && (config.ALLOW_MOCK_SERVICES || config.NODE_ENV === 'test')) {
-        const stock = mockStockStore.get(productId);
-        if (!stock) {
-          return reply.status(404).send({
-            error: { statusCode: 404, code: 'PRODUCT_NOT_FOUND', message: 'Product inventory not found.' },
-          });
+        // Concurrency serialization lock per product
+        while (inProgressStockOperations.has(productId)) {
+          await new Promise((resolve) => setTimeout(resolve, 5));
         }
+        inProgressStockOperations.add(productId);
 
-        const unreserved = stock.physical - stock.reserved;
-        // Strictly defend physical_stock >= reserved_stock
-        if (damagedQuantity > unreserved) {
-          return reply.status(409).send({
-            error: {
-              statusCode: 409,
-              code: 'INVENTORY_WRITE_OFF_BLOCKED',
-              message: `INVENTORY_WRITE_OFF_BLOCKED: Damaged quantity (${damagedQuantity}) exceeds unreserved stock (${unreserved}). Active customer reservations are impacted. A manager must explicitly cancel and refund affected orders before this stock can be written off.`,
-            },
+        try {
+          const stock = mockStockStore.get(productId);
+          if (!stock) {
+            return reply.status(404).send({
+              error: { statusCode: 404, code: 'PRODUCT_NOT_FOUND', message: 'Product inventory not found.' },
+            });
+          }
+
+          const unreserved = stock.physical - stock.reserved;
+          // Strictly defend physical_stock >= reserved_stock under concurrency
+          if (damagedQuantity > unreserved) {
+            return reply.status(409).send({
+              error: {
+                statusCode: 409,
+                code: 'INVENTORY_WRITE_OFF_BLOCKED',
+                message: `INVENTORY_WRITE_OFF_BLOCKED: Damaged quantity (${damagedQuantity}) exceeds unreserved stock (${unreserved}). Active customer reservations are impacted. A manager must explicitly cancel and refund affected orders before this stock can be written off.`,
+              },
+            });
+          }
+
+          stock.physical -= damagedQuantity;
+          mockStockStore.set(productId, stock);
+
+          return reply.send({
+            physicalStock: stock.physical,
+            reservedStock: stock.reserved,
+            availableStock: stock.physical - stock.reserved,
           });
+        } finally {
+          inProgressStockOperations.delete(productId);
         }
-
-        stock.physical -= damagedQuantity;
-        mockStockStore.set(productId, stock);
-
-        return reply.send({
-          physicalStock: stock.physical,
-          reservedStock: stock.reserved,
-          availableStock: stock.physical - stock.reserved,
-        });
       }
 
       // Call database procedure rpc_write_off_inventory
@@ -1465,6 +1492,7 @@ export const adminRoutes: FastifyPluginAsync<AdminRoutesOptions> = async (app, o
     '/api/v1/admin/inventory/adjust',
     { preHandler: [createStaffAuthPreHandler(config, ['manager', 'admin'])] },
     async (request, reply) => {
+      const staffUser = request.user!;
       const parseResult = AdminInventoryAdjustSchema.safeParse(request.body);
       if (!parseResult.success) {
         return reply.status(400).send({
@@ -1478,69 +1506,81 @@ export const adminRoutes: FastifyPluginAsync<AdminRoutesOptions> = async (app, o
       const { productId, physicalStockDelta, reason } = parseResult.data;
 
       if (config.NODE_ENV !== 'production' && (config.ALLOW_MOCK_SERVICES || config.NODE_ENV === 'test')) {
-        const stock = mockStockStore.get(productId);
-        if (!stock) {
-          return reply.status(404).send({
-            error: { statusCode: 404, code: 'PRODUCT_NOT_FOUND', message: 'Product inventory not found.' },
-          });
+        while (inProgressStockOperations.has(productId)) {
+          await new Promise((resolve) => setTimeout(resolve, 5));
         }
+        inProgressStockOperations.add(productId);
 
-        const newPhysical = stock.physical + physicalStockDelta;
-        if (newPhysical < stock.reserved || newPhysical < 0) {
-          return reply.status(400).send({
-            error: {
-              statusCode: 400,
-              code: 'INVALID_STOCK_ADJUSTMENT',
-              message: `Stock adjustment would violate physical stock (${newPhysical}) >= reserved stock (${stock.reserved}) constraint.`,
-            },
+        try {
+          const stock = mockStockStore.get(productId);
+          if (!stock) {
+            return reply.status(404).send({
+              error: { statusCode: 404, code: 'PRODUCT_NOT_FOUND', message: 'Product inventory not found.' },
+            });
+          }
+
+          const newPhysical = stock.physical + physicalStockDelta;
+          if (newPhysical < stock.reserved || newPhysical < 0) {
+            return reply.status(400).send({
+              error: {
+                statusCode: 400,
+                code: 'INVALID_STOCK_ADJUSTMENT',
+                message: `Stock adjustment would violate physical stock (${newPhysical}) >= reserved stock (${stock.reserved}) constraint.`,
+              },
+            });
+          }
+
+          stock.physical = newPhysical;
+          mockStockStore.set(productId, stock);
+
+          const prod = mockProductsList.find((p) => p.id === productId);
+          return reply.send({
+            productId,
+            productName: prod?.name || 'Product',
+            productSlug: prod?.slug || 'product',
+            categoryName: prod?.categoryName || 'General',
+            physicalStock: stock.physical,
+            reservedStock: stock.reserved,
+            availableStock: stock.physical - stock.reserved,
+            lowStockThreshold: prod?.lowStockThreshold || 5,
+            isLowStock: stock.physical - stock.reserved <= (prod?.lowStockThreshold || 5),
+            lastRestockedAt: new Date().toISOString(),
           });
+        } finally {
+          inProgressStockOperations.delete(productId);
         }
-
-        stock.physical = newPhysical;
-        mockStockStore.set(productId, stock);
-
-        const prod = mockProductsList.find((p) => p.id === productId);
-        return reply.send({
-          productId,
-          productName: prod?.name || 'Product',
-          productSlug: prod?.slug || 'product',
-          categoryName: prod?.categoryName || 'General',
-          physicalStock: stock.physical,
-          reservedStock: stock.reserved,
-          availableStock: stock.physical - stock.reserved,
-          lowStockThreshold: prod?.lowStockThreshold || 5,
-          isLowStock: stock.physical - stock.reserved <= (prod?.lowStockThreshold || 5),
-          lastRestockedAt: new Date().toISOString(),
-        });
       }
 
-      // Live Supabase
-      const invRows = await supabaseRest<Array<{ physical_stock: number; reserved_stock: number; low_stock_threshold: number }>>(
-        `inventory?product_id=eq.${encodeURIComponent(productId)}`
-      );
-      if (!invRows || invRows.length === 0) {
-        return reply.status(404).send({
-          error: { statusCode: 404, code: 'PRODUCT_NOT_FOUND', message: 'Product not found.' },
-        });
-      }
-      const inv = invRows[0];
-      const newPhysical = inv.physical_stock + physicalStockDelta;
-      if (newPhysical < inv.reserved_stock || newPhysical < 0) {
+      // Live Supabase: call atomic procedure with row-level locking
+      const { data, error } = await supabaseRpc<Array<{
+        out_physical_stock: number;
+        out_reserved_stock: number;
+        out_available_stock: number;
+      }>>('rpc_adjust_inventory', {
+        p_product_id: productId,
+        p_delta: physicalStockDelta,
+        p_staff_id: staffUser.id,
+        p_reason: reason,
+      });
+
+      if (error) {
         return reply.status(400).send({
           error: {
             statusCode: 400,
             code: 'INVALID_STOCK_ADJUSTMENT',
-            message: `Stock adjustment would violate physical stock (${newPhysical}) >= reserved stock (${inv.reserved_stock}) constraint.`,
+            message: error,
           },
         });
       }
 
-      await supabaseRest(`inventory?product_id=eq.${encodeURIComponent(productId)}`, {
-        method: 'PATCH',
-        body: JSON.stringify({ physical_stock: newPhysical, updated_at: new Date().toISOString() }),
+      const resRow = data && data.length > 0 ? data[0] : null;
+      return reply.send({
+        success: true,
+        productId,
+        physicalStock: resRow?.out_physical_stock ?? 0,
+        reservedStock: resRow?.out_reserved_stock ?? 0,
+        availableStock: resRow?.out_available_stock ?? 0,
       });
-
-      return reply.send({ success: true, productId, newPhysicalStock: newPhysical });
     }
   );
 };

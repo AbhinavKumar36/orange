@@ -99,6 +99,8 @@ describe('Supabase Database Migrations & Security Invariants', () => {
       'rpc_write_off_inventory',
       'rpc_cancel_order',
       'rpc_issue_refund',
+      'rpc_advance_order_status',
+      'rpc_adjust_inventory',
     ];
 
     expectedFunctions.forEach((fn) => {
@@ -126,6 +128,8 @@ describe('Supabase Database Migrations & Security Invariants', () => {
     expect(testSql).toContain('rpc_reconcile_late_payment');
     expect(testSql).toContain('rpc_complete_order_handover');
     expect(testSql).toContain('rpc_write_off_inventory');
+    expect(testSql).toContain('rpc_advance_order_status');
+    expect(testSql).toContain('rpc_adjust_inventory');
     expect(testSql).toContain('rpc_cancel_order');
     expect(testSql).toContain('rpc_issue_refund');
   });
