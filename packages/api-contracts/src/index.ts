@@ -64,6 +64,10 @@ export const StaffRoleEnum = [
 export const StaffRoleSchema = z.enum(StaffRoleEnum);
 export type StaffRole = z.infer<typeof StaffRoleSchema>;
 
+export const FulfillmentTypeEnum = ['immediate', 'scheduled'] as const;
+export const FulfillmentTypeSchema = z.enum(FulfillmentTypeEnum);
+export type FulfillmentType = z.infer<typeof FulfillmentTypeSchema>;
+
 export const RefundStatusEnum = [
   'refund_pending',
   'refund_processing',
@@ -141,3 +145,121 @@ export function formatPaiseToRupees(
         maximumFractionDigits: 2,
       })}`;
 }
+
+// ============================================================================
+// Cart & Checkout Domain Contracts (Phase 5: Cart & Checkout)
+// ============================================================================
+
+export const CartItemSchema = z.object({
+  productId: z.string().uuid(),
+  quantity: z.number().int().min(1).max(100),
+});
+export type CartItem = z.infer<typeof CartItemSchema>;
+
+export const CartValidationItemSchema = z.object({
+  productId: z.string().uuid(),
+  productName: z.string(),
+  basePrice: MoneyInPaiseSchema,
+  taxRatePct: z.number(),
+  quantity: z.number().int().min(1).max(100),
+  lineTotal: MoneyInPaiseSchema,
+  isInStock: z.boolean(),
+  availableStock: z.number().int().nonnegative().optional(),
+});
+export type CartValidationItem = z.infer<typeof CartValidationItemSchema>;
+
+export const ValidateCartRequestSchema = z.object({
+  items: z.array(CartItemSchema).min(1).max(50),
+});
+export type ValidateCartRequest = z.infer<typeof ValidateCartRequestSchema>;
+
+export const ValidateCartResponseSchema = z.object({
+  isValid: z.boolean(),
+  items: z.array(CartValidationItemSchema),
+  subtotalAmount: MoneyInPaiseSchema,
+  taxAmount: MoneyInPaiseSchema,
+  packagingAmount: MoneyInPaiseSchema,
+  totalAmount: MoneyInPaiseSchema,
+  hasOutOfStockItems: z.boolean(),
+});
+export type ValidateCartResponse = z.infer<typeof ValidateCartResponseSchema>;
+
+export const CheckoutRequestSchema = z.object({
+  items: z.array(CartItemSchema).min(1).max(50),
+  fulfillment: FulfillmentTypeSchema.default('immediate'),
+  scheduledPickupAt: z.string().datetime().nullable().optional(),
+  paymentMethod: PaymentMethodSchema,
+  customerName: z.string().min(1).max(100),
+  customerPhone: z.string().min(10).max(20),
+  specialNotes: z.string().max(500).optional(),
+});
+export type CheckoutRequest = z.infer<typeof CheckoutRequestSchema>;
+
+export const CheckoutResponseSchema = z.object({
+  orderId: z.string().uuid(),
+  orderNumber: z.string(),
+  orderStatus: OrderStatusSchema,
+  paymentStatus: PaymentStatusSchema,
+  totalAmount: MoneyInPaiseSchema,
+  currency: z.literal('INR').default('INR'),
+  expiresAt: z.string().nullable(),
+  estimatedPickupAt: z.string().nullable().optional(),
+});
+export type CheckoutResponse = z.infer<typeof CheckoutResponseSchema>;
+
+export const OrderItemSchema = z.object({
+  id: z.string().uuid(),
+  productId: z.string().uuid(),
+  productNameSnapshot: z.string(),
+  unitPriceSnapshot: MoneyInPaiseSchema,
+  taxRateSnapshot: z.number(),
+  quantity: z.number().int().positive(),
+  lineTotal: MoneyInPaiseSchema,
+});
+export type OrderItem = z.infer<typeof OrderItemSchema>;
+
+export const OrderSchema = z.object({
+  id: z.string().uuid(),
+  orderNumber: z.string(),
+  customerId: z.string().uuid(),
+  customerPhone: z.string(),
+  customerName: z.string(),
+  fulfillmentType: FulfillmentTypeSchema,
+  scheduledPickupAt: z.string().nullable().optional(),
+  estimatedPickupAt: z.string(),
+  orderStatus: OrderStatusSchema,
+  paymentStatus: PaymentStatusSchema,
+  paymentMethod: PaymentMethodSchema,
+  subtotalAmount: MoneyInPaiseSchema,
+  taxAmount: MoneyInPaiseSchema,
+  packagingAmount: MoneyInPaiseSchema,
+  totalAmount: MoneyInPaiseSchema,
+  specialNotes: z.string().nullable().optional(),
+  expiresAt: z.string().nullable().optional(),
+  createdAt: z.string(),
+  items: z.array(OrderItemSchema).optional(),
+});
+export type Order = z.infer<typeof OrderSchema>;
+
+export const OrderListResponseSchema = z.object({
+  orders: z.array(OrderSchema),
+});
+export type OrderListResponse = z.infer<typeof OrderListResponseSchema>;
+
+export const OrderDetailResponseSchema = z.object({
+  order: OrderSchema,
+});
+export type OrderDetailResponse = z.infer<typeof OrderDetailResponseSchema>;
+
+export const CustomerProfileSchema = z.object({
+  id: z.string().uuid(),
+  phone: z.string(),
+  fullName: z.string().nullable(),
+  email: z.string().nullable().optional(),
+});
+export type CustomerProfile = z.infer<typeof CustomerProfileSchema>;
+
+export const UpdateProfileRequestSchema = z.object({
+  fullName: z.string().min(1).max(100),
+});
+export type UpdateProfileRequest = z.infer<typeof UpdateProfileRequestSchema>;
