@@ -486,7 +486,7 @@ INSERT INTO public.orders (
 ) VALUES (
     'd0000000-0000-0000-0000-000000000001', 'MO-TEST-ADVANCE',
     '00000000-0000-0000-0000-000000000001', '+919876543210', 'Advance Customer',
-    NOW() + INTERVAL '1 hour', 'confirmed', 'captured', 'online_upi',
+    NOW() + INTERVAL '1 hour', 'confirmed', 'captured', 'online_razorpay',
     10000, 10000, 'idemp-advance-01'
 ) ON CONFLICT (id) DO NOTHING;
 

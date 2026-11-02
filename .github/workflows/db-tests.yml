@@ -32,18 +32,7 @@ jobs:
         run: supabase start
 
       - name: Execute pgTAP Database Tests
-        run: |
-          supabase test db 2>&1 | tee /tmp/supabase_test.log
-
-      - name: Report Test Results
-        if: always()
-        run: |
-          echo "## pgTAP Test Log" >> $GITHUB_STEP_SUMMARY
-          echo '```text' >> $GITHUB_STEP_SUMMARY
-          cat /tmp/supabase_test.log >> $GITHUB_STEP_SUMMARY || true
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          TEST_LOG=$(tail -n 25 /tmp/supabase_test.log | tr '\n' ' ' | tr '"' "'")
-          echo "::notice title=pgTAPResults::$TEST_LOG"
+        run: supabase test db
 
       - name: Stop Database
         if: always()
