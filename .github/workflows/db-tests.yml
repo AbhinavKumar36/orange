@@ -29,19 +29,7 @@ jobs:
           version: latest
 
       - name: Start Supabase
-        id: start_supabase
-        run: |
-          supabase start --debug 2>&1 | tee /tmp/supabase_start.log
-
-      - name: Save Diagnostic to Summary
-        if: always()
-        run: |
-          echo "## Supabase Start Log" >> $GITHUB_STEP_SUMMARY
-          echo '```text' >> $GITHUB_STEP_SUMMARY
-          cat /tmp/supabase_start.log >> $GITHUB_STEP_SUMMARY || true
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          LOG_CONTENT=$(head -c 2000 /tmp/supabase_start.log | tr '\n' ' ' | tr '"' "'")
-          echo "::error title=SupabaseStartLog::$LOG_CONTENT"
+        run: supabase start
 
       - name: Execute pgTAP Database Tests
         run: supabase test db
