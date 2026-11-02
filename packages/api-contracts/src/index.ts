@@ -259,7 +259,16 @@ export const CustomerProfileSchema = z.object({
 });
 export type CustomerProfile = z.infer<typeof CustomerProfileSchema>;
 
+export const CustomerProfileResponseSchema = z.object({
+  profile: CustomerProfileSchema,
+});
+export type CustomerProfileResponse = z.infer<typeof CustomerProfileResponseSchema>;
+
 export const UpdateProfileRequestSchema = z.object({
   fullName: z.string().min(1).max(100),
 });
 export type UpdateProfileRequest = z.infer<typeof UpdateProfileRequestSchema>;
+
+// Export Phone Normalization & Validation utilities
+export * from './phone.js';
+

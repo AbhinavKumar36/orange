@@ -41,6 +41,11 @@ import com.moodyorange.app.ui.viewmodel.UiState
 fun HomeScreen(
     viewModel: CatalogViewModel,
     onProductClick: (Product) -> Unit,
+    cartItemCount: Int = 0,
+    onCartClick: () -> Unit = {},
+    isLoggedIn: Boolean = false,
+    customerName: String? = null,
+    onProfileClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val categoriesState by viewModel.categoriesState.collectAsState()
@@ -54,7 +59,13 @@ fun HomeScreen(
             .background(CreamBackground)
     ) {
         // 1. Top Brand Header
-        HeaderBar()
+        HeaderBar(
+            cartItemCount = cartItemCount,
+            onCartClick = onCartClick,
+            isLoggedIn = isLoggedIn,
+            customerName = customerName,
+            onProfileClick = onProfileClick
+        )
 
         // 2. Search Field
         Box(modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp)) {

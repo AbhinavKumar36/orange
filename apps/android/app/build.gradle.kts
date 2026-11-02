@@ -24,6 +24,14 @@ val releaseApiBaseUrl: String = localProperties.getProperty("PROD_API_BASE_URL")
     ?: (System.getenv("API_BASE_URL")?.takeIf { it.startsWith("https://") })
     ?: "https://api.moodyorange.com/api/v1/"
 
+val supabaseUrl: String = localProperties.getProperty("SUPABASE_URL")
+    ?: System.getenv("SUPABASE_URL")
+    ?: "http://10.0.2.2:54321"
+
+val supabaseAnonKey: String = localProperties.getProperty("SUPABASE_ANON_KEY")
+    ?: System.getenv("SUPABASE_ANON_KEY")
+    ?: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.mock_anon_key"
+
 // Enforce that release builds must point to a secure HTTPS endpoint
 check(releaseApiBaseUrl.startsWith("https://")) {
     "Release builds require a real deployed HTTPS endpoint. Found: $releaseApiBaseUrl"
@@ -44,6 +52,9 @@ android {
         vectorDrawables {
             useSupportLibrary = true
         }
+
+        buildConfigField("String", "SUPABASE_URL", "\"$supabaseUrl\"")
+        buildConfigField("String", "SUPABASE_ANON_KEY", "\"$supabaseAnonKey\"")
     }
 
     buildTypes {

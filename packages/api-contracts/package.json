@@ -18,7 +18,7 @@
   "scripts": {
     "build": "tsc",
     "typecheck": "tsc --noEmit",
-    "lint": "redocly lint openapi.yaml"
+    "lint": "node ../../scripts/validate-openapi.mjs && redocly lint openapi.yaml"
   },
   "dependencies": {
     "zod": "^3.24.2"

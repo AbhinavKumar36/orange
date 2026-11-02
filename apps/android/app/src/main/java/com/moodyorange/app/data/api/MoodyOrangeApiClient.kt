@@ -1,30 +1,51 @@
 package com.moodyorange.app.data.api
 
 import com.moodyorange.app.BuildConfig
+import com.moodyorange.app.data.model.CartValidationItem
+import com.moodyorange.app.data.model.CartValidationResponse
 import com.moodyorange.app.data.model.Category
+import com.moodyorange.app.data.model.CheckoutRequest
+import com.moodyorange.app.data.model.CheckoutResponse
+import com.moodyorange.app.data.model.CustomerProfile
+import com.moodyorange.app.data.model.Order
+import com.moodyorange.app.data.model.OrderItem
 import com.moodyorange.app.data.model.Product
+import com.moodyorange.app.data.model.ValidatedLineItem
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
-import java.io.BufferedReader
-import java.io.InputStreamReader
+import java.io.OutputStreamWriter
+import java.net.ConnectException
 import java.net.HttpURLConnection
+import java.net.SocketTimeoutException
 import java.net.URL
 import java.net.URLEncoder
+import java.net.UnknownHostException
 
 /**
  * Networking client for Moody Orange Fastify Backend API.
  * Uses HttpURLConnection and Dispatchers.IO to maintain hermetic execution without heavy third-party wrappers.
+ * In DEBUG mode, automatically falls back across local dev hosts (LAN IP, Android Emulator 10.0.2.2, USB reverse 127.0.0.1).
  */
 class MoodyOrangeApiClient(
     baseUrl: String = BuildConfig.API_BASE_URL
 ) {
-    val sanitizedBaseUrl = baseUrl.trimEnd('/')
+    val configuredBaseUrl = baseUrl.trimEnd('/')
+
+    @Volatile
+    var activeBaseUrl: String = configuredBaseUrl
+
+    private val debugCandidateHosts = listOf(
+        configuredBaseUrl,
+        "http://192.168.29.197:4000/api/v1",
+        "http://10.0.2.2:4000/api/v1",
+        "http://127.0.0.1:4000/api/v1",
+        "http://localhost:4000/api/v1"
+    ).distinct()
 
     suspend fun getCategories(): Result<List<Category>> = withContext(Dispatchers.IO) {
-        val endpoint = "$sanitizedBaseUrl/categories"
-        executeRequest(endpoint) { body ->
+        executeWithFallback("/categories", "GET") { body ->
             parseCategories(body)
         }
     }
@@ -46,73 +67,181 @@ class MoodyOrangeApiClient(
         }
 
         val queryString = if (queryParams.isNotEmpty()) "?" + queryParams.joinToString("&") else ""
-        val endpoint = "$sanitizedBaseUrl/products$queryString"
-
-        executeRequest(endpoint) { body ->
+        executeWithFallback("/products$queryString", "GET") { body ->
             parseProducts(body)
         }
     }
 
     suspend fun getProductByIdOrSlug(idOrSlug: String): Result<Product?> = withContext(Dispatchers.IO) {
         val encoded = URLEncoder.encode(idOrSlug, "UTF-8")
-        val endpoint = "$sanitizedBaseUrl/products/$encoded"
-        var connection: HttpURLConnection? = null
-
-        try {
-            val url = URL(endpoint)
-            connection = (url.openConnection() as HttpURLConnection).apply {
-                requestMethod = "GET"
-                connectTimeout = 10_000
-                readTimeout = 10_000
-                setRequestProperty("Accept", "application/json")
-            }
-
-            val statusCode = connection.responseCode
-            if (statusCode == 404) {
-                return@withContext Result.success(null)
-            }
-
-            if (statusCode in 200..299) {
-                val responseBody = connection.inputStream.bufferedReader().use { it.readText() }
-                val product = parseProductDetail(responseBody)
-                Result.success(product)
-            } else {
-                val errorBody = connection.errorStream?.bufferedReader()?.use { it.readText() } ?: ""
-                val errorMessage = extractErrorMessage(errorBody, "Server returned HTTP $statusCode")
-                Result.failure(ApiException(statusCode, errorMessage))
-            }
-        } catch (e: Exception) {
-            Result.failure(e)
-        } finally {
-            connection?.disconnect()
+        val path = "/products/$encoded"
+        executeWithFallback(
+            path = path,
+            method = "GET",
+            allow404AsNull = true
+        ) { body ->
+            if (body.isEmpty()) null else parseProductDetail(body)
         }
     }
 
-    private fun <T> executeRequest(endpoint: String, parser: (String) -> T): Result<T> {
-        var connection: HttpURLConnection? = null
-        return try {
-            val url = URL(endpoint)
-            connection = (url.openConnection() as HttpURLConnection).apply {
-                requestMethod = "GET"
-                connectTimeout = 10_000
-                readTimeout = 10_000
-                setRequestProperty("Accept", "application/json")
+    suspend fun validateCart(items: List<CartValidationItem>): Result<CartValidationResponse> = withContext(Dispatchers.IO) {
+        val jsonArray = JSONArray()
+        for (item in items) {
+            val itemObj = JSONObject().apply {
+                put("productId", item.productId)
+                put("quantity", item.quantity)
             }
-
-            val statusCode = connection.responseCode
-            if (statusCode in 200..299) {
-                val body = connection.inputStream.bufferedReader().use { it.readText() }
-                Result.success(parser(body))
-            } else {
-                val errorBody = connection.errorStream?.bufferedReader()?.use { it.readText() } ?: ""
-                val message = extractErrorMessage(errorBody, "Server error: HTTP $statusCode")
-                Result.failure(ApiException(statusCode, message))
-            }
-        } catch (e: Exception) {
-            Result.failure(e)
-        } finally {
-            connection?.disconnect()
+            jsonArray.put(itemObj)
         }
+        val requestBody = JSONObject().apply {
+            put("items", jsonArray)
+        }.toString()
+
+        executeWithFallback("/orders/validate-cart", "POST", requestBody) { body ->
+            parseCartValidation(body)
+        }
+    }
+
+    suspend fun checkout(
+        request: CheckoutRequest,
+        token: String,
+        idempotencyKey: String
+    ): Result<CheckoutResponse> = withContext(Dispatchers.IO) {
+        val itemsArray = JSONArray()
+        for (item in request.items) {
+            val obj = JSONObject().apply {
+                put("productId", item.productId)
+                put("quantity", item.quantity)
+            }
+            itemsArray.put(obj)
+        }
+
+        val payload = JSONObject().apply {
+            put("items", itemsArray)
+            put("fulfillment", request.fulfillment)
+            if (request.scheduledPickupAt != null) {
+                put("scheduledPickupAt", request.scheduledPickupAt)
+            }
+            put("paymentMethod", request.paymentMethod)
+            if (!request.customerName.isNullOrBlank()) {
+                put("customerName", request.customerName)
+            }
+            if (!request.customerPhone.isNullOrBlank()) {
+                put("customerPhone", request.customerPhone)
+            }
+            if (!request.specialNotes.isNullOrBlank()) {
+                put("specialNotes", request.specialNotes)
+            }
+        }.toString()
+
+        val headers = mapOf(
+            "Authorization" to "Bearer $token",
+            "X-Idempotency-Key" to idempotencyKey,
+            "Idempotency-Key" to idempotencyKey
+        )
+
+        executeWithFallback("/orders/checkout", "POST", payload, headers) { body ->
+            parseCheckoutResponse(body)
+        }
+    }
+
+    suspend fun getOrders(token: String): Result<List<Order>> = withContext(Dispatchers.IO) {
+        val headers = mapOf("Authorization" to "Bearer $token")
+        executeWithFallback("/orders", "GET", null, headers) { body ->
+            parseOrdersResponse(body)
+        }
+    }
+
+    suspend fun getProfile(token: String): Result<CustomerProfile> = withContext(Dispatchers.IO) {
+        val headers = mapOf("Authorization" to "Bearer $token")
+        executeWithFallback("/profile", "GET", null, headers) { body ->
+            parseProfileResponse(body)
+        }
+    }
+
+    suspend fun updateProfile(fullName: String, token: String): Result<CustomerProfile> = withContext(Dispatchers.IO) {
+        val payload = JSONObject().apply {
+            put("full_name", fullName)
+        }.toString()
+        val headers = mapOf("Authorization" to "Bearer $token")
+        executeWithFallback("/profile", "PUT", payload, headers) { body ->
+            parseProfileResponse(body)
+        }
+    }
+
+    /**
+     * Executes HTTP request with automatic candidate URL fallback in DEBUG mode.
+     */
+    private fun <T> executeWithFallback(
+        path: String,
+        method: String,
+        body: String? = null,
+        extraHeaders: Map<String, String> = emptyMap(),
+        allow404AsNull: Boolean = false,
+        parser: (String) -> T
+    ): Result<T> {
+        val candidates = if (BuildConfig.DEBUG) {
+            listOf(activeBaseUrl).plus(debugCandidateHosts).distinct()
+        } else {
+            listOf(activeBaseUrl)
+        }
+
+        var lastException: Exception? = null
+
+        for (base in candidates) {
+            val endpoint = "$base$path"
+            var connection: HttpURLConnection? = null
+            try {
+                val url = URL(endpoint)
+                connection = (url.openConnection() as HttpURLConnection).apply {
+                    requestMethod = method
+                    connectTimeout = 4_000 // Fast failover in local dev
+                    readTimeout = 8_000
+                    setRequestProperty("Accept", "application/json")
+                    if (body != null) {
+                        setRequestProperty("Content-Type", "application/json; charset=UTF-8")
+                        doOutput = true
+                    }
+                    extraHeaders.forEach { (k, v) -> setRequestProperty(k, v) }
+                }
+
+                if (body != null) {
+                    OutputStreamWriter(connection.outputStream, "UTF-8").use {
+                        it.write(body)
+                        it.flush()
+                    }
+                }
+
+                val statusCode = connection.responseCode
+                if (allow404AsNull && statusCode == 404) {
+                    activeBaseUrl = base
+                    return Result.success(parser(""))
+                }
+
+                if (statusCode in 200..299) {
+                    activeBaseUrl = base
+                    val responseText = connection.inputStream.bufferedReader().use { it.readText() }
+                    return Result.success(parser(responseText))
+                } else {
+                    val errorBody = connection.errorStream?.bufferedReader()?.use { it.readText() } ?: ""
+                    val message = extractErrorMessage(errorBody, "Server returned HTTP $statusCode")
+                    return Result.failure(ApiException(statusCode, message))
+                }
+            } catch (e: Exception) {
+                lastException = e
+                // Only fallback on network unreachable/timeout errors
+                val isNetworkError = e is ConnectException || e is SocketTimeoutException || e is UnknownHostException
+                if (!BuildConfig.DEBUG || !isNetworkError) {
+                    return Result.failure(e)
+                }
+            } finally {
+                connection?.disconnect()
+            }
+        }
+
+        return Result.failure(
+            lastException ?: ApiException(-1, "Unable to connect to Moody Orange server on $activeBaseUrl")
+        )
     }
 
     fun parseCategories(jsonString: String): List<Category> {
@@ -160,7 +289,6 @@ class MoodyOrangeApiClient(
             }
         }
 
-        // Mandatory safety rule: Never default missing availability to true!
         val isInStock = if (obj.has("isInStock") && !obj.isNull("isInStock")) {
             obj.getBoolean("isInStock")
         } else {
@@ -175,7 +303,7 @@ class MoodyOrangeApiClient(
             name = obj.getString("name"),
             slug = obj.getString("slug"),
             description = if (obj.isNull("description")) null else obj.getString("description"),
-            basePrice = obj.getLong("basePrice"), // Preserved in integer INR paise
+            basePrice = obj.getLong("basePrice"),
             taxRatePct = obj.optDouble("taxRatePct", 5.0),
             isVeg = obj.optBoolean("isVeg", true),
             allergens = allergensList,
@@ -183,6 +311,122 @@ class MoodyOrangeApiClient(
             imageUrl = if (obj.isNull("imageUrl")) null else obj.getString("imageUrl"),
             isInStock = isInStock
         )
+    }
+
+    fun parseCartValidation(jsonString: String): CartValidationResponse {
+        val root = JSONObject(jsonString)
+        val isValid = root.getBoolean("isValid")
+        val itemsArray = root.getJSONArray("items")
+        val items = ArrayList<ValidatedLineItem>(itemsArray.length())
+        for (i in 0 until itemsArray.length()) {
+            val it = itemsArray.getJSONObject(i)
+            items.add(
+                ValidatedLineItem(
+                    productId = it.getString("productId"),
+                    title = it.getString("title"),
+                    unitPricePaise = it.getLong("unitPricePaise"),
+                    requestedQuantity = it.getInt("requestedQuantity"),
+                    availableQuantity = it.getInt("availableQuantity"),
+                    lineTotalPaise = it.getLong("lineTotalPaise"),
+                    isAvailable = it.getBoolean("isAvailable")
+                )
+            )
+        }
+
+        val errorsArray = root.optJSONArray("errors")
+        val errors = mutableListOf<String>()
+        if (errorsArray != null) {
+            for (i in 0 until errorsArray.length()) {
+                errors.add(errorsArray.getString(i))
+            }
+        }
+
+        return CartValidationResponse(
+            isValid = isValid,
+            items = items,
+            subtotalPaise = root.getLong("subtotalPaise"),
+            taxPaise = root.getLong("taxPaise"),
+            totalPaise = root.getLong("totalPaise"),
+            currency = root.optString("currency", "INR"),
+            errors = errors
+        )
+    }
+
+    fun parseCheckoutResponse(jsonString: String): CheckoutResponse {
+        val root = JSONObject(jsonString)
+        return CheckoutResponse(
+            orderId = root.getString("orderId"),
+            orderNumber = root.getString("orderNumber"),
+            orderStatus = root.getString("orderStatus"),
+            paymentStatus = root.getString("paymentStatus"),
+            fulfillmentType = root.optString("fulfillmentType", "counter_pickup"),
+            totalAmount = root.getLong("totalAmount"),
+            currency = root.optString("currency", "INR"),
+            expiresAt = if (root.isNull("expiresAt")) null else root.getString("expiresAt"),
+            estimatedPickupAt = if (root.isNull("estimatedPickupAt")) null else root.getString("estimatedPickupAt")
+        )
+    }
+
+    fun parseProfileResponse(jsonString: String): CustomerProfile {
+        val root = JSONObject(jsonString)
+        val profile = root.getJSONObject("profile")
+        return CustomerProfile(
+            id = profile.getString("id"),
+            phone = profile.getString("phone"),
+            fullName = if (profile.isNull("full_name")) null else profile.getString("full_name"),
+            createdAt = if (profile.isNull("created_at")) null else profile.getString("created_at")
+        )
+    }
+
+    fun parseOrdersResponse(jsonString: String): List<Order> {
+        val root = JSONObject(jsonString)
+        val ordersArray = root.getJSONArray("orders")
+        val result = mutableListOf<Order>()
+        for (i in 0 until ordersArray.length()) {
+            val obj = ordersArray.getJSONObject(i)
+            val itemsList = mutableListOf<OrderItem>()
+            val itemsArr = obj.optJSONArray("items")
+            if (itemsArr != null) {
+                for (j in 0 until itemsArr.length()) {
+                    val itObj = itemsArr.getJSONObject(j)
+                    itemsList.add(
+                        OrderItem(
+                            id = itObj.optString("id", ""),
+                            productId = itObj.optString("productId", ""),
+                            productNameSnapshot = itObj.optString("productNameSnapshot", ""),
+                            unitPriceSnapshot = itObj.optLong("unitPriceSnapshot", 0L),
+                            taxRateSnapshot = itObj.optDouble("taxRateSnapshot", 5.0),
+                            quantity = itObj.optInt("quantity", 1),
+                            lineTotal = itObj.optLong("lineTotal", 0L)
+                        )
+                    )
+                }
+            }
+            result.add(
+                Order(
+                    id = obj.getString("id"),
+                    orderNumber = obj.getString("orderNumber"),
+                    customerId = obj.getString("customerId"),
+                    customerPhone = obj.getString("customerPhone"),
+                    customerName = obj.optString("customerName", "Customer"),
+                    fulfillmentType = obj.optString("fulfillmentType", "counter_pickup"),
+                    scheduledPickupAt = if (obj.isNull("scheduledPickupAt")) null else obj.getString("scheduledPickupAt"),
+                    estimatedPickupAt = obj.optString("estimatedPickupAt", ""),
+                    orderStatus = obj.getString("orderStatus"),
+                    paymentStatus = obj.getString("paymentStatus"),
+                    paymentMethod = obj.getString("paymentMethod"),
+                    subtotalAmount = obj.getLong("subtotalAmount"),
+                    taxAmount = obj.getLong("taxAmount"),
+                    packagingAmount = obj.optLong("packagingAmount", 0L),
+                    totalAmount = obj.getLong("totalAmount"),
+                    specialNotes = if (obj.isNull("specialNotes")) null else obj.getString("specialNotes"),
+                    expiresAt = if (obj.isNull("expiresAt")) null else obj.getString("expiresAt"),
+                    createdAt = obj.getString("createdAt"),
+                    items = itemsList
+                )
+            )
+        }
+        return result
     }
 
     private fun extractErrorMessage(errorBody: String, fallback: String): String {
@@ -202,4 +446,3 @@ class ApiException(
     val statusCode: Int,
     override val message: String
 ) : Exception(message)
-

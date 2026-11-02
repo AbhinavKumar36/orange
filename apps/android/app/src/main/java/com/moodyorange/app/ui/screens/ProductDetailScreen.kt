@@ -53,12 +53,14 @@ import com.moodyorange.app.ui.theme.TextSecondary
 import com.moodyorange.app.ui.theme.VegGreen
 import com.moodyorange.app.ui.viewmodel.CatalogViewModel
 import com.moodyorange.app.ui.viewmodel.ProductDetailUiState
+import com.moodyorange.app.util.CurrencyFormatter
 
 @Composable
 fun ProductDetailScreen(
     productIdOrSlug: String,
     viewModel: CatalogViewModel,
     onBackClick: () -> Unit,
+    onAddToCart: (Product) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val detailState by viewModel.productDetailState.collectAsState()
@@ -176,6 +178,7 @@ fun ProductDetailScreen(
             ProductDetailContent(
                 product = state.product,
                 onBackClick = onBackClick,
+                onAddToCart = onAddToCart,
                 modifier = modifier
             )
         }
@@ -234,6 +237,7 @@ private fun DetailTopBar(
 private fun ProductDetailContent(
     product: Product,
     onBackClick: () -> Unit,
+    onAddToCart: (Product) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val scrollState = rememberScrollState()
@@ -452,12 +456,15 @@ private fun ProductDetailContent(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Phase 4 Honest Cart State:
-            // Nonfunctional button is honestly disabled with "Coming Soon in Phase 5"
+            // Phase 5 Add to Shopping Bag Action
+            val isInStock = product.isInStock
+            val priceText = CurrencyFormatter.formatPaiseToInr(product.basePrice)
             Button(
-                onClick = {},
-                enabled = false,
+                onClick = { onAddToCart(product) },
+                enabled = isInStock,
                 colors = ButtonDefaults.buttonColors(
+                    containerColor = OrangePrimary,
+                    contentColor = Color.White,
                     disabledContainerColor = SurfaceVariant,
                     disabledContentColor = TextMuted
                 ),
@@ -467,9 +474,9 @@ private fun ProductDetailContent(
                     .height(50.dp)
             ) {
                 Text(
-                    text = "Online Ordering Coming in Phase 5",
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.SemiBold
+                    text = if (isInStock) "Add to Shopping Bag • $priceText" else "Temporarily Unavailable",
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold
                 )
             }
         }

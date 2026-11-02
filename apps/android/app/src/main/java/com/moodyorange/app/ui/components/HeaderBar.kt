@@ -2,12 +2,14 @@ package com.moodyorange.app.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -31,6 +33,11 @@ import com.moodyorange.app.ui.theme.TextSecondary
 
 @Composable
 fun HeaderBar(
+    cartItemCount: Int = 0,
+    onCartClick: () -> Unit = {},
+    isLoggedIn: Boolean = false,
+    customerName: String? = null,
+    onProfileClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Row(
@@ -73,20 +80,70 @@ fun HeaderBar(
             }
         }
 
-        // Cart Preview Icon (Phase 4: Non-functional preview, strictly respects cart restrictions)
-        Box(
-            modifier = Modifier
-                .size(36.dp)
-                .clip(RoundedCornerShape(10.dp))
-                .border(1.dp, BorderMuted, RoundedCornerShape(10.dp))
-                .background(OrangeLight),
-            contentAlignment = Alignment.Center
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Text(
-                text = "🛍️",
-                fontSize = 16.sp
-            )
+            // User Profile / Auth Button
+            Box(
+                modifier = Modifier
+                    .size(38.dp)
+                    .clip(CircleShape)
+                    .border(1.dp, BorderMuted, CircleShape)
+                    .background(if (isLoggedIn) OrangeLight else CardBackground)
+                    .clickable { onProfileClick() },
+                contentAlignment = Alignment.Center
+            ) {
+                if (isLoggedIn) {
+                    val initial = customerName?.firstOrNull()?.uppercaseChar()?.toString() ?: "✓"
+                    Text(
+                        text = initial,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = OrangePrimary
+                    )
+                } else {
+                    Text(
+                        text = "👤",
+                        fontSize = 15.sp
+                    )
+                }
+            }
+
+            // Interactive Shopping Bag with Counter Badge
+            Box(
+                modifier = Modifier
+                    .size(38.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .border(1.dp, BorderMuted, RoundedCornerShape(10.dp))
+                    .background(OrangeLight)
+                    .clickable { onCartClick() },
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "🛍️",
+                    fontSize = 16.sp
+                )
+
+                if (cartItemCount > 0) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .offset(x = 4.dp, y = (-4).dp)
+                            .size(18.dp)
+                            .clip(CircleShape)
+                            .background(OrangePrimary),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = if (cartItemCount > 99) "99+" else "$cartItemCount",
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                    }
+                }
+            }
         }
     }
 }
-

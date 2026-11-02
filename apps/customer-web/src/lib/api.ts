@@ -1,9 +1,19 @@
 import {
   type Category,
   type Product,
+  type ValidateCartResponse,
+  type CheckoutRequest,
+  type CheckoutResponse,
+  type Order,
+  type CustomerProfile,
   CategoryListResponseSchema,
   ProductListResponseSchema,
   ProductDetailResponseSchema,
+  ValidateCartResponseSchema,
+  CheckoutResponseSchema,
+  OrderListResponseSchema,
+  OrderDetailResponseSchema,
+  CustomerProfileResponseSchema,
 } from '@orange/api-contracts';
 
 const API_BASE_URL =
@@ -136,5 +146,146 @@ export async function fetchProductByIdOrSlug(idOrSlug: string): Promise<Product 
       `Store server is unreachable at ${API_BASE_URL}. Ensure the backend API is running on port 4000.`
     );
   }
+}
+
+interface ErrorPayload {
+  error?: {
+    code?: string;
+    message?: string;
+  };
+}
+
+export async function validateCartApi(
+  items: Array<{ productId: string; quantity: number }>
+): Promise<ValidateCartResponse> {
+  const res = await fetch(`${API_BASE_URL}/orders/validate-cart`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    },
+    body: JSON.stringify({ items }),
+  });
+
+  if (!res.ok) {
+    const errJson = (await res.json().catch(() => null)) as ErrorPayload | null;
+    throw new ApiError(
+      res.status,
+      errJson?.error?.code || 'VALIDATION_FAILED',
+      errJson?.error?.message || 'Failed to validate cart'
+    );
+  }
+
+  const data = await res.json();
+  return ValidateCartResponseSchema.parse(data);
+}
+
+export async function checkoutOrderApi(
+  payload: CheckoutRequest,
+  token: string,
+  idempotencyKey?: string
+): Promise<CheckoutResponse> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    Accept: 'application/json',
+    Authorization: `Bearer ${token}`,
+  };
+
+  if (idempotencyKey) {
+    headers['X-Idempotency-Key'] = idempotencyKey;
+  }
+
+  const res = await fetch(`${API_BASE_URL}/orders/checkout`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(payload),
+  });
+
+  const body = (await res.json().catch(() => null)) as ErrorPayload | null;
+
+  if (!res.ok) {
+    throw new ApiError(
+      res.status,
+      body?.error?.code || 'CHECKOUT_FAILED',
+      body?.error?.message || 'Failed to place order'
+    );
+  }
+
+  return CheckoutResponseSchema.parse(body);
+}
+
+export async function fetchCustomerOrdersApi(token: string): Promise<Order[]> {
+  const res = await fetch(`${API_BASE_URL}/orders`, {
+    headers: {
+      Accept: 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  if (!res.ok) {
+    const err = (await res.json().catch(() => null)) as ErrorPayload | null;
+    throw new ApiError(res.status, err?.error?.code || 'FETCH_FAILED', 'Failed to fetch orders');
+  }
+
+  const data = await res.json();
+  const parsed = OrderListResponseSchema.parse(data);
+  return parsed.orders;
+}
+
+export async function fetchCustomerOrderByIdApi(id: string, token: string): Promise<Order> {
+  const res = await fetch(`${API_BASE_URL}/orders/${encodeURIComponent(id)}`, {
+    headers: {
+      Accept: 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  if (!res.ok) {
+    const err = (await res.json().catch(() => null)) as ErrorPayload | null;
+    throw new ApiError(res.status, err?.error?.code || 'FETCH_FAILED', 'Failed to fetch order');
+  }
+
+  const data = await res.json();
+  const parsed = OrderDetailResponseSchema.parse(data);
+  return parsed.order;
+}
+
+export async function fetchProfileApi(token: string): Promise<CustomerProfile> {
+  const res = await fetch(`${API_BASE_URL}/profile`, {
+    headers: {
+      Accept: 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  if (!res.ok) {
+    const err = (await res.json().catch(() => null)) as ErrorPayload | null;
+    throw new ApiError(res.status, err?.error?.code || 'FETCH_FAILED', 'Failed to fetch profile');
+  }
+
+  const data = await res.json();
+  const parsed = CustomerProfileResponseSchema.parse(data);
+  return parsed.profile;
+}
+
+export async function updateProfileApi(fullName: string, token: string): Promise<CustomerProfile> {
+  const res = await fetch(`${API_BASE_URL}/profile`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ fullName }),
+  });
+
+  if (!res.ok) {
+    const err = (await res.json().catch(() => null)) as ErrorPayload | null;
+    throw new ApiError(res.status, err?.error?.code || 'UPDATE_FAILED', 'Failed to update profile');
+  }
+
+  const data = await res.json();
+  const parsed = CustomerProfileResponseSchema.parse(data);
+  return parsed.profile;
 }
 

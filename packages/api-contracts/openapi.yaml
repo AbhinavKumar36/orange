@@ -31,193 +31,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-  /profile:
-    get:
-      summary: Get customer profile
-      description: Retrieve the authenticated customer's profile.
-      operationId: getCustomerProfile
-      security:
-        - bearerAuth: []
-      responses:
-        '200':
-          description: Customer profile retrieved.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/CustomerProfileResponse'
-        '401':
-          description: Unauthorized.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-    put:
-      summary: Update customer profile
-      description: Update the authenticated customer's profile details.
-      operationId: updateCustomerProfile
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/UpdateProfileRequest'
-      responses:
-        '200':
-          description: Customer profile updated.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/CustomerProfileResponse'
-        '400':
-          description: Validation error.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '401':
-          description: Unauthorized.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-  /orders/validate-cart:
-    post:
-      summary: Validate cart prices and stock
-      description: Validates current catalog prices, taxes, and stock availability for a given cart.
-      operationId: validateCart
-      security: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ValidateCartRequest'
-      responses:
-        '200':
-          description: Cart validation result.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ValidateCartResponse'
-        '400':
-          description: Invalid cart request.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-  /orders/checkout:
-    post:
-      summary: Create order and reserve stock
-      description: Creates an order transactionally and reserves physical inventory.
-      operationId: checkoutOrder
-      security:
-        - bearerAuth: []
-      parameters:
-        - name: X-Idempotency-Key
-          in: header
-          required: false
-          description: Customer-scoped idempotency key for preventing duplicate orders
-          schema:
-            type: string
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CheckoutRequest'
-      responses:
-        '201':
-          description: Order created and stock reserved successfully.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/CheckoutResponse'
-        '400':
-          description: Validation error or invalid cart.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '401':
-          description: Unauthorized.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '409':
-          description: Idempotency conflict (key reused with mismatched payload).
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '422':
-          description: Insufficient stock or unfulfillable request.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-  /orders:
-    get:
-      summary: List customer orders
-      description: Retrieve orders placed by the authenticated customer.
-      operationId: getCustomerOrders
-      security:
-        - bearerAuth: []
-      responses:
-        '200':
-          description: List of customer orders.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/OrderListResponse'
-        '401':
-          description: Unauthorized.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-  /orders/{id}:
-    get:
-      summary: Get order details by ID
-      description: Retrieve details and items for an order owned by the authenticated customer.
-      operationId: getCustomerOrderById
-      security:
-        - bearerAuth: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-          description: Order UUID
-          schema:
-            type: string
-            format: uuid
-      responses:
-        '200':
-          description: Order details.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/OrderDetailResponse'
-        '401':
-          description: Unauthorized.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '403':
-          description: Forbidden (Order belongs to another customer).
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '404':
-          description: Order not found.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
   /categories:
     get:
       summary: List active product categories
@@ -233,193 +46,6 @@ paths:
                 $ref: '#/components/schemas/CategoryListResponse'
         '500':
           description: Internal server error.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-  /profile:
-    get:
-      summary: Get customer profile
-      description: Retrieve the authenticated customer's profile.
-      operationId: getCustomerProfile
-      security:
-        - bearerAuth: []
-      responses:
-        '200':
-          description: Customer profile retrieved.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/CustomerProfileResponse'
-        '401':
-          description: Unauthorized.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-    put:
-      summary: Update customer profile
-      description: Update the authenticated customer's profile details.
-      operationId: updateCustomerProfile
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/UpdateProfileRequest'
-      responses:
-        '200':
-          description: Customer profile updated.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/CustomerProfileResponse'
-        '400':
-          description: Validation error.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '401':
-          description: Unauthorized.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-  /orders/validate-cart:
-    post:
-      summary: Validate cart prices and stock
-      description: Validates current catalog prices, taxes, and stock availability for a given cart.
-      operationId: validateCart
-      security: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ValidateCartRequest'
-      responses:
-        '200':
-          description: Cart validation result.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ValidateCartResponse'
-        '400':
-          description: Invalid cart request.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-  /orders/checkout:
-    post:
-      summary: Create order and reserve stock
-      description: Creates an order transactionally and reserves physical inventory.
-      operationId: checkoutOrder
-      security:
-        - bearerAuth: []
-      parameters:
-        - name: X-Idempotency-Key
-          in: header
-          required: false
-          description: Customer-scoped idempotency key for preventing duplicate orders
-          schema:
-            type: string
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CheckoutRequest'
-      responses:
-        '201':
-          description: Order created and stock reserved successfully.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/CheckoutResponse'
-        '400':
-          description: Validation error or invalid cart.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '401':
-          description: Unauthorized.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '409':
-          description: Idempotency conflict (key reused with mismatched payload).
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '422':
-          description: Insufficient stock or unfulfillable request.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-  /orders:
-    get:
-      summary: List customer orders
-      description: Retrieve orders placed by the authenticated customer.
-      operationId: getCustomerOrders
-      security:
-        - bearerAuth: []
-      responses:
-        '200':
-          description: List of customer orders.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/OrderListResponse'
-        '401':
-          description: Unauthorized.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-  /orders/{id}:
-    get:
-      summary: Get order details by ID
-      description: Retrieve details and items for an order owned by the authenticated customer.
-      operationId: getCustomerOrderById
-      security:
-        - bearerAuth: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-          description: Order UUID
-          schema:
-            type: string
-            format: uuid
-      responses:
-        '200':
-          description: Order details.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/OrderDetailResponse'
-        '401':
-          description: Unauthorized.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '403':
-          description: Forbidden (Order belongs to another customer).
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '404':
-          description: Order not found.
           content:
             application/json:
               schema:
@@ -463,193 +89,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-  /profile:
-    get:
-      summary: Get customer profile
-      description: Retrieve the authenticated customer's profile.
-      operationId: getCustomerProfile
-      security:
-        - bearerAuth: []
-      responses:
-        '200':
-          description: Customer profile retrieved.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/CustomerProfileResponse'
-        '401':
-          description: Unauthorized.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-    put:
-      summary: Update customer profile
-      description: Update the authenticated customer's profile details.
-      operationId: updateCustomerProfile
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/UpdateProfileRequest'
-      responses:
-        '200':
-          description: Customer profile updated.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/CustomerProfileResponse'
-        '400':
-          description: Validation error.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '401':
-          description: Unauthorized.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-  /orders/validate-cart:
-    post:
-      summary: Validate cart prices and stock
-      description: Validates current catalog prices, taxes, and stock availability for a given cart.
-      operationId: validateCart
-      security: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ValidateCartRequest'
-      responses:
-        '200':
-          description: Cart validation result.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ValidateCartResponse'
-        '400':
-          description: Invalid cart request.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-  /orders/checkout:
-    post:
-      summary: Create order and reserve stock
-      description: Creates an order transactionally and reserves physical inventory.
-      operationId: checkoutOrder
-      security:
-        - bearerAuth: []
-      parameters:
-        - name: X-Idempotency-Key
-          in: header
-          required: false
-          description: Customer-scoped idempotency key for preventing duplicate orders
-          schema:
-            type: string
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CheckoutRequest'
-      responses:
-        '201':
-          description: Order created and stock reserved successfully.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/CheckoutResponse'
-        '400':
-          description: Validation error or invalid cart.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '401':
-          description: Unauthorized.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '409':
-          description: Idempotency conflict (key reused with mismatched payload).
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '422':
-          description: Insufficient stock or unfulfillable request.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-  /orders:
-    get:
-      summary: List customer orders
-      description: Retrieve orders placed by the authenticated customer.
-      operationId: getCustomerOrders
-      security:
-        - bearerAuth: []
-      responses:
-        '200':
-          description: List of customer orders.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/OrderListResponse'
-        '401':
-          description: Unauthorized.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-  /orders/{id}:
-    get:
-      summary: Get order details by ID
-      description: Retrieve details and items for an order owned by the authenticated customer.
-      operationId: getCustomerOrderById
-      security:
-        - bearerAuth: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-          description: Order UUID
-          schema:
-            type: string
-            format: uuid
-      responses:
-        '200':
-          description: Order details.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/OrderDetailResponse'
-        '401':
-          description: Unauthorized.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '403':
-          description: Forbidden (Order belongs to another customer).
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '404':
-          description: Order not found.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
   /products/{idOrSlug}:
     get:
       summary: Get product details
@@ -685,7 +124,7 @@ paths:
   /profile:
     get:
       summary: Get customer profile
-      description: Retrieve the authenticated customer's profile.
+      description: Retrieve the authenticated customer profile.
       operationId: getCustomerProfile
       security:
         - bearerAuth: []
@@ -702,9 +141,15 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
     put:
       summary: Update customer profile
-      description: Update the authenticated customer's profile details.
+      description: Update the authenticated customer profile details.
       operationId: updateCustomerProfile
       security:
         - bearerAuth: []
@@ -729,6 +174,12 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '401':
           description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error.
           content:
             application/json:
               schema:
@@ -758,6 +209,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /orders/checkout:
     post:
       summary: Create order and reserve stock
@@ -768,10 +225,12 @@ paths:
       parameters:
         - name: X-Idempotency-Key
           in: header
-          required: false
-          description: Customer-scoped idempotency key for preventing duplicate orders
+          required: true
+          description: Customer-scoped idempotency key for preventing duplicate orders (alphanumeric, dash, underscore, max 128 chars)
           schema:
             type: string
+            maxLength: 128
+            pattern: '^[a-zA-Z0-9_-]+$'
       requestBody:
         required: true
         content:
@@ -809,6 +268,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /orders:
     get:
       summary: List customer orders
@@ -825,6 +290,12 @@ paths:
                 $ref: '#/components/schemas/OrderListResponse'
         '401':
           description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error.
           content:
             application/json:
               schema:
@@ -869,7 +340,19 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Supabase Auth JWT access token
   schemas:
     MoneyInPaise:
       type: integer
@@ -1000,6 +483,331 @@ components:
           $ref: '#/components/schemas/Product'
       required:
         - product
+      additionalProperties: false
+    CartItem:
+      type: object
+      properties:
+        productId:
+          type: string
+          format: uuid
+          example: aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa
+        quantity:
+          type: integer
+          minimum: 1
+          maximum: 100
+          example: 2
+      required:
+        - productId
+        - quantity
+      additionalProperties: false
+    CartValidationItem:
+      type: object
+      properties:
+        productId:
+          type: string
+          format: uuid
+        productName:
+          type: string
+        basePrice:
+          $ref: '#/components/schemas/MoneyInPaise'
+        taxRatePct:
+          type: number
+        quantity:
+          type: integer
+        lineTotal:
+          $ref: '#/components/schemas/MoneyInPaise'
+        isInStock:
+          type: boolean
+        availableStock:
+          type: integer
+      required:
+        - productId
+        - productName
+        - basePrice
+        - taxRatePct
+        - quantity
+        - lineTotal
+        - isInStock
+      additionalProperties: false
+    ValidateCartRequest:
+      type: object
+      properties:
+        items:
+          type: array
+          minItems: 1
+          maxItems: 50
+          items:
+            $ref: '#/components/schemas/CartItem'
+      required:
+        - items
+      additionalProperties: false
+    ValidateCartResponse:
+      type: object
+      properties:
+        isValid:
+          type: boolean
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CartValidationItem'
+        subtotalAmount:
+          $ref: '#/components/schemas/MoneyInPaise'
+        taxAmount:
+          $ref: '#/components/schemas/MoneyInPaise'
+        packagingAmount:
+          $ref: '#/components/schemas/MoneyInPaise'
+        totalAmount:
+          $ref: '#/components/schemas/MoneyInPaise'
+        hasOutOfStockItems:
+          type: boolean
+      required:
+        - isValid
+        - items
+        - subtotalAmount
+        - taxAmount
+        - packagingAmount
+        - totalAmount
+        - hasOutOfStockItems
+      additionalProperties: false
+    CheckoutRequest:
+      type: object
+      properties:
+        items:
+          type: array
+          minItems: 1
+          maxItems: 50
+          items:
+            $ref: '#/components/schemas/CartItem'
+        fulfillment:
+          type: string
+          enum: [immediate, scheduled]
+          default: immediate
+        scheduledPickupAt:
+          type: [string, "null"]
+          format: date-time
+        paymentMethod:
+          type: string
+          enum: [online_razorpay, cash_at_pickup]
+        customerName:
+          type: string
+          minLength: 1
+          maxLength: 100
+        customerPhone:
+          type: string
+          minLength: 10
+          maxLength: 20
+        specialNotes:
+          type: string
+          maxLength: 500
+      required:
+        - items
+        - paymentMethod
+        - customerName
+        - customerPhone
+      additionalProperties: false
+    CheckoutResponse:
+      type: object
+      properties:
+        orderId:
+          type: string
+          format: uuid
+        orderNumber:
+          type: string
+        orderStatus:
+          type: string
+          enum:
+            - draft
+            - confirmed
+            - preparing
+            - ready_for_pickup
+            - completed
+            - cancelled_expired
+            - cancelled_by_customer
+            - cancelled_by_staff
+            - cancelled_damaged_stock
+            - cancelled_inventory_depleted
+            - cancelled_uncollected
+        paymentStatus:
+          type: string
+          enum:
+            - unpaid
+            - pending
+            - authorized
+            - captured
+            - failed
+            - refund_pending
+            - refund_processing
+            - partially_refunded
+            - refunded
+            - refund_failed
+        totalAmount:
+          $ref: '#/components/schemas/MoneyInPaise'
+        currency:
+          type: string
+          enum: [INR]
+          default: INR
+        expiresAt:
+          type: [string, "null"]
+          format: date-time
+        estimatedPickupAt:
+          type: [string, "null"]
+          format: date-time
+      required:
+        - orderId
+        - orderNumber
+        - orderStatus
+        - paymentStatus
+        - totalAmount
+        - currency
+      additionalProperties: false
+    OrderItem:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        productId:
+          type: string
+          format: uuid
+        productNameSnapshot:
+          type: string
+        unitPriceSnapshot:
+          $ref: '#/components/schemas/MoneyInPaise'
+        taxRateSnapshot:
+          type: number
+        quantity:
+          type: integer
+          minimum: 1
+        lineTotal:
+          $ref: '#/components/schemas/MoneyInPaise'
+      required:
+        - id
+        - productId
+        - productNameSnapshot
+        - unitPriceSnapshot
+        - taxRateSnapshot
+        - quantity
+        - lineTotal
+      additionalProperties: false
+    Order:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        orderNumber:
+          type: string
+        customerId:
+          type: string
+          format: uuid
+        customerPhone:
+          type: string
+        customerName:
+          type: string
+        fulfillmentType:
+          type: string
+          enum: [immediate, scheduled]
+        scheduledPickupAt:
+          type: [string, "null"]
+          format: date-time
+        estimatedPickupAt:
+          type: string
+          format: date-time
+        orderStatus:
+          type: string
+        paymentStatus:
+          type: string
+        paymentMethod:
+          type: string
+          enum: [online_razorpay, cash_at_pickup]
+        subtotalAmount:
+          $ref: '#/components/schemas/MoneyInPaise'
+        taxAmount:
+          $ref: '#/components/schemas/MoneyInPaise'
+        packagingAmount:
+          $ref: '#/components/schemas/MoneyInPaise'
+        totalAmount:
+          $ref: '#/components/schemas/MoneyInPaise'
+        specialNotes:
+          type: [string, "null"]
+        expiresAt:
+          type: [string, "null"]
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderItem'
+      required:
+        - id
+        - orderNumber
+        - customerId
+        - customerPhone
+        - customerName
+        - fulfillmentType
+        - estimatedPickupAt
+        - orderStatus
+        - paymentStatus
+        - paymentMethod
+        - subtotalAmount
+        - taxAmount
+        - packagingAmount
+        - totalAmount
+        - createdAt
+      additionalProperties: false
+    OrderListResponse:
+      type: object
+      properties:
+        orders:
+          type: array
+          items:
+            $ref: '#/components/schemas/Order'
+      required:
+        - orders
+      additionalProperties: false
+    OrderDetailResponse:
+      type: object
+      properties:
+        order:
+          $ref: '#/components/schemas/Order'
+      required:
+        - order
+      additionalProperties: false
+    CustomerProfile:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        phone:
+          type: string
+        fullName:
+          type: [string, "null"]
+        email:
+          type: [string, "null"]
+      required:
+        - id
+        - phone
+      additionalProperties: false
+    CustomerProfileResponse:
+      type: object
+      properties:
+        profile:
+          $ref: '#/components/schemas/CustomerProfile'
+      required:
+        - profile
+      additionalProperties: false
+    UpdateProfileRequest:
+      type: object
+      properties:
+        fullName:
+          type: string
+          minLength: 1
+          maxLength: 100
+      required:
+        - fullName
       additionalProperties: false
     ErrorResponse:
       type: object

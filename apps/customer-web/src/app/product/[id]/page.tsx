@@ -9,6 +9,7 @@ import { Header } from '../../../components/Header';
 import { Footer } from '../../../components/Footer';
 import { CartDrawer } from '../../../components/CartDrawer';
 import { ProductIllustration } from '../../../components/ProductIllustration';
+import { addToCart } from '../../../lib/cart';
 
 export default function ProductDetailPage(): ReactElement {
   const params = useParams();
@@ -212,17 +213,17 @@ export default function ProductDetailPage(): ReactElement {
                   {product.isInStock ? (
                     <button
                       type="button"
-                      disabled
+                      onClick={() => {
+                        addToCart(product, 1);
+                        setIsCartOpen(true);
+                      }}
                       className="btn-primary"
                       style={{
                         flexGrow: 1,
-                        opacity: 0.75,
-                        cursor: 'not-allowed',
-                        boxShadow: 'none',
+                        cursor: 'pointer',
                       }}
-                      aria-disabled="true"
                     >
-                      Online Ordering Coming Soon (Phase 5)
+                      🛍️ Add to Shopping Bag
                     </button>
                   ) : (
                     <button

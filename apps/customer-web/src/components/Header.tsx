@@ -3,6 +3,9 @@
 import { useState, type ReactElement } from 'react';
 import Link from 'next/link';
 import { CartDrawer } from './CartDrawer';
+import { AuthModal } from './AuthModal';
+import { useCart } from '../lib/cart';
+import { useCustomerAuth } from '../lib/auth';
 
 interface HeaderProps {
   onCategorySelect?: (slug: string) => void;
@@ -10,7 +13,11 @@ interface HeaderProps {
 
 export function Header({ onCategorySelect }: HeaderProps): ReactElement {
   const [isCartOpen, setIsCartOpen] = useState(false);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  const { totalQuantity } = useCart();
+  const { session, isAuthenticated, logout } = useCustomerAuth();
 
   const handleNavClick = (slug: string) => {
     setIsMobileMenuOpen(false);
@@ -69,11 +76,66 @@ export function Header({ onCategorySelect }: HeaderProps): ReactElement {
           </nav>
 
           <div className="header-actions">
+            {isAuthenticated ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Link
+                  href="/orders"
+                  className="nav-link"
+                  style={{
+                    fontSize: '0.85rem',
+                    fontWeight: 600,
+                    color: 'var(--color-brand-primary, #D9531E)',
+                    textDecoration: 'none',
+                    padding: '0.3rem 0.5rem',
+                    borderRadius: '6px',
+                    border: '1px solid rgba(217, 83, 30, 0.2)',
+                  }}
+                >
+                  My Orders
+                </Link>
+                <span style={{ fontSize: '0.85rem', color: '#555', fontWeight: 600 }}>
+                  👤 {session?.user.fullName || session?.user.phone}
+                </span>
+                <button
+                  type="button"
+                  onClick={logout}
+                  style={{
+                    background: 'none',
+                    border: '1px solid #DDD',
+                    borderRadius: '6px',
+                    padding: '0.3rem 0.6rem',
+                    fontSize: '0.75rem',
+                    cursor: 'pointer',
+                  }}
+                  aria-label="Sign out"
+                >
+                  Sign Out
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setIsAuthModalOpen(true)}
+                style={{
+                  background: 'none',
+                  border: '1px solid var(--color-brand-primary, #D9531E)',
+                  color: 'var(--color-brand-primary, #D9531E)',
+                  borderRadius: '8px',
+                  padding: '0.4rem 0.8rem',
+                  fontSize: '0.85rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                Sign In
+              </button>
+            )}
+
             <button
               type="button"
               className="icon-btn"
               onClick={() => setIsCartOpen(true)}
-              aria-label="View Shopping Bag (0 items)"
+              aria-label={`View Shopping Bag (${totalQuantity} items)`}
             >
               <svg
                 width="20"
@@ -91,7 +153,7 @@ export function Header({ onCategorySelect }: HeaderProps): ReactElement {
                 <path d="M16 10a4 4 0 0 1-8 0" />
               </svg>
               <span className="cart-badge" aria-hidden="true">
-                0
+                {totalQuantity}
               </span>
             </button>
 
@@ -161,11 +223,22 @@ export function Header({ onCategorySelect }: HeaderProps): ReactElement {
             >
               Our Story
             </Link>
+            {isAuthenticated && (
+              <Link
+                href="/orders"
+                className="nav-link"
+                style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--color-brand-primary, #D9531E)' }}
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                My Orders
+              </Link>
+            )}
           </div>
         )}
       </header>
 
       <CartDrawer isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} />
+      <AuthModal isOpen={isAuthModalOpen} onClose={() => setIsAuthModalOpen(false)} />
     </>
   );
 }
