@@ -6,10 +6,14 @@ const PLACEHOLDER_KEY_PATTERN = /(example|mock|placeholder|dummy)/i;
 
 function getValidatedAuthEnv(): { url: string; anonKey: string } {
   const isProd = process.env.NODE_ENV === 'production';
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || (isProd ? '' : 'http://localhost:54321');
+  const url =
+    process.env.NEXT_PUBLIC_SUPABASE_URL ||
+    (isProd ? '' : 'https://pdosvzdkuulstvzqfnkl.supabase.co');
   const anonKey =
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-    (isProd ? '' : 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.example_anon_key');
+    (isProd
+      ? ''
+      : 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkb3N2emRrdXVsc3R2enFmbmtsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM1MjgzODIsImV4cCI6MjEwOTEwNDM4Mn0.MPVNcaabsiMtH7S3WiKncr_yRQxKiIxxv9cXWsbDXXQ');
 
   if (isProd && typeof window !== 'undefined') {
     if (!url || url.includes('localhost') || url.includes('127.0.0.1')) {

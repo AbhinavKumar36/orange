@@ -26,10 +26,10 @@ jobs:
           version: latest
 
       - name: Start Database
-        run: supabase start --debug --exclude studio,realtime,storage-api,imgproxy,inbucket,edge-runtime
+        run: supabase db start
 
       - name: Execute pgTAP Database Tests
-        run: supabase test db --debug
+        run: supabase test db
 
       - name: Stop Database
         if: always()
