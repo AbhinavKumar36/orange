@@ -13,7 +13,11 @@ import { addToCart } from '../../../lib/cart';
 
 export default function ProductDetailPage(): ReactElement {
   const params = useParams();
-  const idOrSlug = typeof params.id === 'string' ? params.id : Array.isArray(params.id) ? params.id[0] : '';
+  const idOrSlug = params && typeof params.id === 'string'
+    ? params.id
+    : Array.isArray(params?.id)
+    ? params.id[0]
+    : '';
 
   const [product, setProduct] = useState<Product | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);

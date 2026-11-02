@@ -269,6 +269,196 @@ export const UpdateProfileRequestSchema = z.object({
 });
 export type UpdateProfileRequest = z.infer<typeof UpdateProfileRequestSchema>;
 
+// ============================================================================
+// Admin & Staff Operations Domain Contracts (Phase 6: Admin Dashboard)
+// ============================================================================
+
+export const AdminStaffProfileSchema = z.object({
+  id: z.string().uuid(),
+  phone: z.string().nullable().optional(),
+  fullName: z.string().nullable().optional(),
+  email: z.string().nullable().optional(),
+  role: StaffRoleSchema,
+});
+export type AdminStaffProfile = z.infer<typeof AdminStaffProfileSchema>;
+
+export const AdminMeResponseSchema = z.object({
+  staff: AdminStaffProfileSchema,
+});
+export type AdminMeResponse = z.infer<typeof AdminMeResponseSchema>;
+
+export const DashboardMetricsSchema = z.object({
+  totalOrders: z.number().int().nonnegative(),
+  ordersAwaitingProcessing: z.number().int().nonnegative(),
+  ordersReadyForPickup: z.number().int().nonnegative(),
+  completedOrders: z.number().int().nonnegative(),
+  grossSalesPaise: MoneyInPaiseSchema,
+  activeProducts: z.number().int().nonnegative(),
+  lowStockProducts: z.number().int().nonnegative(),
+  recentOrders: z.array(
+    z.object({
+      id: z.string().uuid(),
+      orderNumber: z.string(),
+      customerName: z.string(),
+      totalAmount: MoneyInPaiseSchema,
+      orderStatus: OrderStatusSchema,
+      paymentStatus: PaymentStatusSchema,
+      createdAt: z.string(),
+    })
+  ),
+  lowStockAlerts: z.array(
+    z.object({
+      id: z.string().uuid(),
+      name: z.string(),
+      physicalStock: z.number().int(),
+      reservedStock: z.number().int(),
+      availableStock: z.number().int(),
+      lowStockThreshold: z.number().int(),
+    })
+  ),
+});
+export type DashboardMetrics = z.infer<typeof DashboardMetricsSchema>;
+
+export const AdminProductItemSchema = ProductSchema.extend({
+  isActive: z.boolean(),
+  physicalStock: z.number().int().nonnegative(),
+  reservedStock: z.number().int().nonnegative(),
+  availableStock: z.number().int(),
+  lowStockThreshold: z.number().int().nonnegative(),
+});
+export type AdminProductItem = z.infer<typeof AdminProductItemSchema>;
+
+export const AdminProductListResponseSchema = z.object({
+  products: z.array(AdminProductItemSchema),
+});
+export type AdminProductListResponse = z.infer<typeof AdminProductListResponseSchema>;
+
+export const AdminProductCreateSchema = z.object({
+  name: z.string().min(1, 'Product name is required').max(120),
+  slug: z
+    .string()
+    .min(1, 'Slug is required')
+    .max(120)
+    .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'Slug must be lowercase alphanumeric with hyphens'),
+  categoryId: z.string().uuid('Valid Category UUID is required'),
+  description: z.string().max(500).nullable().optional(),
+  basePrice: MoneyInPaiseSchema,
+  taxRatePct: z.number().min(0).max(100).default(5.0),
+  isVeg: z.boolean().default(true),
+  allergens: z.array(z.string()).default([]),
+  prepTimeMinutes: z.number().int().min(0).max(300).default(15),
+  imageUrl: z.string().url().nullable().optional(),
+  initialStock: z.number().int().nonnegative().default(10),
+  lowStockThreshold: z.number().int().nonnegative().default(5),
+  isActive: z.boolean().default(true),
+});
+export type AdminProductCreate = z.infer<typeof AdminProductCreateSchema>;
+
+export const AdminProductUpdateSchema = z.object({
+  name: z.string().min(1).max(120).optional(),
+  slug: z
+    .string()
+    .min(1)
+    .max(120)
+    .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/)
+    .optional(),
+  categoryId: z.string().uuid().optional(),
+  description: z.string().max(500).nullable().optional(),
+  basePrice: MoneyInPaiseSchema.optional(),
+  taxRatePct: z.number().min(0).max(100).optional(),
+  isVeg: z.boolean().optional(),
+  allergens: z.array(z.string()).optional(),
+  prepTimeMinutes: z.number().int().min(0).max(300).optional(),
+  imageUrl: z.string().url().nullable().optional(),
+  isActive: z.boolean().optional(),
+});
+export type AdminProductUpdate = z.infer<typeof AdminProductUpdateSchema>;
+
+export const AdminCategoryItemSchema = CategorySchema.extend({
+  isActive: z.boolean().default(true),
+  productCount: z.number().int().nonnegative().default(0),
+});
+export type AdminCategoryItem = z.infer<typeof AdminCategoryItemSchema>;
+
+export const AdminCategoryListResponseSchema = z.object({
+  categories: z.array(AdminCategoryItemSchema),
+});
+export type AdminCategoryListResponse = z.infer<typeof AdminCategoryListResponseSchema>;
+
+export const AdminCategoryCreateSchema = z.object({
+  name: z.string().min(1, 'Category name is required').max(80),
+  slug: z
+    .string()
+    .min(1, 'Slug is required')
+    .max(80)
+    .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'Slug must be lowercase alphanumeric with hyphens'),
+  description: z.string().max(300).nullable().optional(),
+  display_order: z.number().int().default(0),
+});
+export type AdminCategoryCreate = z.infer<typeof AdminCategoryCreateSchema>;
+
+export const AdminCategoryUpdateSchema = z.object({
+  name: z.string().min(1).max(80).optional(),
+  slug: z
+    .string()
+    .min(1)
+    .max(80)
+    .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/)
+    .optional(),
+  description: z.string().max(300).nullable().optional(),
+  display_order: z.number().int().optional(),
+  isActive: z.boolean().optional(),
+});
+export type AdminCategoryUpdate = z.infer<typeof AdminCategoryUpdateSchema>;
+
+export const AdminOrderStatusUpdateSchema = z.object({
+  status: z.enum(['preparing', 'ready_for_pickup']),
+});
+export type AdminOrderStatusUpdate = z.infer<typeof AdminOrderStatusUpdateSchema>;
+
+export const AdminOrderHandoverSchema = z.object({
+  cashCollected: z.boolean().default(false),
+});
+export type AdminOrderHandover = z.infer<typeof AdminOrderHandoverSchema>;
+
+export const AdminOrderCancelSchema = z.object({
+  reason: z.string().min(1, 'Cancellation reason is required').max(200),
+});
+export type AdminOrderCancel = z.infer<typeof AdminOrderCancelSchema>;
+
+export const AdminInventoryItemSchema = z.object({
+  productId: z.string().uuid(),
+  productName: z.string(),
+  productSlug: z.string(),
+  categoryName: z.string(),
+  physicalStock: z.number().int().nonnegative(),
+  reservedStock: z.number().int().nonnegative(),
+  availableStock: z.number().int(),
+  lowStockThreshold: z.number().int().nonnegative(),
+  isLowStock: z.boolean(),
+  lastRestockedAt: z.string().nullable().optional(),
+});
+export type AdminInventoryItem = z.infer<typeof AdminInventoryItemSchema>;
+
+export const AdminInventoryListResponseSchema = z.object({
+  inventory: z.array(AdminInventoryItemSchema),
+});
+export type AdminInventoryListResponse = z.infer<typeof AdminInventoryListResponseSchema>;
+
+export const AdminInventoryWriteOffSchema = z.object({
+  productId: z.string().uuid('Valid Product UUID is required'),
+  damagedQuantity: z.number().int().positive('Damaged quantity must be greater than zero'),
+  reason: z.string().min(1, 'Reason for write-off is required').max(300),
+});
+export type AdminInventoryWriteOff = z.infer<typeof AdminInventoryWriteOffSchema>;
+
+export const AdminInventoryAdjustSchema = z.object({
+  productId: z.string().uuid('Valid Product UUID is required'),
+  physicalStockDelta: z.number().int('Delta must be an integer'),
+  reason: z.string().min(1, 'Reason is required').max(300),
+});
+export type AdminInventoryAdjust = z.infer<typeof AdminInventoryAdjustSchema>;
+
 // Export Phone Normalization & Validation utilities
 export {
   normalizeIndianPhoneNumber,

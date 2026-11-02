@@ -84,6 +84,27 @@ export const CANONICAL_PRODUCTS: Product[] = [
   },
 ];
 
+export interface MockProductEntry extends Product {
+  isActive: boolean;
+  lowStockThreshold: number;
+}
+
+export let mockCategoriesList: Category[] = CANONICAL_CATEGORIES.map((c) => ({ ...c }));
+export let mockProductsList: MockProductEntry[] = CANONICAL_PRODUCTS.map((p) => ({
+  ...p,
+  isActive: true,
+  lowStockThreshold: 5,
+}));
+
+export function resetMockCatalogStore(): void {
+  mockCategoriesList = CANONICAL_CATEGORIES.map((c) => ({ ...c }));
+  mockProductsList = CANONICAL_PRODUCTS.map((p) => ({
+    ...p,
+    isActive: true,
+    lowStockThreshold: 5,
+  }));
+}
+
 interface SupabaseCategoryRow {
   id: string;
   name: string;
@@ -173,7 +194,7 @@ async function loadCategories(config: AppConfig): Promise<Category[] | null> {
 
   // In production, NEVER return mock/sample categories: return null to trigger 503 DATABASE_UNAVAILABLE
   if (config.NODE_ENV !== 'production' && (config.ALLOW_MOCK_SERVICES || config.NODE_ENV === 'test')) {
-    return CANONICAL_CATEGORIES;
+    return mockCategoriesList;
   }
 
   return null;
@@ -223,7 +244,7 @@ async function loadProducts(config: AppConfig): Promise<Product[] | null> {
 
   // In production, NEVER return mock/sample products: return null to trigger 503 DATABASE_UNAVAILABLE
   if (config.NODE_ENV !== 'production' && (config.ALLOW_MOCK_SERVICES || config.NODE_ENV === 'test')) {
-    return CANONICAL_PRODUCTS;
+    return mockProductsList.filter((p) => p.isActive);
   }
 
   return null;

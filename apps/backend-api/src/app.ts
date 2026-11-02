@@ -6,6 +6,7 @@ import { healthRoutes } from './routes/health.js';
 import { catalogRoutes } from './routes/catalog.js';
 import { profileRoutes } from './routes/profile.js';
 import { ordersRoutes } from './routes/orders.js';
+import { adminRoutes } from './routes/admin.js';
 
 export interface BuildAppOptions {
   config?: AppConfig;
@@ -45,6 +46,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
   await app.register(catalogRoutes, { config });
   await app.register(profileRoutes, { config });
   await app.register(ordersRoutes, { config });
+  await app.register(adminRoutes, { config });
 
   return app;
 }

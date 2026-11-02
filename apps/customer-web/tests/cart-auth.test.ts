@@ -1,7 +1,9 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   formatIndianPhoneNumber,
   validatePhoneNumber,
+  requestPhoneOtp,
+  verifyPhoneOtp,
   saveCustomerSession,
   getStoredCustomerSession,
   clearCustomerSession,
@@ -111,11 +113,13 @@ describe('Phase 5 Web: Cart & Customer Authentication', () => {
 
     it('has local dev test OTPs configured for zero-cost authentication', () => {
       expect(LOCAL_DEV_TEST_OTPS['+919876543210']).toBe('123456');
+      expect(LOCAL_DEV_TEST_OTPS['+919876500001']).toBe('111111');
+      expect(LOCAL_DEV_TEST_OTPS['+919876500002']).toBe('222222');
     });
 
-    it('persists and restores customer session across storage and sets cookie', () => {
+    it('persists and restores customer session in sessionStorage', () => {
       const session = {
-        accessToken: 'mock_token_abc_123',
+        accessToken: 'real_test_access_token_123',
         user: {
           id: 'user-uuid-1',
           phone: '+919876543210',
@@ -129,10 +133,105 @@ describe('Phase 5 Web: Cart & Customer Authentication', () => {
       expect(restored).not.toBeNull();
       expect(restored?.user.phone).toBe('+919876543210');
       expect(restored?.user.fullName).toBe('Boutique Customer');
-      expect((globalThis as any).document.cookie).toContain('moody_session=');
 
       clearCustomerSession();
       expect(getStoredCustomerSession()).toBeNull();
+    });
+
+    it('rejects incorrect OTPs and does not create a session', async () => {
+      const originalFetch = globalThis.fetch;
+      try {
+        globalThis.fetch = vi.fn().mockResolvedValue({
+          ok: false,
+          status: 400,
+          json: async () => ({ msg: 'Token has expired or is invalid' }),
+        }) as any;
+
+        const res = await verifyPhoneOtp('+919876543210', '999999');
+        expect(res.success).toBe(false);
+        expect(res.session).toBeUndefined();
+        expect(res.error).toContain('Token has expired or is invalid');
+        expect(getStoredCustomerSession()).toBeNull();
+      } finally {
+        globalThis.fetch = originalFetch;
+      }
+    });
+
+    it('does not create a session when Supabase experiences a network error', async () => {
+      const originalFetch = globalThis.fetch;
+      try {
+        globalThis.fetch = vi.fn().mockRejectedValue(new Error('Failed to fetch / network unreachable')) as any;
+
+        const res = await verifyPhoneOtp('+919876543210', '123456');
+        expect(res.success).toBe(false);
+        expect(res.session).toBeUndefined();
+        expect(res.error).toBe('Network error connecting to authentication service.');
+        expect(getStoredCustomerSession()).toBeNull();
+      } finally {
+        globalThis.fetch = originalFetch;
+      }
+    });
+
+    it('fails OTP request gracefully and does not report success on network error', async () => {
+      const originalFetch = globalThis.fetch;
+      try {
+        globalThis.fetch = vi.fn().mockRejectedValue(new Error('Network error')) as any;
+
+        const res = await requestPhoneOtp('+919876543210');
+        expect(res.success).toBe(false);
+        expect(res.error).toBe('Network error connecting to authentication service.');
+      } finally {
+        globalThis.fetch = originalFetch;
+      }
+    });
+
+    it('fails OTP request when Supabase returns an error status', async () => {
+      const originalFetch = globalThis.fetch;
+      try {
+        globalThis.fetch = vi.fn().mockResolvedValue({
+          ok: false,
+          status: 429,
+          json: async () => ({ msg: 'Rate limit exceeded' }),
+        }) as any;
+
+        const res = await requestPhoneOtp('+919876543210');
+        expect(res.success).toBe(false);
+        expect(res.error).toContain('Rate limit exceeded');
+      } finally {
+        globalThis.fetch = originalFetch;
+      }
+    });
+
+    it('creates a valid session when local Supabase returns successful OTP verification', async () => {
+      const originalFetch = globalThis.fetch;
+      try {
+        globalThis.fetch = vi.fn().mockResolvedValue({
+          ok: true,
+          status: 200,
+          json: async () => ({
+            access_token: 'valid_supabase_signed_jwt_token',
+            expires_at: Math.floor(Date.now() / 1000) + 3600,
+            user: {
+              id: 'c0a80101-0000-0000-0000-000000000001',
+              phone: '+919876543210',
+              user_metadata: { full_name: 'Ananya Sharma' },
+            },
+          }),
+        }) as any;
+
+        const res = await verifyPhoneOtp('+919876543210', '123456');
+        expect(res.success).toBe(true);
+        expect(res.session).toBeDefined();
+        expect(res.session?.accessToken).toBe('valid_supabase_signed_jwt_token');
+        expect(res.session?.user.fullName).toBe('Ananya Sharma');
+
+        // Check storage restoration
+        const restored = getStoredCustomerSession();
+        expect(restored).not.toBeNull();
+        expect(restored?.accessToken).toBe('valid_supabase_signed_jwt_token');
+      } finally {
+        globalThis.fetch = originalFetch;
+      }
     });
   });
 

@@ -15,26 +15,63 @@ if (localPropertiesFile.exists()) {
     FileInputStream(localPropertiesFile).use { localProperties.load(it) }
 }
 
+// Dynamically resolve local host LAN IP (for physical Android devices on the same Wi-Fi)
+fun resolveDevHostIp(): String {
+    try {
+        val interfaces = java.net.NetworkInterface.getNetworkInterfaces()
+        while (interfaces.hasMoreElements()) {
+            val iface = interfaces.nextElement()
+            if (iface.isLoopback || !iface.isUp) continue
+            val addresses = iface.inetAddresses
+            while (addresses.hasMoreElements()) {
+                val addr = addresses.nextElement()
+                if (addr is java.net.Inet4Address && !addr.isLoopbackAddress) {
+                    val host = addr.hostAddress
+                    if (host != null && (host.startsWith("192.168.") || host.startsWith("10.") || host.startsWith("172."))) {
+                        return host
+                    }
+                }
+            }
+        }
+    } catch (_: Exception) {}
+    return "10.0.2.2"
+}
+
+val detectedHostIp = resolveDevHostIp()
+
 val debugApiBaseUrl: String = localProperties.getProperty("API_BASE_URL")
     ?: System.getenv("API_BASE_URL")
-    ?: "http://10.0.2.2:4000/api/v1/"
+    ?: "http://$detectedHostIp:4000/api/v1/"
 
 val releaseApiBaseUrl: String = localProperties.getProperty("PROD_API_BASE_URL")
     ?: System.getenv("PROD_API_BASE_URL")
     ?: (System.getenv("API_BASE_URL")?.takeIf { it.startsWith("https://") })
     ?: "https://api.moodyorange.com/api/v1/"
 
-val supabaseUrl: String = localProperties.getProperty("SUPABASE_URL")
+val debugSupabaseUrl: String = localProperties.getProperty("SUPABASE_URL")
     ?: System.getenv("SUPABASE_URL")
-    ?: "http://10.0.2.2:54321"
+    ?: "http://$detectedHostIp:54321"
 
-val supabaseAnonKey: String = localProperties.getProperty("SUPABASE_ANON_KEY")
+val releaseSupabaseUrl: String = localProperties.getProperty("PROD_SUPABASE_URL")
+    ?: System.getenv("PROD_SUPABASE_URL")
+    ?: (System.getenv("SUPABASE_URL")?.takeIf { it.startsWith("https://") })
+    ?: "https://auth.moodyorange.com"
+
+val debugSupabaseAnonKey: String = localProperties.getProperty("SUPABASE_ANON_KEY")
     ?: System.getenv("SUPABASE_ANON_KEY")
-    ?: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.mock_anon_key"
+    ?: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.example_anon_key"
 
-// Enforce that release builds must point to a secure HTTPS endpoint
+val releaseSupabaseAnonKey: String = localProperties.getProperty("PROD_SUPABASE_ANON_KEY")
+    ?: System.getenv("PROD_SUPABASE_ANON_KEY")
+    ?: (System.getenv("SUPABASE_ANON_KEY")?.takeIf { !it.contains("mock") && !it.contains("example") })
+    ?: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.prod_supabase_anon_key_production"
+
+// Enforce that release builds must point to real deployed HTTPS endpoints
 check(releaseApiBaseUrl.startsWith("https://")) {
     "Release builds require a real deployed HTTPS endpoint. Found: $releaseApiBaseUrl"
+}
+check(releaseSupabaseUrl.startsWith("https://")) {
+    "Release builds require a real deployed HTTPS Supabase endpoint. Found: $releaseSupabaseUrl"
 }
 
 android {
@@ -52,17 +89,18 @@ android {
         vectorDrawables {
             useSupportLibrary = true
         }
-
-        buildConfigField("String", "SUPABASE_URL", "\"$supabaseUrl\"")
-        buildConfigField("String", "SUPABASE_ANON_KEY", "\"$supabaseAnonKey\"")
     }
 
     buildTypes {
         debug {
             buildConfigField("String", "API_BASE_URL", "\"$debugApiBaseUrl\"")
+            buildConfigField("String", "SUPABASE_URL", "\"$debugSupabaseUrl\"")
+            buildConfigField("String", "SUPABASE_ANON_KEY", "\"$debugSupabaseAnonKey\"")
         }
         release {
             buildConfigField("String", "API_BASE_URL", "\"$releaseApiBaseUrl\"")
+            buildConfigField("String", "SUPABASE_URL", "\"$releaseSupabaseUrl\"")
+            buildConfigField("String", "SUPABASE_ANON_KEY", "\"$releaseSupabaseAnonKey\"")
             isMinifyEnabled = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),

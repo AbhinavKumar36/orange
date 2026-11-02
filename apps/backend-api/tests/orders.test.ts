@@ -68,6 +68,32 @@ describe('Phase 5: Auth, Profile, Cart Validation & Orders Engine', () => {
       expect(body.error.code).toBe('INVALID_TOKEN');
     });
 
+    it('rejects mock tokens when ALLOW_MOCK_SERVICES is disabled', async () => {
+      const strictConfig = ConfigSchema.parse({
+        PORT: 4003,
+        HOST: '127.0.0.1',
+        NODE_ENV: 'test',
+        ALLOW_MOCK_SERVICES: false,
+        SUPABASE_URL: 'http://localhost:54321',
+      });
+      const strictApp = await buildApp({ config: strictConfig });
+      await strictApp.ready();
+      try {
+        const res = await strictApp.inject({
+          method: 'GET',
+          url: '/api/v1/profile',
+          headers: {
+            authorization: `Bearer ${customerA.token}`,
+          },
+        });
+        expect(res.statusCode).toBe(401);
+        const body = JSON.parse(res.payload);
+        expect(body.error.code).toBe('INVALID_TOKEN');
+      } finally {
+        await strictApp.close();
+      }
+    });
+
     it('accepts valid session cookie for authentication', async () => {
       const res = await app.inject({
         method: 'GET',

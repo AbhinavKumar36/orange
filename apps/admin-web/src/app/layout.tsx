@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import './globals.css';
 
 export const metadata = {
   title: 'Moody Orange — Admin & Counter Portal',
@@ -16,4 +17,3 @@ export default function RootLayout({
     </html>
   );
 }
-

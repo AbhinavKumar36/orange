@@ -18,6 +18,7 @@
     "test": "turbo run test",
     "typecheck": "turbo run typecheck",
     "contracts:lint": "turbo run lint --filter=@orange/api-contracts",
+    "adb:reverse": "adb reverse tcp:4000 tcp:4000 && adb reverse tcp:54321 tcp:54321",
     "secret-scan": "node scripts/secret-scan.mjs"
   },
   "devDependencies": {

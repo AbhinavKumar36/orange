@@ -38,9 +38,9 @@ class MoodyOrangeApiClient(
 
     private val debugCandidateHosts = listOf(
         configuredBaseUrl,
+        "http://127.0.0.1:4000/api/v1",
         "http://192.168.29.197:4000/api/v1",
         "http://10.0.2.2:4000/api/v1",
-        "http://127.0.0.1:4000/api/v1",
         "http://localhost:4000/api/v1"
     ).distinct()
 
@@ -195,7 +195,7 @@ class MoodyOrangeApiClient(
                 val url = URL(endpoint)
                 connection = (url.openConnection() as HttpURLConnection).apply {
                     requestMethod = method
-                    connectTimeout = 4_000 // Fast failover in local dev
+                    connectTimeout = 2_500 // Fast failover across candidates in local dev
                     readTimeout = 8_000
                     setRequestProperty("Accept", "application/json")
                     if (body != null) {

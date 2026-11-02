@@ -10,7 +10,6 @@ import { SearchBar } from '../components/SearchBar';
 import { ProductGrid } from '../components/ProductGrid';
 import { BrandValues } from '../components/BrandValues';
 import { Footer } from '../components/Footer';
-import { CartDrawer } from '../components/CartDrawer';
 
 export default function HomePage(): ReactElement {
   const [categories, setCategories] = useState<Category[]>([]);
@@ -19,7 +18,6 @@ export default function HomePage(): ReactElement {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<Error | null>(null);
-  const [isCartOpen, setIsCartOpen] = useState<boolean>(false);
 
   const loadData = useCallback(async () => {
     setIsLoading(true);
@@ -115,8 +113,6 @@ export default function HomePage(): ReactElement {
       </main>
 
       <Footer />
-
-      <CartDrawer isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} />
     </>
   );
 }
