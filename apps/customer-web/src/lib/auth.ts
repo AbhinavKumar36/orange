@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { normalizeIndianPhoneNumber, isValidIndianPhoneNumber } from '@orange/api-contracts';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'http://localhost:54321';
 const SUPABASE_ANON_KEY =
@@ -41,6 +40,81 @@ interface SupabaseVerifySuccess {
       full_name?: string;
     };
   };
+}
+
+/**
+ * Normalizes Indian mobile phone numbers to E.164 (+91XXXXXXXXXX)
+ * enforcing strict validation across digits, prefixes, and characters.
+ */
+export function normalizeIndianPhoneNumber(input: string | null | undefined): {
+  isValid: boolean;
+  e164?: string;
+  nationalNumber?: string;
+  error?: string;
+} {
+  if (!input || typeof input !== 'string' || !input.trim()) {
+    return { isValid: false, error: 'Phone number cannot be empty.' };
+  }
+
+  const trimmed = input.trim();
+
+  if (/[^0-9+\s\-().]/.test(trimmed)) {
+    return { isValid: false, error: 'Phone number contains invalid characters.' };
+  }
+
+  if ((trimmed.match(/\+/g) || []).length > 1) {
+    return { isValid: false, error: 'Duplicate country prefix detected.' };
+  }
+
+  const hasPlus = trimmed.startsWith('+');
+
+  if (hasPlus && !trimmed.startsWith('+91')) {
+    return { isValid: false, error: 'Only Indian mobile numbers (+91) are currently supported.' };
+  }
+
+  const digitsOnly = trimmed.replace(/\D/g, '');
+  if (!digitsOnly) {
+    return { isValid: false, error: 'Phone number contains no digits.' };
+  }
+
+  if (digitsOnly.startsWith('9191') && digitsOnly.length === 14) {
+    return { isValid: false, error: 'Duplicate country prefix detected.' };
+  }
+
+  let subscriberDigits = digitsOnly;
+  if (hasPlus && subscriberDigits.startsWith('91')) {
+    subscriberDigits = subscriberDigits.slice(2);
+  } else if (!hasPlus && subscriberDigits.startsWith('91') && subscriberDigits.length === 12) {
+    subscriberDigits = subscriberDigits.slice(2);
+  }
+
+  while (subscriberDigits.startsWith('0')) {
+    subscriberDigits = subscriberDigits.slice(1);
+  }
+
+  if (subscriberDigits.length !== 10) {
+    return {
+      isValid: false,
+      error: `Invalid phone number length (${subscriberDigits.length} digits). Indian mobile numbers must have exactly 10 digits.`,
+    };
+  }
+
+  if (!/^[6-9]/.test(subscriberDigits)) {
+    return {
+      isValid: false,
+      error: 'Invalid Indian mobile number. Mobile numbers must begin with 6, 7, 8, or 9.',
+    };
+  }
+
+  return {
+    isValid: true,
+    e164: `+91${subscriberDigits}`,
+    nationalNumber: subscriberDigits,
+  };
+}
+
+export function isValidIndianPhoneNumber(input: string | null | undefined): boolean {
+  return normalizeIndianPhoneNumber(input).isValid;
 }
 
 export function formatIndianPhoneNumber(raw: string): string {

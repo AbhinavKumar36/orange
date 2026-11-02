@@ -270,5 +270,9 @@ export const UpdateProfileRequestSchema = z.object({
 export type UpdateProfileRequest = z.infer<typeof UpdateProfileRequestSchema>;
 
 // Export Phone Normalization & Validation utilities
-export * from './phone.js';
+export {
+  normalizeIndianPhoneNumber,
+  isValidIndianPhoneNumber,
+  type PhoneNormalizationResult,
+} from './phone.js';
 
