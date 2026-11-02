@@ -24,6 +24,11 @@ val releaseApiBaseUrl: String = localProperties.getProperty("PROD_API_BASE_URL")
     ?: (System.getenv("API_BASE_URL")?.takeIf { it.startsWith("https://") })
     ?: "https://api.moodyorange.com/api/v1/"
 
+// Enforce that release builds must point to a secure HTTPS endpoint
+check(releaseApiBaseUrl.startsWith("https://")) {
+    "Release builds require a real deployed HTTPS endpoint. Found: $releaseApiBaseUrl"
+}
+
 android {
     namespace = "com.moodyorange.app"
     compileSdk = 35
@@ -47,7 +52,7 @@ android {
         }
         release {
             buildConfigField("String", "API_BASE_URL", "\"$releaseApiBaseUrl\"")
-            isMinifyEnabled = false
+            isMinifyEnabled = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -66,8 +71,8 @@ android {
         buildConfig = true
     }
     lint {
-        abortOnError = false
-        checkReleaseBuilds = false
+        abortOnError = true
+        checkReleaseBuilds = true
     }
 }
 
