@@ -40,6 +40,8 @@ jobs:
           echo '```text' >> $GITHUB_STEP_SUMMARY
           cat /tmp/supabase_start.log >> $GITHUB_STEP_SUMMARY || true
           echo '```' >> $GITHUB_STEP_SUMMARY
+          LOG_CONTENT=$(head -c 2000 /tmp/supabase_start.log | tr '\n' ' ' | tr '"' "'")
+          echo "::error title=SupabaseStartLog::$LOG_CONTENT"
 
       - name: Execute pgTAP Database Tests
         run: supabase test db
