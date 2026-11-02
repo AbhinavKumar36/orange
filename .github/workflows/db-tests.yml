@@ -21,12 +21,18 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup Supabase CLI
-        uses: supabase/setup-cli@v1
+        uses: supabase/setup-cli@v3
         with:
           version: latest
 
+      - name: Verify Docker Daemon
+        run: |
+          sudo systemctl start docker || true
+          docker version
+
       - name: Start Database
-        run: supabase db start
+        run: |
+          supabase start -x studio -x realtime -x storage-api -x imgproxy -x inbucket -x edge-runtime || supabase db start
 
       - name: Execute pgTAP Database Tests
         run: supabase test db
@@ -34,3 +40,9 @@ jobs:
       - name: Stop Database
         if: always()
         run: supabase stop --no-backup
+
+      - name: Diagnostic on Failure
+        if: failure()
+        run: |
+          docker ps -a || true
+          docker logs $(docker ps -q -l) || true

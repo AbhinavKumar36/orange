@@ -8,14 +8,10 @@ const STORAGE_KEY = 'moody_orange_admin_session';
 
 function getValidatedAuthEnv(): { url: string; anonKey: string } {
   const isProd = process.env.NODE_ENV === 'production';
-  const url =
-    process.env.NEXT_PUBLIC_SUPABASE_URL ||
-    (isProd ? '' : 'https://pdosvzdkuulstvzqfnkl.supabase.co');
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || (isProd ? '' : 'http://localhost:54321');
   const anonKey =
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-    (isProd
-      ? ''
-      : 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkb3N2emRrdXVsc3R2enFmbmtsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM1MjgzODIsImV4cCI6MjEwOTEwNDM4Mn0.MPVNcaabsiMtH7S3WiKncr_yRQxKiIxxv9cXWsbDXXQ');
+    (isProd ? '' : 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.example_anon_key');
 
   return { url, anonKey };
 }

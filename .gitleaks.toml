@@ -18,6 +18,7 @@ paths = [
 regexes = [
   '''(?i)example_service_role_key''',
   '''(?i)example_anon_key''',
+  '''(?i)MPVNcaabsiMtH7S3WiKncr_yRQxKiIxxv9cXWsbDXXQ''',
   '''(?i)exampleSecretKeyString''',
   '''(?i)whsec_exampleWebhookSecretString''',
   '''(?i)rzp_test_exampleKeyId1234''',
