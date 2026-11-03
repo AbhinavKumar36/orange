@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, type ReactElement } from 'react';
+import React, { useState, useEffect, useCallback, type ReactElement } from 'react';
 import {
   type DashboardMetrics,
   type AdminProductItem,
@@ -137,9 +137,9 @@ export default function AdminDashboardPage(): ReactElement {
     setIsLoggingIn(true);
     setLoginErrorMessage(null);
     try {
-      const ok = await login(loginEmail.trim(), loginPassword);
-      if (!ok) {
-        setLoginErrorMessage(authError || 'Failed to authenticate staff credentials.');
+      const res = await login(loginEmail.trim(), loginPassword);
+      if (!res.success) {
+        setLoginErrorMessage(res.error || 'Failed to authenticate staff credentials.');
       }
     } catch (err: unknown) {
       setLoginErrorMessage(err instanceof Error ? err.message : 'Authentication failed.');
@@ -148,16 +148,22 @@ export default function AdminDashboardPage(): ReactElement {
     }
   };
 
+  // Quick dev login is strictly confined to explicitly enabled development environments
+  const isDevLoginEnabled =
+    process.env.NODE_ENV === 'development' &&
+    process.env.NEXT_PUBLIC_ENABLE_DEV_LOGIN === 'true';
+
   // Quick dev login using standard local Supabase seeded staff accounts
   const handleQuickSeedLogin = async (email: string) => {
+    if (!isDevLoginEnabled) return;
     setLoginEmail(email);
     setLoginPassword('password123');
     setIsLoggingIn(true);
     setLoginErrorMessage(null);
     try {
-      const ok = await login(email, 'password123');
-      if (!ok) {
-        setLoginErrorMessage(authError || 'Failed to authenticate staff credentials.');
+      const res = await login(email, 'password123');
+      if (!res.success) {
+        setLoginErrorMessage(res.error || 'Failed to authenticate staff credentials.');
       }
     } catch (err: unknown) {
       setLoginErrorMessage(err instanceof Error ? err.message : 'Authentication failed.');
@@ -201,7 +207,7 @@ export default function AdminDashboardPage(): ReactElement {
                 id="staff-email"
                 type="email"
                 required
-                placeholder="staff@moodyorange.local"
+                placeholder="staff@example.com"
                 value={loginEmail}
                 onChange={(e) => setLoginEmail(e.target.value)}
                 autoComplete="username"
@@ -233,54 +239,56 @@ export default function AdminDashboardPage(): ReactElement {
             </button>
           </form>
 
-          <div style={{ marginTop: '1.5rem', paddingTop: '1.25rem', borderTop: '1px solid var(--color-border)' }}>
-            <p style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--color-text-muted)', marginBottom: '0.5rem' }}>
-              Local Dev Seed Accounts (Supabase Auth):
-            </p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-              <button
-                type="button"
-                className="btn-secondary"
-                disabled={isLoggingIn}
-                style={{ justifyContent: 'space-between', display: 'flex', fontSize: '0.8rem' }}
-                onClick={() => handleQuickSeedLogin('staff@moodyorange.local')}
-              >
-                <span>staff@moodyorange.local</span>
-                <span className="badge badge-role-staff">counter_staff</span>
-              </button>
-              <button
-                type="button"
-                className="btn-secondary"
-                disabled={isLoggingIn}
-                style={{ justifyContent: 'space-between', display: 'flex', fontSize: '0.8rem' }}
-                onClick={() => handleQuickSeedLogin('manager@moodyorange.local')}
-              >
-                <span>manager@moodyorange.local</span>
-                <span className="badge badge-role-manager">manager</span>
-              </button>
-              <button
-                type="button"
-                className="btn-secondary"
-                disabled={isLoggingIn}
-                style={{ justifyContent: 'space-between', display: 'flex', fontSize: '0.8rem' }}
-                onClick={() => handleQuickSeedLogin('admin@moodyorange.local')}
-              >
-                <span>admin@moodyorange.local</span>
-                <span className="badge badge-role-admin">admin</span>
-              </button>
-              <button
-                type="button"
-                className="btn-secondary"
-                disabled={isLoggingIn}
-                style={{ justifyContent: 'space-between', display: 'flex', fontSize: '0.8rem', color: '#c0392b' }}
-                onClick={() => handleQuickSeedLogin('customer@moodyorange.local')}
-                title="Verify that customer account is denied access"
-              >
-                <span>customer@moodyorange.local</span>
-                <span className="badge" style={{ background: '#fce4e4', color: '#c0392b' }}>customer (denied)</span>
-              </button>
+          {isDevLoginEnabled && (
+            <div style={{ marginTop: '1.5rem', paddingTop: '1.25rem', borderTop: '1px solid var(--color-border)' }}>
+              <p style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--color-text-muted)', marginBottom: '0.5rem' }}>
+                Local Dev Seed Accounts (Supabase Auth):
+              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  disabled={isLoggingIn}
+                  style={{ justifyContent: 'space-between', display: 'flex', fontSize: '0.8rem' }}
+                  onClick={() => handleQuickSeedLogin('staff@moodyorange.local')}
+                >
+                  <span>staff@moodyorange.local</span>
+                  <span className="badge badge-role-staff">counter_staff</span>
+                </button>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  disabled={isLoggingIn}
+                  style={{ justifyContent: 'space-between', display: 'flex', fontSize: '0.8rem' }}
+                  onClick={() => handleQuickSeedLogin('manager@moodyorange.local')}
+                >
+                  <span>manager@moodyorange.local</span>
+                  <span className="badge badge-role-manager">manager</span>
+                </button>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  disabled={isLoggingIn}
+                  style={{ justifyContent: 'space-between', display: 'flex', fontSize: '0.8rem' }}
+                  onClick={() => handleQuickSeedLogin('admin@moodyorange.local')}
+                >
+                  <span>admin@moodyorange.local</span>
+                  <span className="badge badge-role-admin">admin</span>
+                </button>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  disabled={isLoggingIn}
+                  style={{ justifyContent: 'space-between', display: 'flex', fontSize: '0.8rem', color: '#c0392b' }}
+                  onClick={() => handleQuickSeedLogin('customer@moodyorange.local')}
+                  title="Verify that customer account is denied access"
+                >
+                  <span>customer@moodyorange.local</span>
+                  <span className="badge" style={{ background: '#fce4e4', color: '#c0392b' }}>customer (denied)</span>
+                </button>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </main>
     );

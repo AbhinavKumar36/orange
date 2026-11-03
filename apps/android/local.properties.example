@@ -9,10 +9,14 @@
 ## To configure local development properties:
 ## Copy this file to `apps/android/local.properties` and customize if needed:
 
+# ==============================================================================
+# 1. LOCAL DEVELOPMENT SETTINGS (DEBUG BUILDS ONLY)
+# ==============================================================================
+
 # Backend API Endpoint:
 # - For Android Emulator: http://10.0.2.2:4000/api/v1/
-# - For Physical Device over Wi-Fi: http://<YOUR_PC_LAN_IP>:4000/api/v1/ (e.g. http://192.168.29.197:4000/api/v1/)
-# - For Physical Device via USB: http://127.0.0.1:4000/api/v1/ (after running 'adb reverse tcp:4000 tcp:4000')
+# - For Physical Device over Wi-Fi: set DEV_LAN_IP=<YOUR_PC_LAN_IP> or API_BASE_URL=http://<YOUR_PC_LAN_IP>:4000/api/v1/
+# - For Physical Device via USB: http://127.0.0.1:4000/api/v1/ (after running 'npm run adb:reverse' or 'adb reverse tcp:4000 tcp:4000')
 API_BASE_URL=http://10.0.2.2:4000/api/v1/
 
 # Supabase Public Keys (Client-safe anon key; NEVER expose service role key)
@@ -21,3 +25,23 @@ SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.example_anon_key
 
 # Razorpay Public Merchant ID (Secret key is NEVER present in Android application)
 RAZORPAY_KEY_ID=rzp_test_exampleKeyId1234
+
+# ==============================================================================
+# 2. PRODUCTION RELEASE CONFIGURATION PROCEDURE (FAIL-CLOSED)
+# ==============================================================================
+# Release builds strictly require explicit production endpoints and client keys.
+# Release builds FAIL-CLOSED and abort immediately if any of the following are missing,
+# non-HTTPS, or contain placeholder/dev hostnames.
+#
+# In CI/CD or production signing builds, supply these via environment variables or
+# via a protected local.properties on the build machine (NEVER commit production keys):
+#
+# PROD_API_BASE_URL=https://api.yourdomain.com/api/v1/
+# PROD_SUPABASE_URL=https://<your-project-id>.supabase.co
+# PROD_SUPABASE_ANON_KEY=<your-production-supabase-anon-key>
+#
+# CRITICAL SECURITY RULE:
+# PROD_SUPABASE_ANON_KEY MUST be the public client "anon" key from Supabase Dashboard ->
+# Project Settings -> API. Under NO circumstances should a Supabase "service_role" key
+# ever be placed here or in any client app. The build system and client will fail if a
+# service_role key is detected.

@@ -38,10 +38,16 @@ class MoodyOrangeApiClient(
     init {
         val trimmed = baseUrl.trimEnd('/')
         if (!isDebug) {
+            check(trimmed.isNotBlank()) {
+                "Production release builds require a configured API base URL."
+            }
             check(trimmed.startsWith("https://")) {
                 "Production release builds require HTTPS API base URL. Found: $trimmed"
             }
-            check(!trimmed.contains("localhost") && !trimmed.contains("127.0.0.1") && !trimmed.contains("10.0.2.2")) {
+            val lower = trimmed.lowercase()
+            check(!lower.contains("localhost") && !lower.contains("127.0.0.1") && !lower.contains("10.0.2.2")
+                && !lower.contains("0.0.0.0") && !lower.contains(".local")
+                && !lower.matches(Regex(""".*//(?:192\.168\.|10\.|172\.(?:1[6-9]|2[0-9]|3[01])\.).*"""))) {
                 "Production release builds cannot point to local development hosts. Found: $trimmed"
             }
         }

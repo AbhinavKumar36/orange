@@ -227,6 +227,46 @@ export function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps): React
               >
                 {isLoading ? 'Sending Code...' : 'Get One-Time Code'}
               </button>
+
+              {process.env.NODE_ENV === 'development' && process.env.NEXT_PUBLIC_ENABLE_DEV_LOGIN === 'true' && (
+                <div style={{ marginTop: '1rem', paddingTop: '0.75rem', borderTop: '1px solid #EEE' }}>
+                  <p style={{ fontSize: '0.75rem', color: '#666', marginBottom: '0.35rem', fontWeight: 600 }}>
+                    Dev test numbers (Local Dev Only):
+                  </p>
+                  <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      onClick={() => setPhone('9876543210')}
+                      style={{
+                        background: '#F8F5F0',
+                        border: '1px solid #E0D9D0',
+                        borderRadius: '4px',
+                        padding: '0.2rem 0.5rem',
+                        fontSize: '0.75rem',
+                        cursor: 'pointer',
+                        color: '#444',
+                      }}
+                    >
+                      9876543210
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPhone('9876500001')}
+                      style={{
+                        background: '#F8F5F0',
+                        border: '1px solid #E0D9D0',
+                        borderRadius: '4px',
+                        padding: '0.2rem 0.5rem',
+                        fontSize: '0.75rem',
+                        cursor: 'pointer',
+                        color: '#444',
+                      }}
+                    >
+                      9876500001
+                    </button>
+                  </div>
+                </div>
+              )}
             </form>
           )}
 

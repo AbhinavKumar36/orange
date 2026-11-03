@@ -20,6 +20,7 @@ dotenv.config();
 
 const options = {
   env: { type: 'string', short: 'e' },
+  url: { type: 'string', short: 'u' },
   email: { type: 'string' },
   'user-id': { type: 'string' },
   role: { type: 'string', default: 'counter_staff' },
@@ -118,15 +119,30 @@ let supabaseUrl = '';
 let serviceRoleKey = '';
 
 if (targetEnv === 'production') {
-  supabaseUrl = process.env.PROD_SUPABASE_URL || process.env.SUPABASE_URL || '';
-  serviceRoleKey = process.env.PROD_SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+  // STRICT: Production must never silently fall back to generic dev configuration
+  supabaseUrl = values.url || process.env.PROD_SUPABASE_URL || '';
+  serviceRoleKey = process.env.PROD_SUPABASE_SERVICE_ROLE_KEY || '';
 
-  if (supabaseUrl.includes('localhost') || supabaseUrl.includes('127.0.0.1')) {
-    console.error(`❌ Safeguard Error: Cannot target local host with --env production. Configured URL: ${supabaseUrl}`);
+  if (!supabaseUrl) {
+    console.error(`❌ Safeguard Error: Production provisioning requires explicit production Supabase endpoint.`);
+    console.error(`   Provide PROD_SUPABASE_URL environment variable or pass --url <https://...>.`);
+    console.error(`   Generic SUPABASE_URL fallback is strictly prohibited to prevent cross-environment pollution.`);
+    process.exit(1);
+  }
+
+  if (!supabaseUrl.startsWith('https://')) {
+    console.error(`❌ Safeguard Error: Production Supabase endpoint must use HTTPS. Received: ${supabaseUrl}`);
+    process.exit(1);
+  }
+
+  const lowerUrl = supabaseUrl.toLowerCase();
+  const invalidPatterns = ['localhost', '127.0.0.1', '10.0.2.2', '0.0.0.0', '.local', 'example', 'placeholder', 'dummy', 'mock'];
+  if (invalidPatterns.some((pattern) => lowerUrl.includes(pattern)) || /(?:192\.168\.|10\.|172\.(?:1[6-9]|2[0-9]|3[01])\.)/.test(lowerUrl)) {
+    console.error(`❌ Safeguard Error: Cannot target local host, private network, or placeholder with --env production. Configured: ${supabaseUrl}`);
     process.exit(1);
   }
 } else if (targetEnv === 'local') {
-  supabaseUrl = process.env.SUPABASE_URL || 'http://localhost:54321';
+  supabaseUrl = values.url || process.env.SUPABASE_URL || 'http://localhost:54321';
   serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
   // Prevent local dev from silently pointing to remote production
@@ -137,26 +153,89 @@ if (targetEnv === 'production') {
   }
 } else {
   // Staging
-  supabaseUrl = process.env.STAGING_SUPABASE_URL || process.env.SUPABASE_URL || '';
-  serviceRoleKey = process.env.STAGING_SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+  supabaseUrl = values.url || process.env.STAGING_SUPABASE_URL || '';
+  serviceRoleKey = process.env.STAGING_SUPABASE_SERVICE_ROLE_KEY || '';
+  if (!supabaseUrl) {
+    console.error(`❌ Error: Staging provisioning requires STAGING_SUPABASE_URL or --url.`);
+    process.exit(1);
+  }
 }
 
 console.log(`\n🍊 Moody Orange Staff Role Provisioning`);
 console.log(`   Target Environment: ${targetEnv.toUpperCase()}`);
 console.log(`   Target Identifier:  ${email || userId}`);
 console.log(`   Assigned Role:      ${targetRole}`);
-console.log(`   Supabase Endpoint:  ${supabaseUrl || '(not configured)'}\n`);
+console.log(`   Supabase Endpoint:  ${supabaseUrl}\n`);
 
 async function provision() {
   if (!serviceRoleKey) {
-    console.log(`ℹ️ SUPABASE_SERVICE_ROLE_KEY not detected in environment.`);
-    console.log(`   To provision directly via SQL in Supabase Studio or psql:`);
+    const safeEmail = email ? email.replace(/'/g, "''") : null;
+    const safeUserId = userId ? userId.replace(/'/g, "''") : null;
+    const identifierCondition = safeUserId ? `id = '${safeUserId}'::UUID` : `lower(email) = lower('${safeEmail}')`;
+    const auditWhere = safeUserId ? `sr.user_id = '${safeUserId}'::UUID` : `lower(u.email) = lower('${safeEmail}')`;
+
+    console.log(`⚠️  ${targetEnv.toUpperCase() === 'PRODUCTION' ? 'PRODUCTION' : targetEnv.toUpperCase()} SERVICE-ROLE KEY NOT DETECTED IN ENVIRONMENT.`);
+    console.log(`   Direct REST API provisioning was skipped. To provision manually with transactional safety`);
+    console.log(`   via Supabase SQL Editor or authorized psql session, execute the following script:`);
     console.log(`
-    INSERT INTO public.staff_roles (user_id, role, is_active)
-    SELECT id, '${targetRole}', true
-    FROM auth.users
-    WHERE ${userId ? `id = '${userId}'` : `email = '${email}'`}
-    ON CONFLICT (user_id) DO UPDATE SET role = EXCLUDED.role, is_active = true, updated_at = now();
+--------------------------------------------------------------------------------
+-- MOODY ORANGE AUTHORIZED STAFF ROLE PROVISIONING SCRIPT
+-- Target Environment: ${targetEnv.toUpperCase()}
+-- Target Endpoint:    ${supabaseUrl}
+-- Target Account:     ${email || userId}
+-- Target Role:        ${targetRole}
+-- Generated:          ${new Date().toISOString()}
+--
+-- CAUTION: Elevated role assignment. Run only if authorized by access request.
+--------------------------------------------------------------------------------
+BEGIN;
+
+DO $$
+DECLARE
+  v_user_id UUID;
+  v_target_email TEXT := ${safeEmail ? `'${safeEmail}'` : 'NULL'};
+  v_target_user_id UUID := ${safeUserId ? `'${safeUserId}'::UUID` : 'NULL'};
+BEGIN
+  -- 1. Verify that user exists in auth.users
+  IF v_target_user_id IS NOT NULL THEN
+    SELECT id INTO v_user_id FROM auth.users WHERE id = v_target_user_id;
+  ELSE
+    SELECT id INTO v_user_id FROM auth.users WHERE lower(email) = lower(v_target_email);
+  END IF;
+
+  IF v_user_id IS NULL THEN
+    RAISE EXCEPTION 'Target user (%) not found in auth.users. The user must first create an account or be invited in Supabase Auth.',
+      COALESCE(v_target_email, v_target_user_id::TEXT);
+  END IF;
+
+  -- 2. Upsert staff role with explicit timestamp
+  INSERT INTO public.staff_roles (user_id, role, is_active, updated_at)
+  VALUES (v_user_id, '${targetRole}', true, TIMEZONE('utc', NOW()))
+  ON CONFLICT (user_id) DO UPDATE SET
+    role = EXCLUDED.role,
+    is_active = true,
+    updated_at = TIMEZONE('utc', NOW());
+
+  -- 3. Record audit trail
+  INSERT INTO public.audit_logs (actor_id, actor_role, action, entity_type, entity_id, new_values)
+  VALUES (
+    v_user_id,
+    '${targetRole}',
+    'MANUAL_STAFF_PROVISIONING',
+    'staff_roles',
+    v_user_id::TEXT,
+    jsonb_build_object('role', '${targetRole}', 'environment', '${targetEnv}', 'timestamp', NOW())
+  );
+END $$;
+
+-- 4. Verify resulting assignment
+SELECT sr.user_id, u.email, sr.role, sr.is_active, sr.updated_at
+FROM public.staff_roles sr
+JOIN auth.users u ON u.id = sr.user_id
+WHERE ${auditWhere};
+
+COMMIT;
+--------------------------------------------------------------------------------
 `);
     return;
   }

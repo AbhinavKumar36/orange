@@ -2,6 +2,8 @@ import java.util.Properties
 import java.io.FileInputStream
 import java.net.NetworkInterface
 import java.net.Inet4Address
+import java.util.Base64
+import java.nio.charset.StandardCharsets
 
 plugins {
     alias(libs.plugins.android.application)
@@ -17,8 +19,9 @@ if (localPropertiesFile.exists()) {
     FileInputStream(localPropertiesFile).use { localProperties.load(it) }
 }
 
-// Dynamically resolve local host LAN IP (for physical Android devices on the same Wi-Fi)
-// Supports explicit DEV_HOST_IP / DEV_LAN_IP configuration, automatic LAN detection, and emulator 10.0.2.2 fallback
+// Dynamically resolve local host IP for development
+// Prioritizes explicit DEV_HOST_IP / DEV_LAN_IP configuration for physical devices,
+// and defaults to 10.0.2.2 for Android emulator out-of-the-box.
 fun resolveDevHostIp(): String {
     val explicitHost = localProperties.getProperty("DEV_HOST_IP")
         ?: System.getenv("DEV_HOST_IP")
@@ -27,24 +30,6 @@ fun resolveDevHostIp(): String {
     if (!explicitHost.isNullOrBlank()) {
         return explicitHost.trim()
     }
-
-    try {
-        val interfaces = NetworkInterface.getNetworkInterfaces()
-        while (interfaces != null && interfaces.hasMoreElements()) {
-            val iface = interfaces.nextElement()
-            if (iface.isLoopback || !iface.isUp) continue
-            val addresses = iface.inetAddresses
-            while (addresses.hasMoreElements()) {
-                val addr = addresses.nextElement()
-                if (addr is Inet4Address && !addr.isLoopbackAddress) {
-                    val host = addr.hostAddress
-                    if (host != null && (host.startsWith("192.168.") || host.startsWith("10.") || host.startsWith("172."))) {
-                        return host
-                    }
-                }
-            }
-        }
-    } catch (_: Exception) {}
     return "10.0.2.2"
 }
 
@@ -62,6 +47,34 @@ val debugSupabaseUrl: String = localProperties.getProperty("SUPABASE_URL")
 val debugSupabaseAnonKey: String = localProperties.getProperty("SUPABASE_ANON_KEY")
     ?: System.getenv("SUPABASE_ANON_KEY")
     ?: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.example_anon_key"
+
+fun isServiceRoleKey(token: String?): Boolean {
+    if (token.isNullOrBlank()) return false
+    val lower = token.lowercase()
+    if (lower.contains("service_role") || lower.contains("service-role")) {
+        return true
+    }
+    try {
+        val parts = token.split(".")
+        if (parts.size >= 2) {
+            val payloadBytes = Base64.getUrlDecoder().decode(parts[1])
+            val payload = String(payloadBytes, StandardCharsets.UTF_8).lowercase()
+            if (payload.contains("\"role\":\"service_role\"") ||
+                payload.contains("\"role\": \"service_role\"") ||
+                payload.contains("'role':'service_role'") ||
+                payload.contains("'role': 'service_role'") ||
+                payload.contains("\"iss\":\"supabase-admin\"") ||
+                payload.contains("\"sub\":\"supabase-admin\"")) {
+                return true
+            }
+        }
+    } catch (_: Exception) {}
+    return false
+}
+
+if (isServiceRoleKey(debugSupabaseAnonKey)) {
+    throw GradleException("SECURITY VIOLATION: SUPABASE_ANON_KEY is a Supabase service_role key! Never use service-role keys in Android app.")
+}
 
 // Production release settings - MUST be explicitly configured and non-placeholder
 val prodApiBaseUrl: String? = localProperties.getProperty("PROD_API_BASE_URL")
@@ -84,7 +97,9 @@ fun validateProductionConfig(apiUrl: String?, supabaseUrl: String?, anonKey: Str
 
     fun isLocalHost(v: String): Boolean {
         val lower = v.lowercase()
-        return lower.contains("localhost") || lower.contains("127.0.0.1") || lower.contains("10.0.2.2")
+        return lower.contains("localhost") || lower.contains("127.0.0.1") || lower.contains("10.0.2.2") ||
+            lower.contains("0.0.0.0") || lower.contains(".local") || lower.contains("192.168.") ||
+            lower.contains("10.") || lower.contains("172.")
     }
 
     if (apiUrl.isNullOrBlank()) {
@@ -109,7 +124,9 @@ fun validateProductionConfig(apiUrl: String?, supabaseUrl: String?, anonKey: Str
 
     if (anonKey.isNullOrBlank()) {
         errors.add("PROD_SUPABASE_ANON_KEY is required for release builds (set in local.properties or PROD_SUPABASE_ANON_KEY env var).")
-    } else if (isPlaceholder(anonKey) || anonKey.length < 30) {
+    } else if (isServiceRoleKey(anonKey)) {
+        errors.add("SECURITY VIOLATION: PROD_SUPABASE_ANON_KEY is a Supabase service_role key. Service-role keys bypass Row-Level Security and must NEVER be embedded or distributed in client applications. Supply the public anon key only.")
+    } else if (isPlaceholder(anonKey) || anonKey.length < 30 || !anonKey.contains(".")) {
         errors.add("PROD_SUPABASE_ANON_KEY must be a valid production client key (received placeholder or invalid string).")
     }
 
@@ -127,6 +144,18 @@ tasks.register("validateReleaseConfig") {
     doLast {
         validateProductionConfig(prodApiBaseUrl, prodSupabaseUrl, prodSupabaseAnonKey)
         logger.lifecycle("Production release configuration validation passed.")
+    }
+}
+
+// Enforce release validation during release compilation and packaging
+tasks.matching {
+    it.name.startsWith("generateReleaseBuildConfig") ||
+    it.name.startsWith("assembleRelease") ||
+    it.name.startsWith("bundleRelease") ||
+    it.name.startsWith("packageRelease")
+}.configureEach {
+    doFirst {
+        validateProductionConfig(prodApiBaseUrl, prodSupabaseUrl, prodSupabaseAnonKey)
     }
 }
 

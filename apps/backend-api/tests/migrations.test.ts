@@ -3,8 +3,11 @@ import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 
 describe('Supabase Database Migrations & Security Invariants', () => {
-  const migrationsDir = join(process.cwd(), '../../supabase/migrations');
-  const testsDir = join(process.cwd(), '../../supabase/tests');
+  const rootDir = existsSync(join(process.cwd(), 'supabase/migrations'))
+    ? process.cwd()
+    : join(process.cwd(), '../..');
+  const migrationsDir = join(rootDir, 'supabase/migrations');
+  const testsDir = join(rootDir, 'supabase/tests');
 
   it('should find ordered migration files in supabase/migrations/', () => {
     expect(existsSync(migrationsDir)).toBe(true);
@@ -120,7 +123,7 @@ describe('Supabase Database Migrations & Security Invariants', () => {
     expect(existsSync(canonicalTestFile)).toBe(true);
 
     const testSql = readFileSync(canonicalTestFile, 'utf-8');
-    expect(testSql).toContain('plan(');
+    expect(testSql).toContain('plan(76)');
     expect(testSql).toContain('chk_stock_balance');
     expect(testSql).toContain('product_availability');
     expect(testSql).toContain('rpc_reserve_order_stock');
@@ -132,6 +135,18 @@ describe('Supabase Database Migrations & Security Invariants', () => {
     expect(testSql).toContain('rpc_adjust_inventory');
     expect(testSql).toContain('rpc_cancel_order');
     expect(testSql).toContain('rpc_issue_refund');
+
+    // Concurrency & Invariant Verification assertions
+    expect(testSql).toContain('Cannot complete cash order without staff confirmation');
+    expect(testSql).toContain('already completed');
+    expect(testSql).toContain('MISSING_INVENTORY_ROW');
+    expect(testSql).toContain('INSUFFICIENT_PHYSICAL_STOCK');
+    expect(testSql).toContain('INSUFFICIENT_RESERVED_STOCK');
+    expect(testSql).toContain('chk_stock_balance database constraint prevents physical_stock < reserved_stock');
+    expect(testSql).toContain('Failed operation creates no payment records (atomic rollback)');
+    expect(testSql).toContain('Counter staff cannot invoke rpc_adjust_inventory');
+    expect(testSql).toContain('Customer cannot invoke rpc_advance_order_status');
+    expect(testSql).toContain('Customer cannot invoke rpc_complete_order_handover');
   });
 });
 

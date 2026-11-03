@@ -20,26 +20,89 @@ import java.net.UnknownHostException
 
 class AuthManager(
     private val context: Context,
-    private val apiClient: MoodyOrangeApiClient
+    private val apiClient: MoodyOrangeApiClient,
+    candidateHosts: List<String>? = null,
+    private val isDebug: Boolean = BuildConfig.DEBUG,
+    supabaseBaseUrl: String = BuildConfig.SUPABASE_URL,
+    private val anonKey: String = BuildConfig.SUPABASE_ANON_KEY
 ) {
+    companion object {
+        fun isServiceRoleKey(token: String?): Boolean {
+            if (token.isNullOrBlank()) return false
+            val lower = token.lowercase()
+            if (lower.contains("service_role") || lower.contains("service-role")) {
+                return true
+            }
+            try {
+                val parts = token.split(".")
+                if (parts.size >= 2) {
+                    val payloadBytes = java.util.Base64.getUrlDecoder().decode(parts[1])
+                    val payload = String(payloadBytes, java.nio.charset.StandardCharsets.UTF_8).lowercase()
+                    if (payload.contains("\"role\":\"service_role\"") ||
+                        payload.contains("\"role\": \"service_role\"") ||
+                        payload.contains("'role':'service_role'") ||
+                        payload.contains("'role': 'service_role'") ||
+                        payload.contains("\"iss\":\"supabase-admin\"") ||
+                        payload.contains("\"sub\":\"supabase-admin\"")) {
+                        return true
+                    }
+                }
+            } catch (_: Exception) {}
+            return false
+        }
+    }
+
     private val secureStore = SecureSessionStore(context)
 
     private val _sessionState = MutableStateFlow<CustomerSession?>(null)
     val sessionState: StateFlow<CustomerSession?> = _sessionState.asStateFlow()
 
     @Volatile
-    private var activeSupabaseUrl: String = BuildConfig.SUPABASE_URL.trimEnd('/')
+    var activeSupabaseUrl: String
 
-    private val debugCandidateHosts = listOf(
-        BuildConfig.SUPABASE_URL.trimEnd('/'),
-        "http://192.168.29.197:54321",
-        "http://10.0.2.2:54321",
-        "http://127.0.0.1:54321",
-        "http://localhost:54321"
-    ).distinct()
+    val debugCandidateHosts: List<String>
 
     init {
+        check(!isServiceRoleKey(anonKey)) {
+            "Security violation: Supabase service_role key must never be used in Android client application."
+        }
+        val trimmed = supabaseBaseUrl.trimEnd('/')
+        if (!isDebug) {
+            check(trimmed.isNotBlank()) {
+                "Production release builds require a configured SUPABASE_URL."
+            }
+            check(trimmed.startsWith("https://")) {
+                "Production release builds require HTTPS SUPABASE_URL. Found: $trimmed"
+            }
+            val lower = trimmed.lowercase()
+            check(!lower.contains("localhost") && !lower.contains("127.0.0.1") && !lower.contains("10.0.2.2")
+                && !lower.contains("0.0.0.0") && !lower.contains(".local")
+                && !lower.matches(Regex(""".*//(?:192\.168\.|10\.|172\.(?:1[6-9]|2[0-9]|3[01])\.).*"""))) {
+                "Production release builds cannot point to local development hosts. Found: $trimmed"
+            }
+        }
+        activeSupabaseUrl = trimmed
+
+        debugCandidateHosts = if (isDebug) {
+            (candidateHosts ?: listOf(
+                activeSupabaseUrl,
+                "http://10.0.2.2:54321",
+                "http://127.0.0.1:54321",
+                "http://localhost:54321"
+            )).map { it.trimEnd('/') }.distinct()
+        } else {
+            emptyList()
+        }
+
         restoreSession()
+    }
+
+    fun getCandidateEndpoints(): List<String> {
+        return if (isDebug) {
+            listOf(activeSupabaseUrl).plus(debugCandidateHosts).distinct()
+        } else {
+            listOf(activeSupabaseUrl)
+        }
     }
 
     private fun restoreSession() {
@@ -95,13 +158,9 @@ class AuthManager(
             return@withContext Result.failure(IllegalArgumentException(norm.error ?: "Please enter a valid 10-digit mobile number."))
         }
         val formatted = norm.e164
-        val anonKey = BuildConfig.SUPABASE_ANON_KEY
+        val anonKey = this@AuthManager.anonKey
 
-        val candidates = if (BuildConfig.DEBUG) {
-            listOf(activeSupabaseUrl).plus(debugCandidateHosts).distinct()
-        } else {
-            listOf(activeSupabaseUrl)
-        }
+        val candidates = getCandidateEndpoints()
 
         var lastException: Exception? = null
 
@@ -139,7 +198,7 @@ class AuthManager(
             } catch (e: Exception) {
                 lastException = e
                 val isNetworkError = e is ConnectException || e is SocketTimeoutException || e is UnknownHostException
-                if (!BuildConfig.DEBUG || !isNetworkError) {
+                if (!isDebug || !isNetworkError) {
                     return@withContext Result.failure(e)
                 }
             } finally {
@@ -157,13 +216,9 @@ class AuthManager(
         }
         val formatted = norm.e164
         val token = tokenInput.trim()
-        val anonKey = BuildConfig.SUPABASE_ANON_KEY
+        val anonKey = this@AuthManager.anonKey
 
-        val candidates = if (BuildConfig.DEBUG) {
-            listOf(activeSupabaseUrl).plus(debugCandidateHosts).distinct()
-        } else {
-            listOf(activeSupabaseUrl)
-        }
+        val candidates = getCandidateEndpoints()
 
         var lastException: Exception? = null
 
@@ -221,7 +276,7 @@ class AuthManager(
             } catch (e: Exception) {
                 lastException = e
                 val isNetworkError = e is ConnectException || e is SocketTimeoutException || e is UnknownHostException
-                if (!BuildConfig.DEBUG || !isNetworkError) {
+                if (!isDebug || !isNetworkError) {
                     return@withContext Result.failure(e)
                 }
             } finally {

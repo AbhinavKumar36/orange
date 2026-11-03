@@ -158,9 +158,12 @@ export async function loginStaffWithCredentials(
       };
     }
   } catch (err: unknown) {
+    const isLocal = SUPABASE_URL.includes('localhost') || SUPABASE_URL.includes('127.0.0.1');
     return {
       success: false,
-      error: err instanceof Error ? err.message : 'Network error connecting to authentication service.',
+      error: isLocal
+        ? `Cannot connect to Supabase Auth service at ${SUPABASE_URL}. Please ensure your local Supabase instance is running (e.g. 'supabase start').`
+        : (err instanceof Error ? err.message : 'Network error connecting to authentication service.'),
     };
   }
 }
@@ -217,8 +220,12 @@ export async function refreshStaffSession(): Promise<AdminStaffSession | null> {
 }
 
 export function useAdminAuth() {
-  const [session, setSession] = useState<AdminStaffSession | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [session, setSession] = useState<AdminStaffSession | null>(() => {
+    return typeof window !== 'undefined' ? getStoredAdminSession() : null;
+  });
+  const [isLoading, setIsLoading] = useState(() => {
+    return typeof window !== 'undefined' && getStoredAdminSession() !== null;
+  });
   const [error, setError] = useState<string | null>(null);
 
   const checkAuth = useCallback(async () => {
@@ -271,18 +278,19 @@ export function useAdminAuth() {
     };
   }, [checkAuth]);
 
-  const login = async (email: string, pass: string) => {
+  const login = async (email: string, pass: string): Promise<{ success: boolean; error?: string }> => {
     setIsLoading(true);
     setError(null);
     const result = await loginStaffWithCredentials(email, pass);
     if (!result.success) {
-      setError(result.error || 'Authentication failed');
+      const err = result.error || 'Authentication failed';
+      setError(err);
       setIsLoading(false);
-      return false;
+      return { success: false, error: err };
     }
     setSession(result.session || null);
     setIsLoading(false);
-    return true;
+    return { success: true };
   };
 
   const logout = () => {

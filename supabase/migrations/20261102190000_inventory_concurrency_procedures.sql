@@ -149,7 +149,10 @@ AS $$
 DECLARE
     v_order RECORD;
     v_item RECORD;
+    v_inv RECORD;
     v_staff_role staff_role_enum;
+    v_item_count INT;
+    v_inv_count INT;
 BEGIN
     -- 1. Validate staff identity and active role
     SELECT role INTO v_staff_role 
@@ -191,23 +194,67 @@ BEGIN
         END IF;
     END IF;
 
-    -- 5. Lock inventory rows in ascending order to prevent deadlocks under concurrency
+    -- 5. Lock relevant inventory rows in ascending order to prevent deadlocks under concurrency
     PERFORM 1 FROM public.inventory
     WHERE product_id IN (SELECT product_id FROM public.order_items WHERE order_id = p_order_id)
     ORDER BY product_id ASC
     FOR UPDATE;
 
-    -- Decrement physical_stock and reserved_stock
-    FOR v_item IN SELECT product_id, quantity FROM public.order_items WHERE order_id = p_order_id ORDER BY product_id ASC
+    -- 6. Strict pre-validation: Verify ALL order items have inventory records and sufficient stock
+    SELECT count(DISTINCT product_id) INTO v_item_count
+    FROM public.order_items WHERE order_id = p_order_id;
+
+    SELECT count(DISTINCT product_id) INTO v_inv_count
+    FROM public.inventory
+    WHERE product_id IN (SELECT product_id FROM public.order_items WHERE order_id = p_order_id);
+
+    IF v_inv_count < v_item_count THEN
+        RAISE EXCEPTION 'MISSING_INVENTORY_ROW: One or more products in order % do not have an inventory record.', p_order_id;
+    END IF;
+
+    FOR v_item IN
+        SELECT product_id, SUM(quantity)::INT AS total_quantity
+        FROM public.order_items
+        WHERE order_id = p_order_id
+        GROUP BY product_id
+        ORDER BY product_id ASC
+    LOOP
+        SELECT * INTO v_inv
+        FROM public.inventory
+        WHERE product_id = v_item.product_id;
+
+        IF NOT FOUND THEN
+            RAISE EXCEPTION 'MISSING_INVENTORY_ROW: Product % has no inventory record for order %.',
+                v_item.product_id, p_order_id;
+        END IF;
+
+        IF v_inv.physical_stock < v_item.total_quantity THEN
+            RAISE EXCEPTION 'INSUFFICIENT_PHYSICAL_STOCK: Product % physical stock (%) is less than required order quantity (%).',
+                v_item.product_id, v_inv.physical_stock, v_item.total_quantity;
+        END IF;
+
+        IF v_inv.reserved_stock < v_item.total_quantity THEN
+            RAISE EXCEPTION 'INSUFFICIENT_RESERVED_STOCK: Product % reserved stock (%) is less than required order quantity (%).',
+                v_item.product_id, v_inv.reserved_stock, v_item.total_quantity;
+        END IF;
+    END LOOP;
+
+    -- 7. Modification phase: Only executed after ALL items pass strict validation
+    FOR v_item IN
+        SELECT product_id, SUM(quantity)::INT AS total_quantity
+        FROM public.order_items
+        WHERE order_id = p_order_id
+        GROUP BY product_id
+        ORDER BY product_id ASC
     LOOP
         UPDATE public.inventory
-        SET physical_stock = physical_stock - v_item.quantity,
-            reserved_stock = GREATEST(0, reserved_stock - v_item.quantity),
+        SET physical_stock = physical_stock - v_item.total_quantity,
+            reserved_stock = reserved_stock - v_item.total_quantity,
             updated_at = TIMEZONE('utc', NOW())
         WHERE product_id = v_item.product_id;
     END LOOP;
 
-    -- 6. Mark order completed
+    -- 8. Mark order completed
     UPDATE public.orders 
     SET order_status = 'completed', 
         collected_at = TIMEZONE('utc', NOW()), 

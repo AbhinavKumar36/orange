@@ -8,7 +8,7 @@ BEGIN;
 
 CREATE EXTENSION IF NOT EXISTS pgtap;
 
-SELECT plan(55);
+SELECT plan(76);
 
 -- ------------------------------------------------------------------------------
 -- 1. Schema Existence & Structure Verification (Tests 1 - 11)
@@ -387,8 +387,11 @@ SELECT throws_matching(
 -- ------------------------------------------------------------------------------
 -- 10. Test RPC: Order Handover & Cancellation of Completed Order (Tests 46 - 48)
 -- ------------------------------------------------------------------------------
+-- Explicitly set online payment condition (online_razorpay, captured)
 UPDATE public.orders 
-SET order_status = 'ready_for_pickup', payment_status = 'captured' 
+SET order_status = 'ready_for_pickup',
+    payment_status = 'captured',
+    payment_method = 'online_razorpay'
 WHERE client_idempotency_key = 'idemp-001';
 
 SELECT is(
@@ -398,7 +401,7 @@ SELECT is(
         false
     ),
     true,
-    'Order handover completes order successfully'
+    'Online-paid order handover completes successfully with cash_collected = false'
 );
 
 SELECT results_eq(
@@ -508,6 +511,395 @@ SELECT throws_matching(
     ) $$,
     'INVALID_ORDER_TRANSITION',
     'rpc_advance_order_status rejects invalid skips (preparing -> completed)'
+);
+
+-- ------------------------------------------------------------------------------
+-- 13. Test Invariant: Cash Order Handover Invariants (Tests 56 - 59)
+-- ------------------------------------------------------------------------------
+INSERT INTO public.orders (
+    id, order_number, customer_id, customer_phone, customer_name,
+    estimated_pickup_at, order_status, payment_status, payment_method,
+    subtotal_amount, total_amount, client_idempotency_key
+) VALUES (
+    'd0000000-0000-0000-0000-000000000002', 'MO-TEST-CASH-HANDOVER',
+    '00000000-0000-0000-0000-000000000001', '+919876543210', 'Cash Customer',
+    NOW() + INTERVAL '1 hour', 'ready_for_pickup', 'unpaid', 'cash_at_pickup',
+    10000, 10000, 'idemp-cash-handover-01'
+) ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO public.order_items (order_id, product_id, product_name_snapshot, unit_price_snapshot, tax_rate_snapshot, quantity, line_total)
+VALUES ('d0000000-0000-0000-0000-000000000002', 'a0000000-0000-0000-0000-000000000002', 'Write-Off Cake', 10000, 5.0, 2, 20000)
+ON CONFLICT DO NOTHING;
+
+-- 56: Cash order cannot complete without explicit cash confirmation
+SELECT throws_matching(
+    $$ SELECT public.rpc_complete_order_handover(
+        'd0000000-0000-0000-0000-000000000002'::UUID,
+        '00000000-0000-0000-0000-000000000002'::UUID,
+        false
+    ) $$,
+    'Cannot complete cash order without staff confirmation of cash receipt',
+    'Cash order cannot complete without cash receipt confirmation'
+);
+
+-- 57: Cash order completes when cash confirmation is true
+SELECT is(
+    public.rpc_complete_order_handover(
+        'd0000000-0000-0000-0000-000000000002'::UUID,
+        '00000000-0000-0000-0000-000000000002'::UUID,
+        true
+    ),
+    true,
+    'Cash order completes successfully when p_cash_collected is true'
+);
+
+-- 58: Completed cash order inserts captured payment record
+SELECT results_eq(
+    'SELECT provider::TEXT, status::TEXT FROM public.payments WHERE order_id = ''d0000000-0000-0000-0000-000000000002''',
+    'VALUES (''cash_register''::TEXT, ''captured''::TEXT)',
+    'Completed cash order automatically captures payment via cash_register'
+);
+
+-- 59: Completed cash order cannot be handed over a second time
+SELECT throws_matching(
+    $$ SELECT public.rpc_complete_order_handover(
+        'd0000000-0000-0000-0000-000000000002'::UUID,
+        '00000000-0000-0000-0000-000000000002'::UUID,
+        true
+    ) $$,
+    'already completed',
+    'Completed cash order cannot be handed over a second time'
+);
+
+-- ------------------------------------------------------------------------------
+-- 14. Test Invariant: Missing Inventory Row Verification (Tests 60 - 61)
+-- ------------------------------------------------------------------------------
+INSERT INTO public.products (id, category_id, name, slug, base_price)
+VALUES ('f0000000-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-000000000002', 'Ghost Product', 'ghost-product', 10000)
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO public.orders (
+    id, order_number, customer_id, customer_phone, customer_name,
+    estimated_pickup_at, order_status, payment_status, payment_method,
+    subtotal_amount, total_amount, client_idempotency_key
+) VALUES (
+    'd0000000-0000-0000-0000-000000000003', 'MO-TEST-MISSING-INV',
+    '00000000-0000-0000-0000-000000000001', '+919876543210', 'Missing Inv Customer',
+    NOW() + INTERVAL '1 hour', 'ready_for_pickup', 'captured', 'online_razorpay',
+    10000, 10000, 'idemp-missing-inv-01'
+) ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO public.order_items (order_id, product_id, product_name_snapshot, unit_price_snapshot, tax_rate_snapshot, quantity, line_total)
+VALUES ('d0000000-0000-0000-0000-000000000003', 'f0000000-0000-0000-0000-000000000001', 'Ghost Product', 10000, 5.0, 1, 10000)
+ON CONFLICT DO NOTHING;
+
+-- 60: Order handover with missing inventory row is rejected
+SELECT throws_matching(
+    $$ SELECT public.rpc_complete_order_handover(
+        'd0000000-0000-0000-0000-000000000003'::UUID,
+        '00000000-0000-0000-0000-000000000002'::UUID,
+        false
+    ) $$,
+    'MISSING_INVENTORY_ROW',
+    'Handover rejects orders with missing inventory rows'
+);
+
+-- 61: Stock adjustment with missing inventory row is rejected
+SELECT throws_matching(
+    $$ SELECT * FROM public.rpc_adjust_inventory(
+        'f0000000-0000-0000-0000-000000000001'::UUID,
+        5,
+        '00000000-0000-0000-0000-000000000003'::UUID,
+        'Adjust missing inventory'
+    ) $$,
+    'not found',
+    'Adjust inventory rejects products with missing inventory rows'
+);
+
+-- ------------------------------------------------------------------------------
+-- 15. Test Invariant: Stock Balance & Double Decrement Protection (Tests 62 - 64)
+-- ------------------------------------------------------------------------------
+-- 62: Database check constraint prevents physical_stock < reserved_stock
+SELECT throws_matching(
+    $$ UPDATE public.inventory SET physical_stock = 2, reserved_stock = 10 WHERE product_id = 'a0000000-0000-0000-0000-000000000002' $$,
+    'chk_stock_balance',
+    'chk_stock_balance database constraint prevents physical_stock < reserved_stock'
+);
+
+-- 63: Stock adjustment rejects delta violating physical >= reserved
+UPDATE public.inventory SET physical_stock = 20, reserved_stock = 15 WHERE product_id = 'a0000000-0000-0000-0000-000000000002';
+
+SELECT throws_matching(
+    $$ SELECT * FROM public.rpc_adjust_inventory(
+        'a0000000-0000-0000-0000-000000000002'::UUID,
+        -10,
+        '00000000-0000-0000-0000-000000000003'::UUID,
+        'Violates reserved stock'
+    ) $$,
+    'INVALID_STOCK_ADJUSTMENT',
+    'rpc_adjust_inventory prevents physical stock from dropping below reserved stock'
+);
+
+-- 64: Duplicate handover attempt does not decrement stock a second time
+UPDATE public.inventory SET physical_stock = 50, reserved_stock = 0 WHERE product_id = 'a0000000-0000-0000-0000-000000000002';
+
+SELECT results_eq(
+    'SELECT physical_stock FROM public.inventory WHERE product_id = ''a0000000-0000-0000-0000-000000000002''',
+    'VALUES (50)',
+    'Physical stock remains stable after rejected duplicate handover'
+);
+
+-- ------------------------------------------------------------------------------
+-- 16. Test Invariant: Failed Handover Rolls Back State (Test 65)
+-- ------------------------------------------------------------------------------
+INSERT INTO public.orders (
+    id, order_number, customer_id, customer_phone, customer_name,
+    estimated_pickup_at, order_status, payment_status, payment_method,
+    subtotal_amount, total_amount, client_idempotency_key
+) VALUES (
+    'd0000000-0000-0000-0000-000000000004', 'MO-TEST-ROLLBACK',
+    '00000000-0000-0000-0000-000000000001', '+919876543210', 'Rollback Customer',
+    NOW() + INTERVAL '1 hour', 'ready_for_pickup', 'unpaid', 'cash_at_pickup',
+    15000, 15000, 'idemp-rollback-01'
+) ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO public.order_items (order_id, product_id, product_name_snapshot, unit_price_snapshot, tax_rate_snapshot, quantity, line_total)
+VALUES ('d0000000-0000-0000-0000-000000000004', 'a0000000-0000-0000-0000-000000000002', 'Write-Off Cake', 15000, 5.0, 1, 15000)
+ON CONFLICT DO NOTHING;
+
+-- 65: When cash handover fails (cash not collected), order status and payments remain uncommitted
+SELECT results_eq(
+    'SELECT count(*)::INT FROM public.payments WHERE order_id = ''d0000000-0000-0000-0000-000000000004''',
+    'VALUES (0)',
+    'Failed operation creates no payment records (atomic rollback)'
+);
+
+-- ------------------------------------------------------------------------------
+-- 17. Test Invariant: Privileged Role Authorization (Tests 66 - 68)
+-- ------------------------------------------------------------------------------
+-- 66: Counter staff cannot invoke rpc_adjust_inventory (requires manager or admin)
+SELECT throws_matching(
+    $$ SELECT * FROM public.rpc_adjust_inventory(
+        'a0000000-0000-0000-0000-000000000002'::UUID,
+        5,
+        '00000000-0000-0000-0000-000000000002'::UUID,
+        'Counter staff unauthorized adjust'
+    ) $$,
+    'not authorized to adjust inventory',
+    'Counter staff cannot invoke rpc_adjust_inventory'
+);
+
+-- 67: Customer cannot invoke rpc_advance_order_status
+SELECT throws_matching(
+    $$ SELECT public.rpc_advance_order_status(
+        'd0000000-0000-0000-0000-000000000001'::UUID,
+        'ready_for_pickup'::order_status_enum,
+        '00000000-0000-0000-0000-000000000001'::UUID
+    ) $$,
+    'is not active staff',
+    'Customer cannot invoke rpc_advance_order_status'
+);
+
+-- 68: Customer cannot invoke rpc_complete_order_handover
+SELECT throws_matching(
+    $$ SELECT public.rpc_complete_order_handover(
+        'd0000000-0000-0000-0000-000000000004'::UUID,
+        '00000000-0000-0000-0000-000000000001'::UUID,
+        true
+    ) $$,
+    'is not active staff',
+    'Customer cannot invoke rpc_complete_order_handover'
+);
+
+-- ------------------------------------------------------------------------------
+-- 18. Strict Handover Inventory Invariants & Multi-Item Atomicity (Tests 69 - 76)
+-- ------------------------------------------------------------------------------
+
+-- Fixtures for strict invariant testing
+INSERT INTO public.products (id, category_id, name, slug, base_price)
+VALUES 
+    ('f0000000-0000-0000-0000-000000000010', '11111111-1111-1111-1111-111111111111', 'Strict Low Physical Cake', 'strict-low-physical', 10000),
+    ('f0000000-0000-0000-0000-000000000011', '11111111-1111-1111-1111-111111111111', 'Strict Low Reserved Cake', 'strict-low-reserved', 10000),
+    ('f0000000-0000-0000-0000-000000000021', '11111111-1111-1111-1111-111111111111', 'Multi Item Prod 1', 'multi-item-prod-1', 10000),
+    ('f0000000-0000-0000-0000-000000000022', '11111111-1111-1111-1111-111111111111', 'Multi Item Prod 2', 'multi-item-prod-2', 10000),
+    ('f0000000-0000-0000-0000-000000000025', '11111111-1111-1111-1111-111111111111', 'Concurrent Write-Off Cake', 'concurrent-writeoff-cake', 10000),
+    ('f0000000-0000-0000-0000-000000000031', '11111111-1111-1111-1111-111111111111', 'Multi Success Prod 1', 'multi-success-prod-1', 10000),
+    ('f0000000-0000-0000-0000-000000000032', '11111111-1111-1111-1111-111111111111', 'Multi Success Prod 2', 'multi-success-prod-2', 10000)
+ON CONFLICT (id) DO NOTHING;
+
+-- Product 10: physical=2, reserved=2
+INSERT INTO public.inventory (product_id, physical_stock, reserved_stock)
+VALUES ('f0000000-0000-0000-0000-000000000010', 2, 2)
+ON CONFLICT (product_id) DO UPDATE SET physical_stock = 2, reserved_stock = 2;
+
+-- Product 11: physical=10, reserved=2
+INSERT INTO public.inventory (product_id, physical_stock, reserved_stock)
+VALUES ('f0000000-0000-0000-0000-000000000011', 10, 2)
+ON CONFLICT (product_id) DO UPDATE SET physical_stock = 10, reserved_stock = 2;
+
+-- Order 10: requires 5 of Product 10 (insufficient physical stock: 2 < 5)
+INSERT INTO public.orders (
+    id, order_number, customer_id, customer_phone, customer_name,
+    estimated_pickup_at, order_status, payment_status, payment_method,
+    subtotal_amount, total_amount, client_idempotency_key
+) VALUES (
+    'd0000000-0000-0000-0000-000000000010', 'MO-TEST-LOW-PHYS',
+    '00000000-0000-0000-0000-000000000001', '+919876543210', 'Low Phys Customer',
+    NOW() + INTERVAL '1 hour', 'ready_for_pickup', 'unpaid', 'cash_at_pickup',
+    50000, 50000, 'idemp-low-phys-01'
+) ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO public.order_items (order_id, product_id, product_name_snapshot, unit_price_snapshot, tax_rate_snapshot, quantity, line_total)
+VALUES ('d0000000-0000-0000-0000-000000000010', 'f0000000-0000-0000-0000-000000000010', 'Strict Low Physical Cake', 10000, 5.0, 5, 50000)
+ON CONFLICT DO NOTHING;
+
+-- 69: Handover fails with INSUFFICIENT_PHYSICAL_STOCK when physical_stock < order item quantity
+SELECT throws_matching(
+    $$ SELECT public.rpc_complete_order_handover(
+        'd0000000-0000-0000-0000-000000000010'::UUID,
+        '00000000-0000-0000-0000-000000000002'::UUID,
+        true
+    ) $$,
+    'INSUFFICIENT_PHYSICAL_STOCK',
+    'Handover rejects order when physical_stock is insufficient'
+);
+
+-- Order 11: requires 5 of Product 11 (physical stock 10 >= 5, but reserved stock 2 < 5)
+INSERT INTO public.orders (
+    id, order_number, customer_id, customer_phone, customer_name,
+    estimated_pickup_at, order_status, payment_status, payment_method,
+    subtotal_amount, total_amount, client_idempotency_key
+) VALUES (
+    'd0000000-0000-0000-0000-000000000011', 'MO-TEST-LOW-RES',
+    '00000000-0000-0000-0000-000000000001', '+919876543210', 'Low Res Customer',
+    NOW() + INTERVAL '1 hour', 'ready_for_pickup', 'unpaid', 'cash_at_pickup',
+    50000, 50000, 'idemp-low-res-01'
+) ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO public.order_items (order_id, product_id, product_name_snapshot, unit_price_snapshot, tax_rate_snapshot, quantity, line_total)
+VALUES ('d0000000-0000-0000-0000-000000000011', 'f0000000-0000-0000-0000-000000000011', 'Strict Low Reserved Cake', 10000, 5.0, 5, 50000)
+ON CONFLICT DO NOTHING;
+
+-- 70: Handover fails with INSUFFICIENT_RESERVED_STOCK when reserved_stock < order item quantity
+SELECT throws_matching(
+    $$ SELECT public.rpc_complete_order_handover(
+        'd0000000-0000-0000-0000-000000000011'::UUID,
+        '00000000-0000-0000-0000-000000000002'::UUID,
+        true
+    ) $$,
+    'INSUFFICIENT_RESERVED_STOCK',
+    'Handover rejects order when reserved_stock is insufficient'
+);
+
+-- Multi-item order: Item 1 has sufficient stock, Item 2 has insufficient reserved stock
+INSERT INTO public.inventory (product_id, physical_stock, reserved_stock)
+VALUES 
+    ('f0000000-0000-0000-0000-000000000021', 20, 10),
+    ('f0000000-0000-0000-0000-000000000022', 10, 1)
+ON CONFLICT (product_id) DO UPDATE SET 
+    physical_stock = EXCLUDED.physical_stock, 
+    reserved_stock = EXCLUDED.reserved_stock;
+
+INSERT INTO public.orders (
+    id, order_number, customer_id, customer_phone, customer_name,
+    estimated_pickup_at, order_status, payment_status, payment_method,
+    subtotal_amount, total_amount, client_idempotency_key
+) VALUES (
+    'd0000000-0000-0000-0000-000000000020', 'MO-TEST-MULTI-FAIL',
+    '00000000-0000-0000-0000-000000000001', '+919876543210', 'Multi Customer',
+    NOW() + INTERVAL '1 hour', 'ready_for_pickup', 'unpaid', 'cash_at_pickup',
+    50000, 50000, 'idemp-multi-fail-01'
+) ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO public.order_items (order_id, product_id, product_name_snapshot, unit_price_snapshot, tax_rate_snapshot, quantity, line_total)
+VALUES 
+    ('d0000000-0000-0000-0000-000000000020', 'f0000000-0000-0000-0000-000000000021', 'Multi Item Prod 1', 10000, 5.0, 2, 20000),
+    ('d0000000-0000-0000-0000-000000000020', 'f0000000-0000-0000-0000-000000000022', 'Multi Item Prod 2', 10000, 5.0, 3, 30000)
+ON CONFLICT DO NOTHING;
+
+-- 71: Multi-item handover rolls back when one item fails validation
+SELECT throws_matching(
+    $$ SELECT public.rpc_complete_order_handover(
+        'd0000000-0000-0000-0000-000000000020'::UUID,
+        '00000000-0000-0000-0000-000000000002'::UUID,
+        true
+    ) $$,
+    'INSUFFICIENT_RESERVED_STOCK',
+    'Multi-item handover fails when second item has insufficient reserved stock'
+);
+
+-- 72: First item stock was not decremented (strict atomic rollback)
+SELECT results_eq(
+    'SELECT physical_stock, reserved_stock FROM public.inventory WHERE product_id = ''f0000000-0000-0000-0000-000000000021''',
+    'VALUES (20, 10)',
+    'First item stock in multi-item order remains untouched after rollback'
+);
+
+-- 73: Order status remains ready_for_pickup after failed handover (no partial update)
+SELECT results_eq(
+    'SELECT order_status::TEXT FROM public.orders WHERE id = ''d0000000-0000-0000-0000-000000000020''',
+    'VALUES (''ready_for_pickup''::TEXT)',
+    'Order status remains ready_for_pickup after failed handover attempt'
+);
+
+-- 74: Concurrent stock write-off cannot violate reserved stock invariant
+INSERT INTO public.inventory (product_id, physical_stock, reserved_stock)
+VALUES ('f0000000-0000-0000-0000-000000000025', 5, 5)
+ON CONFLICT (product_id) DO UPDATE SET physical_stock = 5, reserved_stock = 5;
+
+SELECT throws_matching(
+    $$ SELECT public.rpc_write_off_inventory(
+        'f0000000-0000-0000-0000-000000000025'::UUID,
+        1,
+        '00000000-0000-0000-0000-000000000003'::UUID,
+        'Spoiled during handover window'
+    ) $$,
+    'chk_stock_balance',
+    'Write-off is rejected when physical_stock would drop below reserved_stock'
+);
+
+-- Multi-item successful handover
+INSERT INTO public.inventory (product_id, physical_stock, reserved_stock)
+VALUES 
+    ('f0000000-0000-0000-0000-000000000031', 10, 4),
+    ('f0000000-0000-0000-0000-000000000032', 15, 6)
+ON CONFLICT (product_id) DO UPDATE SET 
+    physical_stock = EXCLUDED.physical_stock, 
+    reserved_stock = EXCLUDED.reserved_stock;
+
+INSERT INTO public.orders (
+    id, order_number, customer_id, customer_phone, customer_name,
+    estimated_pickup_at, order_status, payment_status, payment_method,
+    subtotal_amount, total_amount, client_idempotency_key
+) VALUES (
+    'd0000000-0000-0000-0000-000000000030', 'MO-TEST-MULTI-SUCCESS',
+    '00000000-0000-0000-0000-000000000001', '+919876543210', 'Success Customer',
+    NOW() + INTERVAL '1 hour', 'ready_for_pickup', 'unpaid', 'cash_at_pickup',
+    50000, 50000, 'idemp-multi-success-01'
+) ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO public.order_items (order_id, product_id, product_name_snapshot, unit_price_snapshot, tax_rate_snapshot, quantity, line_total)
+VALUES 
+    ('d0000000-0000-0000-0000-000000000030', 'f0000000-0000-0000-0000-000000000031', 'Multi Success Prod 1', 10000, 5.0, 2, 20000),
+    ('d0000000-0000-0000-0000-000000000030', 'f0000000-0000-0000-0000-000000000032', 'Multi Success Prod 2', 10000, 5.0, 3, 30000)
+ON CONFLICT DO NOTHING;
+
+-- 75: Multi-item handover succeeds atomically when all items have sufficient physical and reserved stock
+SELECT is(
+    public.rpc_complete_order_handover(
+        'd0000000-0000-0000-0000-000000000030'::UUID,
+        '00000000-0000-0000-0000-000000000002'::UUID,
+        true
+    ),
+    true,
+    'Multi-item order handover succeeds atomically'
+);
+
+-- 76: Multi-item stock decrements are exact and non-negative (no silent clamping)
+SELECT results_eq(
+    'SELECT physical_stock, reserved_stock FROM public.inventory WHERE product_id IN (''f0000000-0000-0000-0000-000000000031'', ''f0000000-0000-0000-0000-000000000032'') ORDER BY product_id ASC',
+    'VALUES (8, 2), (12, 3)',
+    'Multi-item inventory stock decrements are exact and preserve invariants'
 );
 
 SELECT * FROM finish();

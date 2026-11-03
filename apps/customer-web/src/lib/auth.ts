@@ -165,9 +165,16 @@ export async function requestPhoneOtp(phone: string): Promise<{ success: boolean
 
     if (!res.ok) {
       const data = (await res.json().catch(() => null)) as SupabaseAuthError | null;
+      let msg = data?.msg || data?.error_description || `Failed to send SMS verification code (status ${res.status}).`;
+      if (
+        process.env.NODE_ENV === 'development' &&
+        (msg.toLowerCase().includes('unsupported phone provider') || msg.toLowerCase().includes('phone provider'))
+      ) {
+        msg = 'SMS provider not configured on local development environment.';
+      }
       return {
         success: false,
-        error: data?.msg || data?.error_description || `Failed to send SMS verification code (status ${res.status}).`,
+        error: msg,
       };
     }
 

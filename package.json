@@ -15,7 +15,7 @@
     "dev:customer": "turbo run dev --filter=@orange/customer-web",
     "dev:admin": "turbo run dev --filter=@orange/admin-web",
     "lint": "turbo run lint",
-    "test": "turbo run test",
+    "test": "vitest run --globals --environment node apps/",
     "typecheck": "turbo run typecheck",
     "contracts:lint": "turbo run lint --filter=@orange/api-contracts",
     "adb:reverse": "adb reverse tcp:4000 tcp:4000 && adb reverse tcp:54321 tcp:54321",
