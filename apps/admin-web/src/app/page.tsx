@@ -135,6 +135,13 @@ export default function AdminDashboardPage(): ReactElement {
     }
   }, [isAuthenticated, loadData]);
 
+  // Keep product form category selection synchronized with loaded categories
+  useEffect(() => {
+    if (!productForm.categoryId && categories.length > 0) {
+      setProductForm((prev) => ({ ...prev, categoryId: categories[0].id }));
+    }
+  }, [categories, productForm.categoryId]);
+
   // Handle Real Supabase Auth Login
   const handleStaffLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -709,10 +716,11 @@ export default function AdminDashboardPage(): ReactElement {
                   className="btn-primary"
                   onClick={() => {
                     setEditingProduct(null);
+                    const initialCatId = categories.length > 0 ? categories[0].id : '';
                     setProductForm({
                       name: '',
                       slug: '',
-                      categoryId: categories[0]?.id || '',
+                      categoryId: initialCatId,
                       description: '',
                       priceRupees: '',
                       isVeg: true,
@@ -1164,7 +1172,7 @@ export default function AdminDashboardPage(): ReactElement {
               <div style={{ marginBottom: '0.8rem' }}>
                 <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '0.2rem' }}>Category</label>
                 <select
-                  value={productForm.categoryId}
+                  value={productForm.categoryId || (categories[0]?.id ?? '')}
                   onChange={(e) => setProductForm({ ...productForm, categoryId: e.target.value })}
                 >
                   {categories.map((c) => (
@@ -1247,12 +1255,18 @@ export default function AdminDashboardPage(): ReactElement {
                     return;
                   }
 
+                  const selectedCategoryId = productForm.categoryId || (categories[0]?.id ?? '');
+                  if (!selectedCategoryId) {
+                    alert('Please select a category for this product.');
+                    return;
+                  }
+
                   try {
                     if (editingProduct) {
                       await updateAdminProduct(token, editingProduct.id, {
                         name: productForm.name,
                         slug: productForm.slug,
-                        categoryId: productForm.categoryId,
+                        categoryId: selectedCategoryId,
                         description: productForm.description,
                         basePrice: pricePaise,
                         isVeg: productForm.isVeg,
@@ -1262,7 +1276,7 @@ export default function AdminDashboardPage(): ReactElement {
                       await createAdminProduct(token, {
                         name: productForm.name,
                         slug: productForm.slug,
-                        categoryId: productForm.categoryId,
+                        categoryId: selectedCategoryId,
                         description: productForm.description,
                         basePrice: pricePaise,
                         isVeg: productForm.isVeg,

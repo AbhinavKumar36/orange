@@ -116,4 +116,63 @@ test.describe('Moody Orange Web Portals Inspection', () => {
       await page.screenshot({ path: 'e2e-screenshots/07-customer-logged-in.png', fullPage: true });
     }
   });
+
+  test('Add product in Admin Web and verify it renders live in Customer Web', async ({ page, context }) => {
+    page.on('dialog', async (dialog) => {
+      console.log('ALERT DIALOG:', dialog.message());
+      await dialog.dismiss();
+    });
+
+    // 1. Visit Admin Web login page
+    await page.goto('http://localhost:3001');
+    const emailInput = page.locator('input[type="email"]');
+    const passwordInput = page.locator('input[type="password"]');
+    const submitBtn = page.locator('button[type="submit"]:has-text("Sign In to Staff Portal")');
+
+    await expect(emailInput).toBeVisible();
+    await expect(passwordInput).toBeVisible();
+    await expect(page.locator('form[data-hydrated="true"]')).toBeVisible({ timeout: 20000 });
+
+    // 2. Log in as Store Manager (manager@moodyorange.com / password123)
+    await emailInput.fill('manager@moodyorange.com');
+    await passwordInput.fill('password123');
+    await submitBtn.click();
+
+    // 3. Navigate to Products tab
+    const productsTab = page.locator('button:has-text("Products")');
+    await expect(productsTab).toBeVisible({ timeout: 20000 });
+    await productsTab.click();
+
+    // Wait for product catalog table to populate from Supabase
+    await expect(page.locator('text=Dark Chocolate Truffle Cake')).toBeVisible({ timeout: 15000 });
+
+    // 4. Click Add Product button
+    const addProductBtn = page.locator('button:has-text("+ Add Product")');
+    await expect(addProductBtn).toBeVisible({ timeout: 10000 });
+    await addProductBtn.click();
+
+    // 5. Fill product modal form
+    const uniqueName = `Alphonso Mango Cake ${Date.now().toString().slice(-4)}`;
+
+    await page.locator('.modal-body input[type="text"]').first().fill(uniqueName);
+    await page.locator('.modal-body input[type="number"]').first().fill('750');
+    await page.locator('.modal-body textarea').fill('Special fresh seasonal mango layered sponge cake');
+
+    // 6. Save product
+    const saveBtn = page.locator('.modal-footer button:has-text("Save Product")');
+    await saveBtn.click();
+
+    // Verify modal closes and product appears in the admin table
+    await expect(page.locator(`text=${uniqueName}`)).toBeVisible({ timeout: 15000 });
+    await page.screenshot({ path: 'e2e-screenshots/08-admin-product-added.png', fullPage: true });
+
+    // 7. Verify live rendering in Customer Web storefront
+    const customerPage = await context.newPage();
+    await customerPage.goto('http://localhost:3000');
+    await customerPage.waitForLoadState('networkidle');
+
+    await expect(customerPage.locator(`text=${uniqueName}`)).toBeVisible({ timeout: 20000 });
+    await customerPage.screenshot({ path: 'e2e-screenshots/09-customer-new-product-visible.png', fullPage: true });
+    await customerPage.close();
+  });
 });
