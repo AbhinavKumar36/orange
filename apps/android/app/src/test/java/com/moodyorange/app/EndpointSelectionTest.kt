@@ -115,4 +115,70 @@ class EndpointSelectionTest {
         assertTrue("Must detect plain service_role substring", AuthManager.isServiceRoleKey("supabase_service_role_key_secret"))
         assertFalse("Must allow anon key", AuthManager.isServiceRoleKey(anonToken))
     }
+
+    @Test
+    fun testSupabaseUrlRejectsLocalhostAndPort54321() {
+        val prohibited = listOf(
+            "http://10.0.2.2:54321",
+            "http://localhost:54321",
+            "http://127.0.0.1:54321",
+            "https://10.0.2.2:54321",
+            "https://localhost:54321",
+            "https://127.0.0.1:54321",
+            "https://192.168.1.100:54321"
+        )
+        for (url in prohibited) {
+            try {
+                AuthManager.validateSupabaseUrl(url)
+                fail("Expected failure for local Supabase URL: $url")
+            } catch (e: IllegalStateException) {
+                assertTrue(e.message?.contains("prohibited") == true || e.message?.contains("HTTPS") == true)
+            }
+        }
+    }
+
+    @Test
+    fun testSupabaseUrlRejectsNonHttps() {
+        try {
+            AuthManager.validateSupabaseUrl("http://myproject.supabase.co")
+            fail("Expected failure for non-HTTPS hosted Supabase URL")
+        } catch (e: IllegalStateException) {
+            assertTrue(e.message?.contains("must use HTTPS") == true)
+        }
+    }
+
+    @Test
+    fun testSupabaseUrlAcceptsValidHostedHttps() {
+        val valid = "https://abcxyzproject.supabase.co"
+        val resolved = AuthManager.validateSupabaseUrl(valid)
+        assertEquals(valid, resolved)
+    }
+
+    @Test
+    fun testAnonKeyRejectsPlaceholderAndServiceRole() {
+        val prohibitedKeys = listOf(
+            "",
+            "   ",
+            "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.example_anon_key",
+            "dummy_anon_key",
+            "placeholder_key",
+            "eyJhbGciOiJIUzI1NiJ9.eyJyb2xlIjoic2VydmljZV9yb2xlIn0.signature"
+        )
+        for (key in prohibitedKeys) {
+            try {
+                AuthManager.validateAnonKey(key)
+                fail("Expected failure for prohibited anon key: $key")
+            } catch (e: IllegalStateException) {
+                assertTrue(e.message?.contains("required") == true ||
+                    e.message?.contains("placeholder") == true ||
+                    e.message?.contains("service_role") == true)
+            }
+        }
+    }
+
+    @Test
+    fun testAnonKeyAcceptsValidKey() {
+        val validKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJvbGUiOiJhbm9uIn0.valid_signature"
+        AuthManager.validateAnonKey(validKey)
+    }
 }

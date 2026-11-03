@@ -48,7 +48,7 @@ Environment variables must be kept in local untracked files or GitHub Actions se
 
 | Environment | Purpose | Supabase Project Target | Backend API Endpoint |
 | :--- | :--- | :--- | :--- |
-| **Development** | Feature development & local debugging | Hosted Dev Supabase Project (`SUPABASE_URL`) | `http://localhost:4000/api/v1` |
+| **Development** | Feature development & local debugging | Hosted Dev Supabase Project (`DEV_SUPABASE_URL` / `SUPABASE_URL`) | `http://localhost:4000/api/v1` |
 | **Staging** | Automated QA & pre-release validation | Dedicated Hosted Staging Supabase Project (`STAGING_SUPABASE_URL`) | `https://staging-api.moodyorange.com/api/v1` |
 | **Production** | Live transactional storefront | Authoritative Live Production Supabase Project (`PROD_SUPABASE_URL`) | `https://api.moodyorange.com/api/v1` |
 
@@ -116,14 +116,21 @@ npx supabase db push --db-url "$SUPABASE_DB_URL"
 > - Never execute `supabase db reset`, `DROP SCHEMA`, or truncate commands against hosted databases.
 > - Destructive migrations are strictly prohibited. Always preserve existing data.
 
-### 2. Safe Hosted Database Testing (pgTAP)
+### 2. Safe Hosted Database Testing (pgTAP) & Real Concurrency Testing
 Database integrity tests are defined in `supabase/tests/database/database.test.sql` (76 assertions).
 - All tests execute inside an isolated transaction (`BEGIN ... ROLLBACK`) so existing data is preserved and zero side-effects persist.
 - **Dedicated Test Environment**: Run pgTAP tests against a dedicated hosted development or staging Supabase project using `pg_prove`:
   ```bash
-  pg_prove -U postgres -h [HOST] -p [PORT] -d postgres supabase/tests/database/database.test.sql
+  pg_prove --dbname "$TEST_SUPABASE_DB_URL" supabase/tests/database/database.test.sql
   ```
-- **Safeguard against Production Pollution**: If a separate hosted test connection string (`TEST_SUPABASE_DB_URL` or `SUPABASE_DB_URL`) is not configured in the test runner environment, the suite safely reports the missing remote configuration as **BLOCKED** rather than silently executing against production.
+- **Real Multi-Session PostgreSQL Concurrency Tests**:
+  Real database concurrency tests execute separate simultaneous database sessions (`pg.Client`) to test row-level locking, race conditions, and atomic rollbacks:
+  ```bash
+  npm run test:db:concurrency
+  # Or:
+  node scripts/test-database-concurrency.mjs
+  ```
+- **Safeguard against Production Pollution**: If a separate hosted test connection string (`TEST_SUPABASE_DB_URL`) is not configured in the test runner environment, both pgTAP and concurrency test suites safely report the missing remote configuration as **BLOCKED** rather than silently executing against production. Connection strings referencing production (`prod`, `production`, `live`) are strictly rejected.
 
 ### 3. Inventory Reservation Invariants & Strict Handover Validation
 The stored procedure `public.rpc_complete_order_handover` enforces strict stock validation:
@@ -157,14 +164,14 @@ The stored procedure `public.rpc_complete_order_handover` enforces strict stock 
 
 ### 3. Safe Online Staff Provisioning Utility
 The script `scripts/provision-admin.mjs` manages staff role assignments without manual database tampering:
-- **Explicit Target Environment**: Requires `--env <local|staging|production>`.
+- **Explicit Target Environment**: Requires `--env <development|staging|production>`.
 - **Production Safeguards**: Targeting production strictly requires `--confirm-production` and `PROD_SUPABASE_URL`.
 - **Credential Protection**: Never prints passwords, access tokens, or service-role keys to terminal output.
 - **SQL Fallback**: When direct service-role API credentials are not detected in the environment, it outputs a safe, transactional, idempotent SQL block (`BEGIN ... COMMIT`) for execution in the Supabase Dashboard SQL Editor by an authorized database administrator.
 
 ```bash
 # Provisioning examples:
-node scripts/provision-admin.mjs --env local --email staff@moodyorange.local --role counter_staff
+node scripts/provision-admin.mjs --env development --email staff@company.com --role counter_staff
 node scripts/provision-admin.mjs --env staging --email manager@staging.moodyorange.com --role manager
 node scripts/provision-admin.mjs --env production --email authorized-admin@company.com --role admin --confirm-production
 ```
@@ -174,9 +181,11 @@ node scripts/provision-admin.mjs --env production --email authorized-admin@compa
 ## 📱 Native Android Application (`apps/android`)
 
 ### 1. Target Device Networking Setup
-- **Android Emulator**: Uses `10.0.2.2:4000` (Backend API) and `10.0.2.2:54321` (or hosted Supabase URL). Default debug candidate endpoints include loopback addresses automatically.
-- **Physical Device via USB Reverse Tethering**: Run `npm run adb:reverse` (maps `tcp:4000` and `tcp:54321` to host). The debug client tests `127.0.0.1` candidate endpoints.
-- **Physical Device over Local Wi-Fi**: Set `DEV_LAN_IP=<YOUR_PC_LAN_IP>` or `API_BASE_URL` in `apps/android/local.properties`.
+- **Supabase Authentication & Data**: Always connects directly to the remote hosted Supabase project via HTTPS (`DEV_SUPABASE_URL` in debug, `PROD_SUPABASE_URL` in release). Local Supabase ports (54321) are strictly prohibited.
+- **Backend API Networking (When Running API Server Locally)**:
+  - **Android Emulator**: Uses `API_BASE_URL=http://10.0.2.2:4000/api/v1/`.
+  - **Physical Device via USB Reverse Tethering**: Run `npm run adb:reverse` (`adb reverse tcp:4000 tcp:4000`). The client connects to `http://127.0.0.1:4000/api/v1/`.
+  - **Physical Device over Local Wi-Fi**: Set `DEV_LAN_IP=<YOUR_PC_LAN_IP>` or `API_BASE_URL` in `apps/android/local.properties`.
 
 ### 2. Production Release Configuration (Fail-Closed)
 Release builds (`assembleRelease`, `bundleRelease`, `packageRelease`) enforce strict compile-time and runtime validation:
@@ -184,10 +193,11 @@ Release builds (`assembleRelease`, `bundleRelease`, `packageRelease`) enforce st
 - Rejects non-HTTPS URLs, local development hostnames (`localhost`, `127.0.0.1`, `10.0.2.2`), `.local` domains, and private RFC-1918 LAN IPs.
 - **Strict Service-Role Key Prohibition**: Supabase `service_role` keys bypass Row Level Security and must **never** be included in the Android application. Both Gradle and runtime `AuthManager` validate JWT payloads and immediately abort if a `service_role` key is detected.
 
-To validate release configuration without building an APK:
+To validate configurations without building an APK:
 ```bash
 cd apps/android
-./gradlew validateReleaseConfig
+./gradlew validateDevConfig       # Validates hosted dev configuration
+./gradlew validateReleaseConfig   # Validates production release configuration
 ```
 
 ---
@@ -203,13 +213,15 @@ All available project checks and validation suites have been independently execu
 | **TypeScript Typecheck** | `npm run typecheck` | **PASS** | Strict TypeScript check passed across all packages (`tsc --noEmit`). |
 | **Unit & Integration Tests** | `npm run test` | **PASS** | 13 test files passed (109 tests passed in Vitest). |
 | **Production Build** | `npm run build` | **PASS** | Next.js and Fastify production artifacts compiled successfully. |
-| **Repository Secret Scan** | `npm run secret-scan` | **PASS** | 179 files checked; zero unredacted live secrets or private keys detected. |
+| **Repository Secret Scan** | `npm run secret-scan` | **PASS** | 180 files checked; zero unredacted live secrets or private keys detected. |
 | **Admin Production Bundle Scan** | `admin-login-page.test.tsx` | **PASS** | Production HTML and `.next/static` assets verified free of demo credentials. |
 | **Android Gradle Configuration** | `./gradlew tasks --dry-run` | **PASS** | Build scripts and plugins validated cleanly. |
+| **Android Dev Config Validation** | `./gradlew validateDevConfig` | **PASS** | Hosted development Supabase configuration validated (local Supabase/54321 rejected). |
 | **Android Debug Build** | `./gradlew assembleDebug` | **PASS** | Debug APK built successfully with Compose and BuildConfig. |
-| **Android Unit Tests** | `./gradlew testDebugUnitTest` | **PASS** | Endpoint selection, LAN IP candidates, and service-role key detection tests passed. |
+| **Android Unit Tests** | `./gradlew testDebugUnitTest` | **PASS** | Endpoint selection, LAN IP candidates, service-role prohibition, and hosted URL validation tests passed. |
 | **Android Release Validation** | `./gradlew validateReleaseConfig` | **PASS** | Fail-closed validation correctly rejects missing/invalid production configuration. |
 | **Remote Database Tests** | `database.test.sql` (pgTAP) | **BLOCKED** | Test suite updated to plan(76). Execution requires dedicated hosted test project connection string (`TEST_SUPABASE_DB_URL`). Production database protected from test pollution. |
+| **Database Concurrency Tests** | `npm run test:db:concurrency` | **BLOCKED** | Real multi-session PostgreSQL test suite verified. Execution requires dedicated hosted test project (`TEST_SUPABASE_DB_URL`). Production database protected from test pollution. |
 
 ---
 

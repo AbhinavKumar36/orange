@@ -4,13 +4,16 @@
  * Moody Orange - Staff Role Provisioning Script (Hardened)
  *
  * Authorized Provisioning Procedures:
- * 1. Local Development:
- *    node scripts/provision-admin.mjs --env local --email staff@moodyorange.local --role counter_staff
- *    node scripts/provision-admin.mjs --env local --email manager@moodyorange.local --role manager
- *    node scripts/provision-admin.mjs --env local --email admin@moodyorange.local --role admin
+ * 1. Hosted Development Environment:
+ *    node scripts/provision-admin.mjs --env development --email staff@company.com --role counter_staff
+ *    node scripts/provision-admin.mjs --env development --email manager@company.com --role manager
+ *    node scripts/provision-admin.mjs --env development --email admin@company.com --role admin
  *
- * 2. Production Environment (Requires explicit --confirm-production flag and PROD_SUPABASE_SERVICE_ROLE_KEY):
- *    node scripts/provision-admin.mjs --env production --email authorized-admin@domain.org --role admin --confirm-production
+ * 2. Hosted Staging Environment:
+ *    node scripts/provision-admin.mjs --env staging --email manager@staging.moodyorange.com --role manager
+ *
+ * 3. Production Environment (Requires explicit --confirm-production flag and PROD_SUPABASE_SERVICE_ROLE_KEY):
+ *    node scripts/provision-admin.mjs --env production --email authorized-admin@company.com --role admin --confirm-production
  */
 
 import { parseArgs } from 'node:util';
@@ -35,10 +38,10 @@ function printUsage() {
 🍊 Moody Orange - Staff Role Provisioning Utility
 
 Usage:
-  node scripts/provision-admin.mjs --env <local|staging|production> [options]
+  node scripts/provision-admin.mjs --env <development|staging|production> [options]
 
 Required Options:
-  -e, --env <env>             Target environment: 'local', 'staging', or 'production' (REQUIRED)
+  -e, --env <env>             Target environment: 'development', 'staging', or 'production' (REQUIRED)
   --email <email>             Email address of the auth.users record to provision
        OR
   --user-id <uuid>            Valid UUID of the auth.users record to provision
@@ -49,10 +52,13 @@ Optional Options:
   -h, --help                  Show this help and provisioning procedures
 
 Examples:
-  # Local Development:
-  node scripts/provision-admin.mjs --env local --email staff@moodyorange.local --role counter_staff
-  node scripts/provision-admin.mjs --env local --email manager@moodyorange.local --role manager
-  node scripts/provision-admin.mjs --env local --email admin@moodyorange.local --role admin
+  # Hosted Development:
+  node scripts/provision-admin.mjs --env development --email staff@company.com --role counter_staff
+  node scripts/provision-admin.mjs --env development --email manager@company.com --role manager
+  node scripts/provision-admin.mjs --env development --email admin@company.com --role admin
+
+  # Hosted Staging:
+  node scripts/provision-admin.mjs --env staging --email manager@staging.moodyorange.com --role manager
 
   # Production Environment:
   node scripts/provision-admin.mjs --env production --email lead-admin@company.com --role admin --confirm-production
@@ -66,10 +72,17 @@ if (values.help) {
 
 // 1. Validate Target Environment
 const targetEnv = (values.env || '').toLowerCase();
-const VALID_ENVS = ['local', 'staging', 'production'];
+const VALID_ENVS = ['development', 'staging', 'production'];
+
+if (targetEnv === 'local') {
+  console.error(`❌ Error: '--env local' is no longer supported.`);
+  console.error(`   The Moody Orange development workflow operates strictly against hosted Supabase projects.`);
+  console.error(`   Please use '--env development' with DEV_SUPABASE_URL (or pass --url <https://...>) to provision a development account.`);
+  process.exit(1);
+}
 
 if (!targetEnv || !VALID_ENVS.includes(targetEnv)) {
-  console.error(`❌ Error: Explicit --env <local|staging|production> is required.`);
+  console.error(`❌ Error: Explicit --env <development|staging|production> is required.`);
   printUsage();
   process.exit(1);
 }
@@ -136,19 +149,29 @@ if (targetEnv === 'production') {
   }
 
   const lowerUrl = supabaseUrl.toLowerCase();
-  const invalidPatterns = ['localhost', '127.0.0.1', '10.0.2.2', '0.0.0.0', '.local', 'example', 'placeholder', 'dummy', 'mock'];
+  const invalidPatterns = ['localhost', '127.0.0.1', '10.0.2.2', '0.0.0.0', '.local', ':54321', 'example', 'placeholder', 'dummy', 'mock'];
   if (invalidPatterns.some((pattern) => lowerUrl.includes(pattern)) || /(?:192\.168\.|10\.|172\.(?:1[6-9]|2[0-9]|3[01])\.)/.test(lowerUrl)) {
     console.error(`❌ Safeguard Error: Cannot target local host, private network, or placeholder with --env production. Configured: ${supabaseUrl}`);
     process.exit(1);
   }
-} else if (targetEnv === 'local') {
-  supabaseUrl = values.url || process.env.SUPABASE_URL || 'http://localhost:54321';
-  serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+} else if (targetEnv === 'development') {
+  supabaseUrl = values.url || process.env.DEV_SUPABASE_URL || process.env.SUPABASE_URL || '';
+  serviceRoleKey = process.env.DEV_SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
-  // Prevent local dev from silently pointing to remote production
-  if (supabaseUrl.startsWith('https://') && !process.env.ALLOW_REMOTE_DEV) {
-    console.error(`❌ Safeguard Warning: --env local is configured with remote URL: ${supabaseUrl}`);
-    console.error(`   If you intended to provision remote staging/production, use --env staging or --env production.`);
+  if (!supabaseUrl) {
+    console.error(`❌ Error: Development provisioning requires DEV_SUPABASE_URL or SUPABASE_URL environment variable (or --url).`);
+    process.exit(1);
+  }
+
+  if (!supabaseUrl.startsWith('https://')) {
+    console.error(`❌ Error: Hosted development Supabase endpoint must use HTTPS. Received: ${supabaseUrl}`);
+    process.exit(1);
+  }
+
+  const lowerUrl = supabaseUrl.toLowerCase();
+  const invalidPatterns = ['localhost', '127.0.0.1', '10.0.2.2', '0.0.0.0', '.local', ':54321'];
+  if (invalidPatterns.some((pattern) => lowerUrl.includes(pattern)) || /(?:192\.168\.|10\.|172\.(?:1[6-9]|2[0-9]|3[01])\.)/.test(lowerUrl)) {
+    console.error(`❌ Error: Local Supabase endpoints (localhost, 10.0.2.2, port 54321) are prohibited. Development uses a hosted Supabase project. Configured: ${supabaseUrl}`);
     process.exit(1);
   }
 } else {
@@ -157,6 +180,16 @@ if (targetEnv === 'production') {
   serviceRoleKey = process.env.STAGING_SUPABASE_SERVICE_ROLE_KEY || '';
   if (!supabaseUrl) {
     console.error(`❌ Error: Staging provisioning requires STAGING_SUPABASE_URL or --url.`);
+    process.exit(1);
+  }
+  if (!supabaseUrl.startsWith('https://')) {
+    console.error(`❌ Error: Staging Supabase endpoint must use HTTPS. Received: ${supabaseUrl}`);
+    process.exit(1);
+  }
+  const lowerUrl = supabaseUrl.toLowerCase();
+  const invalidPatterns = ['localhost', '127.0.0.1', '10.0.2.2', '0.0.0.0', '.local', ':54321'];
+  if (invalidPatterns.some((pattern) => lowerUrl.includes(pattern))) {
+    console.error(`❌ Error: Local endpoints are prohibited for staging. Configured: ${supabaseUrl}`);
     process.exit(1);
   }
 }

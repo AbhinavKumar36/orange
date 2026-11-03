@@ -152,7 +152,7 @@ async function fetchFromSupabase<T>(config: AppConfig, path: string): Promise<T 
   }
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 2000);
+  const timeoutId = setTimeout(() => controller.abort(), 10000);
 
   try {
     const res = await fetch(url, { headers, signal: controller.signal });

@@ -37,6 +37,8 @@ captures/
 # Testing and Coverage
 coverage/
 .nyc_output/
+test-results/
+e2e-screenshots/
 
 # Logs
 *.log

@@ -19,9 +19,10 @@
 # - For Physical Device via USB: http://127.0.0.1:4000/api/v1/ (after running 'npm run adb:reverse' or 'adb reverse tcp:4000 tcp:4000')
 API_BASE_URL=http://10.0.2.2:4000/api/v1/
 
-# Supabase Public Keys (Client-safe anon key; NEVER expose service role key)
-SUPABASE_URL=http://10.0.2.2:54321
-SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.example_anon_key
+# Hosted Development Supabase Project (Strictly remote HTTPS; local port 54321 prohibited)
+# NEVER expose a Supabase service-role key in client configuration.
+DEV_SUPABASE_URL=https://<your-dev-project-ref>.supabase.co
+DEV_SUPABASE_ANON_KEY=<your-hosted-dev-public-anon-key>
 
 # Razorpay Public Merchant ID (Secret key is NEVER present in Android application)
 RAZORPAY_KEY_ID=rzp_test_exampleKeyId1234

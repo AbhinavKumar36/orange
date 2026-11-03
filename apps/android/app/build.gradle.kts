@@ -40,13 +40,17 @@ val debugApiBaseUrl: String = localProperties.getProperty("API_BASE_URL")
     ?: System.getenv("API_BASE_URL")
     ?: "http://$detectedHostIp:4000/api/v1/"
 
-val debugSupabaseUrl: String = localProperties.getProperty("SUPABASE_URL")
+val debugSupabaseUrl: String = localProperties.getProperty("DEV_SUPABASE_URL")
+    ?: localProperties.getProperty("SUPABASE_URL")
+    ?: System.getenv("DEV_SUPABASE_URL")
     ?: System.getenv("SUPABASE_URL")
-    ?: "http://$detectedHostIp:54321"
+    ?: ""
 
-val debugSupabaseAnonKey: String = localProperties.getProperty("SUPABASE_ANON_KEY")
+val debugSupabaseAnonKey: String = localProperties.getProperty("DEV_SUPABASE_ANON_KEY")
+    ?: localProperties.getProperty("SUPABASE_ANON_KEY")
+    ?: System.getenv("DEV_SUPABASE_ANON_KEY")
     ?: System.getenv("SUPABASE_ANON_KEY")
-    ?: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.example_anon_key"
+    ?: ""
 
 fun isServiceRoleKey(token: String?): Boolean {
     if (token.isNullOrBlank()) return false
@@ -72,8 +76,36 @@ fun isServiceRoleKey(token: String?): Boolean {
     return false
 }
 
+fun validateDevConfig(supabaseUrl: String, anonKey: String) {
+    val errors = mutableListOf<String>()
+    if (supabaseUrl.isBlank()) {
+        errors.add("Hosted development Supabase URL is required. Set DEV_SUPABASE_URL (or SUPABASE_URL) in local.properties or environment variable.")
+    } else {
+        if (!supabaseUrl.startsWith("https://")) {
+            errors.add("Hosted development Supabase URL must use HTTPS. Found: '$supabaseUrl'")
+        }
+        val lower = supabaseUrl.lowercase()
+        if (lower.contains("localhost") || lower.contains("127.0.0.1") || lower.contains("10.0.2.2") || lower.contains(":54321")) {
+            errors.add("Local Supabase endpoints (localhost, 10.0.2.2, port 54321) are prohibited. Development must use a hosted Supabase project URL (https://<project-ref>.supabase.co). Found: '$supabaseUrl'")
+        }
+    }
+    if (anonKey.isBlank()) {
+        errors.add("Hosted development Supabase anon key is required. Set DEV_SUPABASE_ANON_KEY (or SUPABASE_ANON_KEY) in local.properties or environment variable.")
+    } else {
+        if (anonKey.contains("example_anon_key") || anonKey.contains("dummy") || anonKey.contains("placeholder")) {
+            errors.add("Dummy or placeholder Supabase keys are prohibited. Configure a valid hosted development public anon key.")
+        }
+        if (isServiceRoleKey(anonKey)) {
+            errors.add("SECURITY VIOLATION: DEV_SUPABASE_ANON_KEY is a Supabase service_role key! Never use service-role keys in Android app.")
+        }
+    }
+    if (errors.isNotEmpty()) {
+        throw GradleException("Hosted development configuration validation failed:\n" + errors.joinToString("\n") { "  - $it" })
+    }
+}
+
 if (isServiceRoleKey(debugSupabaseAnonKey)) {
-    throw GradleException("SECURITY VIOLATION: SUPABASE_ANON_KEY is a Supabase service_role key! Never use service-role keys in Android app.")
+    throw GradleException("SECURITY VIOLATION: DEV_SUPABASE_ANON_KEY is a Supabase service_role key! Never use service-role keys in Android app.")
 }
 
 // Production release settings - MUST be explicitly configured and non-placeholder
@@ -137,13 +169,32 @@ fun validateProductionConfig(apiUrl: String?, supabaseUrl: String?, anonKey: Str
     }
 }
 
-// Standalone verification task
+// Standalone verification tasks
+tasks.register("validateDevConfig") {
+    group = "verification"
+    description = "Validates that hosted development Supabase URL and anon key are explicitly configured and not local or placeholder."
+    doLast {
+        validateDevConfig(debugSupabaseUrl, debugSupabaseAnonKey)
+        logger.lifecycle("Hosted development configuration validation passed.")
+    }
+}
+
 tasks.register("validateReleaseConfig") {
     group = "verification"
     description = "Validates that all production release URLs and keys are explicitly configured and not placeholders."
     doLast {
         validateProductionConfig(prodApiBaseUrl, prodSupabaseUrl, prodSupabaseAnonKey)
         logger.lifecycle("Production release configuration validation passed.")
+    }
+}
+
+// Enforce debug validation during debug compilation and packaging
+tasks.matching {
+    it.name.startsWith("generateDebugBuildConfig") ||
+    it.name.startsWith("assembleDebug")
+}.configureEach {
+    doFirst {
+        validateDevConfig(debugSupabaseUrl, debugSupabaseAnonKey)
     }
 }
 

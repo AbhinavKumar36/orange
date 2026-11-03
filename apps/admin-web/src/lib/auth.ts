@@ -8,10 +8,12 @@ const STORAGE_KEY = 'moody_orange_admin_session';
 
 function getValidatedAuthEnv(): { url: string; anonKey: string } {
   const isProd = process.env.NODE_ENV === 'production';
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || (isProd ? '' : 'http://localhost:54321');
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || (isProd ? '' : 'https://pdosvzdkuulstvzqfnkl.supabase.co');
   const anonKey =
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-    (isProd ? '' : 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.example_anon_key');
+    (isProd
+      ? ''
+      : 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkb3N2emRrdXVsc3R2enFmbmtsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM1MjgzODIsImV4cCI6MjEwOTEwNDM4Mn0.MPVNcaabsiMtH7S3WiKncr_yRQxKiIxxv9cXWsbDXXQ');
 
   return { url, anonKey };
 }
@@ -56,7 +58,6 @@ export function saveAdminSession(session: AdminStaffSession): void {
   if (typeof window === 'undefined') return;
   try {
     sessionStorage.setItem(STORAGE_KEY, JSON.stringify(session));
-    window.dispatchEvent(new Event('moody_orange_admin_auth_change'));
   } catch {
     // SessionStorage restricted
   }
@@ -158,12 +159,9 @@ export async function loginStaffWithCredentials(
       };
     }
   } catch (err: unknown) {
-    const isLocal = SUPABASE_URL.includes('localhost') || SUPABASE_URL.includes('127.0.0.1');
     return {
       success: false,
-      error: isLocal
-        ? `Cannot connect to Supabase Auth service at ${SUPABASE_URL}. Please ensure your local Supabase instance is running (e.g. 'supabase start').`
-        : (err instanceof Error ? err.message : 'Network error connecting to authentication service.'),
+      error: err instanceof Error ? err.message : 'Network error connecting to authentication service.',
     };
   }
 }
@@ -229,8 +227,6 @@ export function useAdminAuth() {
   const [error, setError] = useState<string | null>(null);
 
   const checkAuth = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
     const stored = getStoredAdminSession();
     if (!stored) {
       setSession(null);
@@ -238,18 +234,29 @@ export function useAdminAuth() {
       return;
     }
 
+    setIsLoading(true);
+    setError(null);
+
     // Verify token validity against /admin/me
     try {
       const me = await fetchAdminMe(stored.accessToken);
+      if (!getStoredAdminSession()) {
+        setSession(null);
+        return;
+      }
       const activeSession: AdminStaffSession = {
         ...stored,
         staff: me.staff,
       };
       setSession(activeSession);
     } catch (err: unknown) {
+      if (!getStoredAdminSession()) {
+        setSession(null);
+        return;
+      }
       // If expired, attempt token refresh
       const refreshed = await refreshStaffSession();
-      if (refreshed) {
+      if (refreshed && getStoredAdminSession()) {
         setSession(refreshed);
       } else {
         clearAdminSession();
@@ -283,6 +290,8 @@ export function useAdminAuth() {
     setError(null);
     const result = await loginStaffWithCredentials(email, pass);
     if (!result.success) {
+      clearAdminSession();
+      setSession(null);
       const err = result.error || 'Authentication failed';
       setError(err);
       setIsLoading(false);

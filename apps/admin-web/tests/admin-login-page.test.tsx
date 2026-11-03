@@ -79,9 +79,10 @@ describe('Admin Portal Login Page - Production Credential Hygiene', () => {
   });
 
   it('verifies generated production JavaScript assets contain zero demo credentials or quick-login code', () => {
+    const buildIdFile = join(__dirname, '../.next/BUILD_ID');
     const nextStaticDir = join(__dirname, '../.next/static');
-    if (!existsSync(nextStaticDir)) {
-      // Build directory not generated yet in current test runner session
+    if (!existsSync(buildIdFile) || !existsSync(nextStaticDir)) {
+      // Production build artifact (BUILD_ID) not generated yet in current test runner session
       return;
     }
 

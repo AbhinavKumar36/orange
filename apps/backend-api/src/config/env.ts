@@ -1,8 +1,10 @@
 import { z } from 'zod';
 import dotenv from 'dotenv';
+import path from 'path';
 
-// Load .env file if available
+// Load .env files if available
 dotenv.config();
+dotenv.config({ path: path.resolve(process.cwd(), 'apps/backend-api/.env') });
 
 const PLACEHOLDER_PATTERN = /(example|mock|placeholder|dummy|test_key|your_)/i;
 
@@ -109,6 +111,9 @@ export function validateConfig(rawEnv: Record<string, unknown> = process.env): A
 }
 
 export function loadConfig(): AppConfig {
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY && process.env.DEV_SUPABASE_SERVICE_ROLE_KEY) {
+    process.env.SUPABASE_SERVICE_ROLE_KEY = process.env.DEV_SUPABASE_SERVICE_ROLE_KEY;
+  }
   return validateConfig(process.env);
 }
 

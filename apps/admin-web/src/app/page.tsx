@@ -95,6 +95,11 @@ export default function AdminDashboardPage(): ReactElement {
   const [loginPassword, setLoginPassword] = useState('');
   const [loginErrorMessage, setLoginErrorMessage] = useState<string | null>(null);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [isHydrated, setIsHydrated] = useState(false);
+
+  useEffect(() => {
+    setIsHydrated(true);
+  }, []);
 
   const loadData = useCallback(async () => {
     if (!token) return;
@@ -148,6 +153,13 @@ export default function AdminDashboardPage(): ReactElement {
     }
   };
 
+  const handleLogout = () => {
+    setLoginEmail('');
+    setLoginPassword('');
+    setLoginErrorMessage(null);
+    logout();
+  };
+
   // Quick dev login is strictly confined to explicitly enabled development environments
   const isDevLoginEnabled =
     process.env.NODE_ENV === 'development' &&
@@ -198,7 +210,7 @@ export default function AdminDashboardPage(): ReactElement {
             </div>
           )}
 
-          <form onSubmit={handleStaffLogin}>
+          <form onSubmit={handleStaffLogin} data-hydrated={isHydrated ? 'true' : 'false'}>
             <div style={{ marginBottom: '1rem' }}>
               <label htmlFor="staff-email" style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '0.3rem' }}>
                 Staff Email
@@ -280,10 +292,10 @@ export default function AdminDashboardPage(): ReactElement {
                   className="btn-secondary"
                   disabled={isLoggingIn}
                   style={{ justifyContent: 'space-between', display: 'flex', fontSize: '0.8rem', color: '#c0392b' }}
-                  onClick={() => handleQuickSeedLogin('customer@moodyorange.local')}
+                  onClick={() => handleQuickSeedLogin('customer@moodyorange.com')}
                   title="Verify that customer account is denied access"
                 >
-                  <span>customer@moodyorange.local</span>
+                  <span>customer@moodyorange.com</span>
                   <span className="badge" style={{ background: '#fce4e4', color: '#c0392b' }}>customer (denied)</span>
                 </button>
               </div>
@@ -364,7 +376,7 @@ export default function AdminDashboardPage(): ReactElement {
             </span>
           </div>
 
-          <button type="button" onClick={logout} className="btn-secondary" style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem' }}>
+          <button type="button" onClick={handleLogout} className="btn-secondary" style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem' }}>
             Sign Out
           </button>
         </div>

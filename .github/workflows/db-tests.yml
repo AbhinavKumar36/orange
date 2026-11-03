@@ -1,4 +1,4 @@
-name: Database Tests & Invariants
+name: Hosted Database Tests & Invariants
 
 on:
   push:
@@ -6,34 +6,72 @@ on:
     paths:
       - 'supabase/**'
       - '.github/workflows/db-tests.yml'
+      - 'scripts/test-database-concurrency.mjs'
   pull_request:
     branches: [main, develop]
     paths:
       - 'supabase/**'
       - '.github/workflows/db-tests.yml'
+      - 'scripts/test-database-concurrency.mjs'
 
 jobs:
   db-tests:
-    name: Supabase Migrations & pgTAP Tests
+    name: Remote Hosted pgTAP & Concurrency Tests
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Adjust permissions
-        run: sudo chown -R $USER:$USER $GITHUB_WORKSPACE
-
-      - name: Setup Supabase CLI
-        uses: supabase/setup-cli@v3
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          version: latest
+          node-version: 22
+          cache: 'npm'
 
-      - name: Start Supabase
-        run: supabase start
+      - name: Install dependencies
+        run: npm ci
 
-      - name: Execute pgTAP Database Tests
-        run: supabase test db
+      - name: Validate Hosted Test Database Secret
+        run: |
+          if [ -z "${{ secrets.TEST_SUPABASE_DB_URL }}" ]; then
+            echo "::error::TEST_SUPABASE_DB_URL repository secret is missing."
+            echo "================================================================================"
+            echo "BLOCKED: Remote database tests require a dedicated hosted staging/test Supabase"
+            echo "database connection string configured in GitHub Actions secret TEST_SUPABASE_DB_URL."
+            echo ""
+            echo "Security and Operational Requirements:"
+            echo "  1. NEVER configure TEST_SUPABASE_DB_URL with production credentials."
+            echo "  2. Use a dedicated hosted Supabase development or staging database."
+            echo "  3. Local Supabase ('supabase start') and local PostgreSQL are prohibited."
+            echo "================================================================================"
+            exit 1
+          fi
 
-      - name: Stop Database
-        if: always()
-        run: supabase stop --no-backup
+      - name: Safeguard Against Production Target
+        env:
+          TEST_DB_URL: ${{ secrets.TEST_SUPABASE_DB_URL }}
+        run: |
+          LOWER_URL=$(echo "$TEST_DB_URL" | tr '[:upper:]' '[:lower:]')
+          if echo "$LOWER_URL" | grep -q -E '(prod|production|live)'; then
+            echo "::error::TEST_SUPABASE_DB_URL contains 'prod', 'production', or 'live'. Testing against production is strictly prohibited."
+            exit 1
+          fi
+
+      - name: Install PostgreSQL Client & pg_prove
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client libtap-parser-sourcehandler-pgtap-perl
+
+      - name: Execute Hosted pgTAP Tests
+        env:
+          TEST_DB_URL: ${{ secrets.TEST_SUPABASE_DB_URL }}
+        run: |
+          echo "Executing pgTAP database test suite against dedicated hosted test database..."
+          pg_prove --dbname "$TEST_DB_URL" supabase/tests/database/database.test.sql
+
+      - name: Execute Hosted Database Concurrency Tests
+        env:
+          TEST_SUPABASE_DB_URL: ${{ secrets.TEST_SUPABASE_DB_URL }}
+        run: |
+          echo "Executing genuine PostgreSQL multi-session concurrency test suite..."
+          node scripts/test-database-concurrency.mjs

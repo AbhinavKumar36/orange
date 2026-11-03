@@ -10,16 +10,20 @@
 ## Setup & Configuration
 1. **SDK Path**:
    Android Studio automatically populates `sdk.dir` in `local.properties` based on your machine's installation. Do not commit machine-specific SDK paths to Git.
-2. **Local Development Configuration**:
+2. **Development Configuration**:
    Copy `local.properties.example` to `local.properties`:
    ```bash
    cp local.properties.example local.properties
    ```
-   The Gradle build will automatically read `API_BASE_URL`, `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `RAZORPAY_KEY_ID` from `local.properties` (or from environment variables in CI).
+   The Gradle build reads `API_BASE_URL`, `DEV_SUPABASE_URL`, and `DEV_SUPABASE_ANON_KEY` from `local.properties` (or from environment variables in CI).
+   
+   > [!IMPORTANT]
+   > - Supabase is strictly hosted online (`https://<project-ref>.supabase.co`). Local Supabase (port 54321) is prohibited.
+   > - The public client `anon` key must be used. NEVER place a `service_role` key in Android configuration.
 
-3. **Development Target Device Networking**:
-   - **Android Emulator**: Uses `http://10.0.2.2:4000/api/v1/` and `http://10.0.2.2:54321`. This works out of the box with default debug candidate endpoints.
-   - **Physical Device via USB Reverse Tethering**: Run `npm run adb:reverse` (or `adb reverse tcp:4000 tcp:4000 && adb reverse tcp:54321 tcp:54321`). The debug client automatically tests `127.0.0.1` and connects to the development machine.
+3. **Backend API Networking (When Running API Server Locally)**:
+   - **Android Emulator**: Set `API_BASE_URL=http://10.0.2.2:4000/api/v1/`.
+   - **Physical Device via USB Reverse Tethering**: Run `npm run adb:reverse` (`adb reverse tcp:4000 tcp:4000`). The debug client automatically connects to `http://127.0.0.1:4000/api/v1/`.
    - **Physical Device over Local Wi-Fi**: Set `DEV_LAN_IP=<YOUR_PC_LAN_IP>` or `API_BASE_URL=http://<YOUR_PC_LAN_IP>:4000/api/v1/` in `local.properties`.
 
 ## Production Release Configuration Procedure (Fail-Closed)

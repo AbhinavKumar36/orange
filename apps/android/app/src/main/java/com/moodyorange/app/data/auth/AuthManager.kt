@@ -50,6 +50,35 @@ class AuthManager(
             } catch (_: Exception) {}
             return false
         }
+
+        fun validateSupabaseUrl(url: String): String {
+            val trimmed = url.trimEnd('/')
+            check(trimmed.isNotBlank()) {
+                "Hosted Supabase URL is required. Ensure DEV_SUPABASE_URL (debug) or PROD_SUPABASE_URL (release) is configured."
+            }
+            check(trimmed.startsWith("https://")) {
+                "Hosted Supabase URL must use HTTPS. Found: '$trimmed'"
+            }
+            val lower = trimmed.lowercase()
+            check(!lower.contains("localhost") && !lower.contains("127.0.0.1") && !lower.contains("10.0.2.2")
+                && !lower.contains("0.0.0.0") && !lower.contains(".local") && !lower.contains(":54321")
+                && !lower.matches(Regex(""".*//(?:192\.168\.|10\.|172\.(?:1[6-9]|2[0-9]|3[01])\.).*"""))) {
+                "Supabase must connect to a remote hosted Supabase project. Local development hosts and port 54321 are prohibited. Found: '$trimmed'"
+            }
+            return trimmed
+        }
+
+        fun validateAnonKey(anonKey: String) {
+            check(anonKey.isNotBlank()) {
+                "Supabase anon key is required. Ensure DEV_SUPABASE_ANON_KEY (debug) or PROD_SUPABASE_ANON_KEY (release) is configured."
+            }
+            check(!isServiceRoleKey(anonKey)) {
+                "Security violation: Supabase service_role key must never be used in Android client application."
+            }
+            check(!anonKey.contains("example_anon_key") && !anonKey.contains("dummy") && !anonKey.contains("placeholder")) {
+                "Supabase anon key cannot be a placeholder or dummy key."
+            }
+        }
     }
 
     private val secureStore = SecureSessionStore(context)
@@ -63,33 +92,13 @@ class AuthManager(
     val debugCandidateHosts: List<String>
 
     init {
-        check(!isServiceRoleKey(anonKey)) {
-            "Security violation: Supabase service_role key must never be used in Android client application."
-        }
-        val trimmed = supabaseBaseUrl.trimEnd('/')
-        if (!isDebug) {
-            check(trimmed.isNotBlank()) {
-                "Production release builds require a configured SUPABASE_URL."
-            }
-            check(trimmed.startsWith("https://")) {
-                "Production release builds require HTTPS SUPABASE_URL. Found: $trimmed"
-            }
-            val lower = trimmed.lowercase()
-            check(!lower.contains("localhost") && !lower.contains("127.0.0.1") && !lower.contains("10.0.2.2")
-                && !lower.contains("0.0.0.0") && !lower.contains(".local")
-                && !lower.matches(Regex(""".*//(?:192\.168\.|10\.|172\.(?:1[6-9]|2[0-9]|3[01])\.).*"""))) {
-                "Production release builds cannot point to local development hosts. Found: $trimmed"
-            }
-        }
-        activeSupabaseUrl = trimmed
+        validateAnonKey(anonKey)
+        activeSupabaseUrl = validateSupabaseUrl(supabaseBaseUrl)
 
-        debugCandidateHosts = if (isDebug) {
-            (candidateHosts ?: listOf(
-                activeSupabaseUrl,
-                "http://10.0.2.2:54321",
-                "http://127.0.0.1:54321",
-                "http://localhost:54321"
-            )).map { it.trimEnd('/') }.distinct()
+        debugCandidateHosts = if (isDebug && candidateHosts != null) {
+            candidateHosts.map { it.trimEnd('/') }
+                .filter { it.startsWith("https://") && !it.contains(":54321") && !it.contains("localhost") && !it.contains("10.0.2.2") }
+                .distinct()
         } else {
             emptyList()
         }
@@ -98,7 +107,7 @@ class AuthManager(
     }
 
     fun getCandidateEndpoints(): List<String> {
-        return if (isDebug) {
+        return if (debugCandidateHosts.isNotEmpty()) {
             listOf(activeSupabaseUrl).plus(debugCandidateHosts).distinct()
         } else {
             listOf(activeSupabaseUrl)

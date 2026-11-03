@@ -24,11 +24,11 @@ const allFiles = [...tracked, ...untracked]
 
 console.log(`Packaging ${allFiles.length} clean project files into orange.zip...`);
 
-const listFilePath = path.resolve('.temp_zip_list.txt');
+const listFilePath = path.join(os.tmpdir(), 'moody_orange_zip_list.txt');
 fs.writeFileSync(listFilePath, allFiles.join('\n'), 'utf8');
 
 const targetZip = path.resolve('orange.zip');
-const tempZip = path.resolve('.orange_temp.zip');
+const tempZip = path.join(os.tmpdir(), '.orange_temp.zip');
 
 try {
   if (fs.existsSync(tempZip)) {
