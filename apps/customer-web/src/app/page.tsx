@@ -74,7 +74,9 @@ export default function HomePage(): ReactElement {
 
     // Vegetarian toggle
     if (isVegOnly) {
-      result = result.filter((p) => p.isVeg);
+      result = result.filter(
+        (p) => p.foodClassification === 'vegetarian' || (!p.foodClassification && p.isVeg)
+      );
     }
 
     // In-Stock toggle

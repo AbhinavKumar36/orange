@@ -4,6 +4,7 @@ import { useState, type ReactElement } from 'react';
 import Link from 'next/link';
 import { type Product, formatPaiseToRupees } from '@orange/api-contracts';
 import { ProductIllustration } from './ProductIllustration';
+import { FoodIndicator } from './FoodIndicator';
 import { addToCart } from '../lib/cart';
 
 interface ProductCardProps {
@@ -40,11 +41,16 @@ export function ProductCard({
       {/* Media Wrapper */}
       <div className="card-media-wrapper">
         <div className="card-badge-top-left">
-          {product.isVeg && (
-            <div className="badge-veg" title="100% Vegetarian / Eggless" aria-label="Vegetarian">
-              <span className="badge-veg-dot" />
-            </div>
-          )}
+          <FoodIndicator
+            classification={
+              product.foodClassification !== undefined
+                ? product.foodClassification
+                : product.isVeg
+                ? 'vegetarian'
+                : 'non_vegetarian'
+            }
+            size={18}
+          />
         </div>
 
         <div className="card-badge-top-right">

@@ -392,6 +392,12 @@ export const adminRoutes: FastifyPluginAsync<AdminRoutesOptions> = async (app, o
           basePrice: typeof row.base_price === 'string' ? parseInt(row.base_price, 10) : row.base_price,
           taxRatePct: typeof row.tax_rate_pct === 'string' ? parseFloat(row.tax_rate_pct) : row.tax_rate_pct,
           isVeg: row.is_veg,
+          foodClassification:
+            (row as any).food_classification === 'vegetarian' || (row as any).food_classification === 'non_vegetarian'
+              ? (row as any).food_classification
+              : row.is_veg
+              ? 'vegetarian'
+              : 'non_vegetarian',
           allergens: Array.isArray(row.allergens) ? row.allergens : [],
           prepTimeMinutes: row.prep_time_minutes,
           imageUrl: row.image_url,
@@ -454,6 +460,7 @@ export const adminRoutes: FastifyPluginAsync<AdminRoutesOptions> = async (app, o
         }
 
         const newId = randomUUID();
+        const isVeg = data.foodClassification ? data.foodClassification === 'vegetarian' : data.isVeg;
         const newProduct: MockProductEntry = {
           id: newId,
           categoryId: category.id,
@@ -464,7 +471,8 @@ export const adminRoutes: FastifyPluginAsync<AdminRoutesOptions> = async (app, o
           description: data.description ?? null,
           basePrice: data.basePrice,
           taxRatePct: data.taxRatePct,
-          isVeg: data.isVeg,
+          isVeg,
+          foodClassification: data.foodClassification ?? (isVeg ? 'vegetarian' : 'non_vegetarian'),
           allergens: data.allergens,
           prepTimeMinutes: data.prepTimeMinutes,
           imageUrl: data.imageUrl ?? null,
@@ -496,22 +504,25 @@ export const adminRoutes: FastifyPluginAsync<AdminRoutesOptions> = async (app, o
         });
       }
 
+      const isVeg = data.foodClassification ? data.foodClassification === 'vegetarian' : data.isVeg;
+      const insertPayload: Record<string, unknown> = {
+        category_id: data.categoryId,
+        name: data.name,
+        slug: data.slug,
+        description: data.description,
+        base_price: data.basePrice,
+        tax_rate_pct: data.taxRatePct,
+        is_veg: isVeg,
+        allergens: data.allergens,
+        prep_time_minutes: data.prepTimeMinutes,
+        image_url: data.imageUrl,
+        is_active: data.isActive,
+      };
+
       const insertRes = await supabaseRest<Array<{ id: string }>>('products', {
         method: 'POST',
         headers: { Prefer: 'return=representation' },
-        body: JSON.stringify({
-          category_id: data.categoryId,
-          name: data.name,
-          slug: data.slug,
-          description: data.description,
-          base_price: data.basePrice,
-          tax_rate_pct: data.taxRatePct,
-          is_veg: data.isVeg,
-          allergens: data.allergens,
-          prep_time_minutes: data.prepTimeMinutes,
-          image_url: data.imageUrl,
-          is_active: data.isActive,
-        }),
+        body: JSON.stringify(insertPayload),
       });
 
       if (!insertRes || insertRes.length === 0) {
@@ -542,7 +553,8 @@ export const adminRoutes: FastifyPluginAsync<AdminRoutesOptions> = async (app, o
         description: data.description,
         basePrice: data.basePrice,
         taxRatePct: data.taxRatePct,
-        isVeg: data.isVeg,
+        isVeg,
+        foodClassification: data.foodClassification ?? (isVeg ? 'vegetarian' : 'non_vegetarian'),
         allergens: data.allergens,
         prepTimeMinutes: data.prepTimeMinutes,
         imageUrl: data.imageUrl,
@@ -607,7 +619,15 @@ export const adminRoutes: FastifyPluginAsync<AdminRoutesOptions> = async (app, o
         if (typeof data.description !== 'undefined') prod.description = data.description;
         if (typeof data.basePrice !== 'undefined') prod.basePrice = data.basePrice;
         if (typeof data.taxRatePct !== 'undefined') prod.taxRatePct = data.taxRatePct;
-        if (typeof data.isVeg !== 'undefined') prod.isVeg = data.isVeg;
+        if (typeof data.foodClassification !== 'undefined') {
+          prod.foodClassification = data.foodClassification;
+          if (data.foodClassification) {
+            prod.isVeg = data.foodClassification === 'vegetarian';
+          }
+        } else if (typeof data.isVeg !== 'undefined') {
+          prod.isVeg = data.isVeg;
+          prod.foodClassification = data.isVeg ? 'vegetarian' : 'non_vegetarian';
+        }
         if (typeof data.allergens !== 'undefined') prod.allergens = data.allergens;
         if (typeof data.prepTimeMinutes !== 'undefined') prod.prepTimeMinutes = data.prepTimeMinutes;
         if (typeof data.imageUrl !== 'undefined') prod.imageUrl = data.imageUrl;
@@ -631,7 +651,13 @@ export const adminRoutes: FastifyPluginAsync<AdminRoutesOptions> = async (app, o
       if (typeof data.description !== 'undefined') updatePayload.description = data.description;
       if (typeof data.basePrice !== 'undefined') updatePayload.base_price = data.basePrice;
       if (typeof data.taxRatePct !== 'undefined') updatePayload.tax_rate_pct = data.taxRatePct;
-      if (typeof data.isVeg !== 'undefined') updatePayload.is_veg = data.isVeg;
+      if (typeof data.foodClassification !== 'undefined') {
+        if (data.foodClassification) {
+          updatePayload.is_veg = data.foodClassification === 'vegetarian';
+        }
+      } else if (typeof data.isVeg !== 'undefined') {
+        updatePayload.is_veg = data.isVeg;
+      }
       if (typeof data.allergens !== 'undefined') updatePayload.allergens = data.allergens;
       if (typeof data.prepTimeMinutes !== 'undefined') updatePayload.prep_time_minutes = data.prepTimeMinutes;
       if (typeof data.imageUrl !== 'undefined') updatePayload.image_url = data.imageUrl;
@@ -688,6 +714,173 @@ export const adminRoutes: FastifyPluginAsync<AdminRoutesOptions> = async (app, o
         body: JSON.stringify({ is_active: isActive }),
       });
       return reply.send({ success: true, id, isActive });
+    }
+  );
+
+  app.delete(
+    '/api/v1/admin/products/:id',
+    { preHandler: [createStaffAuthPreHandler(config, ['manager', 'admin'])] },
+    async (request, reply) => {
+      const { id } = request.params as { id: string };
+
+      if (config.NODE_ENV !== 'production' && (config.ALLOW_MOCK_SERVICES || config.NODE_ENV === 'test')) {
+        const prodIndex = mockProductsList.findIndex((p) => p.id === id);
+        if (prodIndex === -1) {
+          return reply.status(404).send({
+            error: { statusCode: 404, code: 'NOT_FOUND', message: 'Product not found.' },
+          });
+        }
+
+        let hasOrderDependency = false;
+        for (const order of mockOrdersStore.values()) {
+          if (order.items?.some((item) => item.productId === id)) {
+            hasOrderDependency = true;
+            break;
+          }
+        }
+
+        if (hasOrderDependency) {
+          mockProductsList[prodIndex].isActive = false;
+          return reply.send({ success: true, id, archived: true });
+        } else {
+          mockProductsList.splice(prodIndex, 1);
+          mockStockStore.delete(id);
+          return reply.send({ success: true, id, archived: false });
+        }
+      }
+
+      // Live Supabase
+      const orderItems = await supabaseRest<Array<{ id: string }>>(`order_items?product_id=eq.${encodeURIComponent(id)}&limit=1&select=id`);
+      if (orderItems && orderItems.length > 0) {
+        await supabaseRest(`products?id=eq.${encodeURIComponent(id)}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ is_active: false }),
+        });
+        return reply.send({ success: true, id, archived: true });
+      }
+
+      try {
+        await supabaseRest(`inventory?product_id=eq.${encodeURIComponent(id)}`, { method: 'DELETE' });
+        const delRes = await supabaseRest<Array<{ id: string }>>(`products?id=eq.${encodeURIComponent(id)}`, {
+          method: 'DELETE',
+          headers: { Prefer: 'return=representation' },
+        });
+        if (!delRes || delRes.length === 0) {
+          await supabaseRest(`products?id=eq.${encodeURIComponent(id)}`, {
+            method: 'PATCH',
+            body: JSON.stringify({ is_active: false }),
+          });
+          return reply.send({ success: true, id, archived: true });
+        }
+        return reply.send({ success: true, id, archived: false });
+      } catch {
+        await supabaseRest(`products?id=eq.${encodeURIComponent(id)}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ is_active: false }),
+        });
+        return reply.send({ success: true, id, archived: true });
+      }
+    }
+  );
+
+  app.post(
+    '/api/v1/admin/upload-image',
+    { preHandler: [createStaffAuthPreHandler(config, ['manager', 'admin'])] },
+    async (request, reply) => {
+      const body = request.body as {
+        base64?: string;
+        fileName?: string;
+        contentType?: string;
+      } | null;
+
+      if (!body || !body.base64) {
+        return reply.status(400).send({
+          error: {
+            statusCode: 400,
+            code: 'VALIDATION_ERROR',
+            message: 'Image base64 content is required.',
+          },
+        });
+      }
+
+      const rawBase64 = body.base64.replace(/^data:[^;]+;base64,/, '');
+      const buffer = Buffer.from(rawBase64, 'base64');
+
+      const MAX_SIZE = 5 * 1024 * 1024;
+      if (buffer.length > MAX_SIZE) {
+        return reply.status(400).send({
+          error: {
+            statusCode: 400,
+            code: 'FILE_TOO_LARGE',
+            message: 'Image size exceeds maximum allowed limit of 5MB.',
+          },
+        });
+      }
+
+      const contentType = body.contentType || 'image/jpeg';
+      const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/svg+xml', 'image/gif'];
+      if (!allowedTypes.includes(contentType.toLowerCase())) {
+        return reply.status(400).send({
+          error: {
+            statusCode: 400,
+            code: 'INVALID_FILE_TYPE',
+            message: `Unsupported file type: ${contentType}. Allowed types: ${allowedTypes.join(', ')}`,
+          },
+        });
+      }
+
+      const origName = (body.fileName || 'upload.jpg').replace(/[^a-zA-Z0-9._-]/g, '_');
+      const uniqueFileName = `${Date.now()}-${randomUUID().slice(0, 8)}-${origName}`;
+
+      if (config.NODE_ENV !== 'production' && (config.ALLOW_MOCK_SERVICES || config.NODE_ENV === 'test')) {
+        const mockUrl = `https://pdosvzdkuulstvzqfnkl.supabase.co/storage/v1/object/public/product-images/${uniqueFileName}`;
+        return reply.status(200).send({
+          url: mockUrl,
+          fileName: uniqueFileName,
+        });
+      }
+
+      const baseUrl = config.SUPABASE_URL.replace(/\/+$/, '');
+      const apiKey = config.SUPABASE_SERVICE_ROLE_KEY || config.SUPABASE_ANON_KEY || '';
+      const uploadUrl = `${baseUrl}/storage/v1/object/product-images/${uniqueFileName}`;
+
+      try {
+        const uploadRes = await fetch(uploadUrl, {
+          method: 'POST',
+          headers: {
+            apikey: apiKey,
+            Authorization: `Bearer ${apiKey}`,
+            'Content-Type': contentType,
+            'x-upsert': 'true',
+          },
+          body: buffer,
+        });
+
+        if (!uploadRes.ok) {
+          const errText = await uploadRes.text().catch(() => '');
+          return reply.status(502).send({
+            error: {
+              statusCode: 502,
+              code: 'STORAGE_UPLOAD_FAILED',
+              message: `Supabase Storage upload failed: ${uploadRes.statusText} - ${errText}`,
+            },
+          });
+        }
+
+        const publicUrl = `${baseUrl}/storage/v1/object/public/product-images/${uniqueFileName}`;
+        return reply.status(200).send({
+          url: publicUrl,
+          fileName: uniqueFileName,
+        });
+      } catch (err: any) {
+        return reply.status(500).send({
+          error: {
+            statusCode: 500,
+            code: 'STORAGE_ERROR',
+            message: err?.message || 'Failed to upload image to storage service.',
+          },
+        });
+      }
     }
   );
 

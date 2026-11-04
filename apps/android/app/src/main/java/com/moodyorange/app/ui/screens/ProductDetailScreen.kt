@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -35,31 +36,21 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.moodyorange.app.data.model.Product
 import com.moodyorange.app.ui.components.ErrorStateView
+import com.moodyorange.app.ui.components.FoodClassificationIndicator
 import com.moodyorange.app.ui.components.LoadingStateView
 import com.moodyorange.app.ui.components.ProductCard
 import com.moodyorange.app.ui.components.ProductImage
 import com.moodyorange.app.ui.components.`3d`.Product3DViewer
-import com.moodyorange.app.ui.theme.BorderMuted
-import com.moodyorange.app.ui.theme.CardBackground
-import com.moodyorange.app.ui.theme.CreamBackground
-import com.moodyorange.app.ui.theme.DarkBackground
 import com.moodyorange.app.ui.theme.EditorialSerif
-import com.moodyorange.app.ui.theme.InStockBg
-import com.moodyorange.app.ui.theme.InStockGreen
-import com.moodyorange.app.ui.theme.OrangeLight
-import com.moodyorange.app.ui.theme.OrangePrimary
-import com.moodyorange.app.ui.theme.OutOfStockBg
-import com.moodyorange.app.ui.theme.OutOfStockRed
-import com.moodyorange.app.ui.theme.TextMuted
-import com.moodyorange.app.ui.theme.TextPrimary
-import com.moodyorange.app.ui.theme.TextSecondary
-import com.moodyorange.app.ui.theme.VegGreen
+import com.moodyorange.app.ui.theme.ForestGreen
+import com.moodyorange.app.ui.theme.MangalaTheme
+import com.moodyorange.app.ui.theme.MutedGold
+import com.moodyorange.app.ui.theme.WhiteSurface
 import com.moodyorange.app.ui.viewmodel.CatalogViewModel
 import com.moodyorange.app.ui.viewmodel.ProductDetailUiState
 import com.moodyorange.app.ui.viewmodel.UiState
@@ -76,6 +67,7 @@ fun ProductDetailScreen(
     onProductClick: (Product) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    val colors = MangalaTheme.colors
     val detailState by viewModel.productDetailState.collectAsState()
     val allProductsState by viewModel.productsState.collectAsState()
 
@@ -88,18 +80,18 @@ fun ProductDetailScreen(
             Column(
                 modifier = modifier
                     .fillMaxSize()
-                    .background(CreamBackground)
+                    .background(colors.canvas)
             ) {
                 DetailTopBar(
                     title = "Loading...",
-                    subtitle = "Boutique Catalog",
+                    subtitle = "Mangala Enterprises",
                     onBackClick = onBackClick
                 )
                 Box(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center
                 ) {
-                    LoadingStateView(message = "Fetching confection details...")
+                    LoadingStateView(message = "Preparing fine confection details...")
                 }
             }
         }
@@ -107,98 +99,51 @@ fun ProductDetailScreen(
             Column(
                 modifier = modifier
                     .fillMaxSize()
-                    .background(CreamBackground)
+                    .background(colors.canvas)
             ) {
                 DetailTopBar(
-                    title = "Not Found",
+                    title = "Confection Not Found",
                     subtitle = "Boutique Catalog",
                     onBackClick = onBackClick
                 )
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(24.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(56.dp)
-                            .clip(CircleShape)
-                            .background(OrangeLight),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(text = "🍰", fontSize = 26.sp)
-                    }
-
-                    Spacer(modifier = Modifier.height(14.dp))
-
-                    Text(
-                        text = "Confection Not Found",
-                        fontFamily = EditorialSerif,
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = TextPrimary
-                    )
-
-                    Spacer(modifier = Modifier.height(6.dp))
-
-                    Text(
-                        text = "The requested product is no longer available in the boutique catalog.",
-                        fontSize = 13.sp,
-                        color = TextMuted,
-                        textAlign = TextAlign.Center
-                    )
-
-                    Spacer(modifier = Modifier.height(20.dp))
-
-                    Button(
-                        onClick = onBackClick,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = OrangePrimary,
-                            contentColor = Color.White
-                        ),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Text(text = "Back to Catalog", fontWeight = FontWeight.Bold)
-                    }
-                }
+                ErrorStateView(
+                    message = "The requested delicacy could not be found or has been retired from today's batch.",
+                    onRetry = onBackClick,
+                    modifier = Modifier.fillMaxSize()
+                )
             }
         }
         is ProductDetailUiState.Error -> {
             Column(
                 modifier = modifier
                     .fillMaxSize()
-                    .background(CreamBackground)
+                    .background(colors.canvas)
             ) {
                 DetailTopBar(
-                    title = "Error",
+                    title = "Unable to Load",
                     subtitle = "Boutique Catalog",
                     onBackClick = onBackClick
                 )
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(16.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    ErrorStateView(
-                        message = state.message,
-                        onRetry = { viewModel.loadProductDetail(productIdOrSlug, force = true) }
-                    )
-                }
+                ErrorStateView(
+                    message = state.message,
+                    onRetry = { viewModel.loadProductDetail(productIdOrSlug) },
+                    modifier = Modifier.fillMaxSize()
+                )
             }
         }
         is ProductDetailUiState.Success -> {
+            val product = state.product
             val relatedProducts = if (allProductsState is UiState.Success) {
-                (allProductsState as UiState.Success<List<Product>>).data.filter { it.id != state.product.id }.take(4)
+                (allProductsState as UiState.Success<List<Product>>).data
+                    .filter { it.id != product.id && it.categoryId == product.categoryId }
+                    .take(4)
             } else emptyList()
 
             ProductDetailContent(
-                product = state.product,
+                product = product,
                 relatedProducts = relatedProducts,
                 onBackClick = onBackClick,
-                onAddToCart = { prod, qty -> onAddToCart(prod, qty) },
+                onAddToCart = onAddToCart,
                 onRelatedProductClick = onProductClick,
                 modifier = modifier
             )
@@ -212,45 +157,44 @@ private fun DetailTopBar(
     subtitle: String,
     onBackClick: () -> Unit
 ) {
+    val colors = MangalaTheme.colors
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(CardBackground)
-            .border(width = 0.5.dp, color = BorderMuted)
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+            .background(colors.surface)
+            .statusBarsPadding()
+            .border(0.5.dp, colors.border)
+            .padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(
             modifier = Modifier
-                .size(38.dp)
+                .size(36.dp)
                 .clip(CircleShape)
-                .background(OrangeLight)
+                .border(0.5.dp, colors.border, CircleShape)
+                .background(colors.surfaceElevated)
                 .clickable(onClick = onBackClick),
             contentAlignment = Alignment.Center
         ) {
-            Text(
-                text = "←",
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold,
-                color = OrangePrimary
-            )
+            Text(text = "←", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = colors.textPrimary)
         }
 
-        Spacer(modifier = Modifier.width(14.dp))
+        Spacer(modifier = Modifier.width(12.dp))
 
         Column {
             Text(
                 text = title,
                 fontFamily = EditorialSerif,
-                fontSize = 16.sp,
+                fontSize = 15.sp,
                 fontWeight = FontWeight.Bold,
-                color = TextPrimary,
+                color = colors.textPrimary,
                 maxLines = 1
             )
             Text(
                 text = subtitle,
-                fontSize = 11.sp,
-                color = TextSecondary
+                fontSize = 10.5.sp,
+                color = colors.textSecondary
             )
         }
     }
@@ -265,6 +209,8 @@ private fun ProductDetailContent(
     onRelatedProductClick: (Product) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val colors = MangalaTheme.colors
+    val isDark = colors.isDark
     val scrollState = rememberScrollState()
     var galleryMode by remember { mutableStateOf(GalleryMode.STUDIO_2D) }
     var quantity by remember { mutableIntStateOf(1) }
@@ -273,46 +219,44 @@ private fun ProductDetailContent(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(CreamBackground)
+            .background(colors.canvas)
     ) {
-        // 1. Top Bar
         DetailTopBar(
             title = product.name,
             subtitle = product.categoryName,
             onBackClick = onBackClick
         )
 
-        // 2. Scrollable Body
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(scrollState)
-                .padding(20.dp)
+                .padding(16.dp)
         ) {
-            // Gallery Mode Tabs: Studio 2D vs 3D Orbit Viewer
+            // Gallery Mode Tabs
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(CardBackground)
-                    .border(1.dp, BorderMuted, RoundedCornerShape(12.dp))
-                    .padding(4.dp),
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(colors.surface)
+                    .border(0.5.dp, colors.border, RoundedCornerShape(10.dp))
+                    .padding(3.dp),
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 Box(
                     modifier = Modifier
                         .weight(1f)
                         .clip(RoundedCornerShape(8.dp))
-                        .background(if (galleryMode == GalleryMode.STUDIO_2D) OrangePrimary else Color.Transparent)
+                        .background(if (galleryMode == GalleryMode.STUDIO_2D) (if (isDark) MutedGold else ForestGreen) else Color.Transparent)
                         .clickable { galleryMode = GalleryMode.STUDIO_2D }
-                        .padding(vertical = 8.dp),
+                        .padding(vertical = 7.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
                         text = "📷 Studio View",
-                        fontSize = 12.sp,
+                        fontSize = 11.5.sp,
                         fontWeight = FontWeight.Bold,
-                        color = if (galleryMode == GalleryMode.STUDIO_2D) Color.White else TextSecondary
+                        color = if (galleryMode == GalleryMode.STUDIO_2D) (if (isDark) colors.canvas else WhiteSurface) else colors.textSecondary
                     )
                 }
 
@@ -320,30 +264,31 @@ private fun ProductDetailContent(
                     modifier = Modifier
                         .weight(1f)
                         .clip(RoundedCornerShape(8.dp))
-                        .background(if (galleryMode == GalleryMode.THREE_D) OrangePrimary else Color.Transparent)
+                        .background(if (galleryMode == GalleryMode.THREE_D) (if (isDark) MutedGold else ForestGreen) else Color.Transparent)
                         .clickable { galleryMode = GalleryMode.THREE_D }
-                        .padding(vertical = 8.dp),
+                        .padding(vertical = 7.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = "🍊 3D Orbit Viewer",
-                        fontSize = 12.sp,
+                        text = "✨ 3D Orbit Viewer",
+                        fontSize = 11.5.sp,
                         fontWeight = FontWeight.Bold,
-                        color = if (galleryMode == GalleryMode.THREE_D) Color.White else TextSecondary
+                        color = if (galleryMode == GalleryMode.THREE_D) (if (isDark) colors.canvas else WhiteSurface) else colors.textSecondary
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(14.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
             // Main Visual Area
             if (galleryMode == GalleryMode.STUDIO_2D) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(240.dp)
-                        .clip(RoundedCornerShape(20.dp))
-                        .border(1.dp, BorderMuted, RoundedCornerShape(20.dp))
+                        .height(230.dp)
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(colors.surface)
+                        .border(0.5.dp, colors.border, RoundedCornerShape(14.dp))
                         .clickable { showZoomModal = true }
                 ) {
                     ProductImage(
@@ -353,14 +298,13 @@ private fun ProductDetailContent(
                         modifier = Modifier.fillMaxSize()
                     )
 
-                    // Zoom icon badge
                     Box(
                         modifier = Modifier
                             .align(Alignment.BottomEnd)
-                            .padding(12.dp)
-                            .clip(RoundedCornerShape(8.dp))
+                            .padding(10.dp)
+                            .clip(RoundedCornerShape(6.dp))
                             .background(Color(0x88000000))
-                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                            .padding(horizontal = 8.dp, vertical = 3.5.dp)
                     ) {
                         Text(text = "🔍 Tap to Zoom", fontSize = 10.sp, color = Color.White)
                     }
@@ -370,173 +314,153 @@ private fun ProductDetailContent(
                     categorySlug = product.categorySlug,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(260.dp)
+                        .height(240.dp)
                 )
             }
 
-            Spacer(modifier = Modifier.height(18.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
-            // Badges row: Veg, Category, Availability
+            // Badges row: Dietary classification, category, availability
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    if (product.isVeg) {
-                        Box(
-                            modifier = Modifier
-                                .size(18.dp)
-                                .clip(RoundedCornerShape(3.dp))
-                                .border(1.5.dp, VegGreen, RoundedCornerShape(3.dp))
-                                .background(CardBackground),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(7.dp)
-                                    .clip(CircleShape)
-                                    .background(VegGreen)
-                            )
-                        }
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = "Vegetarian",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = VegGreen
-                        )
-                        Spacer(modifier = Modifier.width(10.dp))
-                    }
+                    FoodClassificationIndicator(
+                        isVeg = product.isVeg,
+                        showLabel = true,
+                        size = 18.dp
+                    )
+
+                    Spacer(modifier = Modifier.width(8.dp))
 
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(6.dp))
-                            .background(OrangeLight)
-                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                            .background(colors.primaryContainer)
+                            .padding(horizontal = 8.dp, vertical = 3.dp)
                     ) {
                         Text(
                             text = product.categoryName,
-                            fontSize = 11.sp,
+                            fontSize = 10.5.sp,
                             fontWeight = FontWeight.Bold,
-                            color = OrangePrimary
+                            color = colors.primary
                         )
                     }
                 }
 
-                // In Stock vs Out of Stock
                 if (product.isInStock) {
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(6.dp))
-                            .background(InStockBg)
-                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                            .background(colors.inStockBg)
+                            .padding(horizontal = 8.dp, vertical = 3.dp)
                     ) {
                         Text(
                             text = "In Stock",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = InStockGreen
+                            fontSize = 10.5.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = colors.inStockGreen
                         )
                     }
                 } else {
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(6.dp))
-                            .background(OutOfStockBg)
-                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                            .background(colors.outOfStockBg)
+                            .padding(horizontal = 8.dp, vertical = 3.dp)
                     ) {
                         Text(
                             text = "Unavailable",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = OutOfStockRed
+                            fontSize = 10.5.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = colors.outOfStockRed
                         )
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(14.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
             // Product Title
             Text(
                 text = product.name,
                 fontFamily = EditorialSerif,
-                fontSize = 24.sp,
+                fontSize = 22.sp,
                 fontWeight = FontWeight.Bold,
-                color = TextPrimary
+                color = colors.textPrimary
             )
 
-            Spacer(modifier = Modifier.height(6.dp))
+            Spacer(modifier = Modifier.height(4.dp))
 
-            // Authoritative Formatted Price in INR
+            // Price in INR
             Text(
                 text = product.formattedPrice,
-                fontSize = 24.sp,
+                fontFamily = EditorialSerif,
+                fontSize = 22.sp,
                 fontWeight = FontWeight.Bold,
-                color = OrangePrimary
+                color = colors.primary
             )
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(14.dp))
 
             // Description Section
             if (!product.description.isNullOrBlank()) {
                 Text(
                     text = "Culinary Profile",
                     fontFamily = EditorialSerif,
-                    fontSize = 15.sp,
+                    fontSize = 14.5.sp,
                     fontWeight = FontWeight.Bold,
-                    color = TextPrimary
+                    color = colors.textPrimary
                 )
-                Spacer(modifier = Modifier.height(6.dp))
+                Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = product.description,
-                    fontSize = 14.sp,
-                    lineHeight = 21.sp,
-                    color = TextSecondary
+                    fontSize = 13.sp,
+                    lineHeight = 19.sp,
+                    color = colors.textSecondary
                 )
-                Spacer(modifier = Modifier.height(18.dp))
+                Spacer(modifier = Modifier.height(16.dp))
             }
 
             // Specs Card: Preparation time and Allergens
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(CardBackground)
-                    .border(1.dp, BorderMuted, RoundedCornerShape(16.dp))
-                    .padding(16.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(colors.surface)
+                    .border(0.5.dp, colors.border, RoundedCornerShape(12.dp))
+                    .padding(14.dp)
             ) {
-                // Prep time
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(text = "⏱️", fontSize = 18.sp)
-                    Spacer(modifier = Modifier.width(10.dp))
+                    Text(text = "⏱️", fontSize = 16.sp)
+                    Spacer(modifier = Modifier.width(8.dp))
                     Column {
                         Text(
                             text = "Preparation Time",
-                            fontSize = 11.sp,
-                            color = TextMuted
+                            fontSize = 10.5.sp,
+                            color = colors.textMuted
                         )
                         Text(
-                            text = "${product.prepTimeMinutes} minutes fresh craft",
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = TextPrimary
+                            text = "${product.prepTimeMinutes} minutes fresh kitchen craft",
+                            fontSize = 12.5.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = colors.textPrimary
                         )
                     }
                 }
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(10.dp))
 
-                // Allergens
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(text = "🌾", fontSize = 18.sp)
-                    Spacer(modifier = Modifier.width(10.dp))
+                    Text(text = "🌾", fontSize = 16.sp)
+                    Spacer(modifier = Modifier.width(8.dp))
                     Column {
                         Text(
                             text = "Allergen Information",
-                            fontSize = 11.sp,
-                            color = TextMuted
+                            fontSize = 10.5.sp,
+                            color = colors.textMuted
                         )
                         val allergenText = if (product.allergens.isNotEmpty()) {
                             "Contains: " + product.allergens.joinToString(", ")
@@ -545,78 +469,86 @@ private fun ProductDetailContent(
                         }
                         Text(
                             text = allergenText,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = TextPrimary
+                            fontSize = 12.5.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = colors.textPrimary
                         )
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(18.dp))
 
-            // Quantity Stepper & Add to Cart Action
+            // Quantity Stepper & Add to Cart
             val isInStock = product.isInStock
             val totalPricePaise = product.basePrice * quantity
             val totalPriceFormatted = CurrencyFormatter.formatPaiseToInr(totalPricePaise)
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Stepper
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(CardBackground)
-                        .border(1.dp, BorderMuted, RoundedCornerShape(12.dp))
-                        .padding(horizontal = 6.dp, vertical = 4.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(colors.surface)
+                        .border(0.5.dp, colors.border, RoundedCornerShape(10.dp))
+                        .padding(horizontal = 4.dp, vertical = 2.dp)
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(36.dp)
+                            .size(34.dp)
                             .clickable(enabled = quantity > 1) { quantity -= 1 },
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(text = "−", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = if (quantity > 1) TextPrimary else TextMuted)
+                        Text(
+                            text = "−",
+                            fontSize = 17.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (quantity > 1) colors.textPrimary else colors.textMuted
+                        )
                     }
 
                     Text(
                         text = "$quantity",
-                        fontSize = 15.sp,
+                        fontSize = 14.sp,
                         fontWeight = FontWeight.Bold,
-                        color = TextPrimary,
-                        modifier = Modifier.padding(horizontal = 10.dp)
+                        color = colors.textPrimary,
+                        modifier = Modifier.padding(horizontal = 8.dp)
                     )
 
                     Box(
                         modifier = Modifier
-                            .size(36.dp)
+                            .size(34.dp)
                             .clickable(enabled = quantity < 10) { quantity += 1 },
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(text = "+", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = if (quantity < 10) TextPrimary else TextMuted)
+                        Text(
+                            text = "+",
+                            fontSize = 17.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (quantity < 10) colors.textPrimary else colors.textMuted
+                        )
                     }
                 }
 
-                // Add to Shopping Bag Button
                 Button(
                     onClick = { onAddToCart(product, quantity) },
                     enabled = isInStock,
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = OrangePrimary,
-                        contentColor = Color.White
+                        containerColor = colors.primary,
+                        contentColor = if (isDark) colors.canvas else WhiteSurface
                     ),
-                    shape = RoundedCornerShape(14.dp),
+                    shape = RoundedCornerShape(10.dp),
                     modifier = Modifier
                         .weight(1f)
-                        .height(48.dp)
+                        .height(46.dp)
                 ) {
                     Text(
                         text = if (isInStock) "Add to Bag • $totalPriceFormatted" else "Temporarily Unavailable",
-                        fontSize = 14.sp,
+                        fontSize = 13.5.sp,
                         fontWeight = FontWeight.Bold
                     )
                 }
@@ -624,25 +556,25 @@ private fun ProductDetailContent(
 
             // Related Products Carousel
             if (relatedProducts.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(32.dp))
+                Spacer(modifier = Modifier.height(28.dp))
                 Text(
                     text = "You May Also Relish",
                     fontFamily = EditorialSerif,
-                    fontSize = 18.sp,
+                    fontSize = 17.sp,
                     fontWeight = FontWeight.Bold,
-                    color = TextPrimary
+                    color = colors.textPrimary
                 )
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(10.dp))
 
                 val relatedScrollState = rememberScrollState()
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .horizontalScroll(relatedScrollState),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     relatedProducts.forEach { rel ->
-                        Box(modifier = Modifier.width(170.dp)) {
+                        Box(modifier = Modifier.width(160.dp)) {
                             ProductCard(
                                 product = rel,
                                 onClick = { onRelatedProductClick(rel) }
@@ -652,27 +584,26 @@ private fun ProductDetailContent(
                 }
             }
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(16.dp))
         }
     }
 
-    // Fullscreen Zoom Dialog
     if (showZoomModal) {
         Dialog(onDismissRequest = { showZoomModal = false }) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .clickable { showZoomModal = false }
-                    .padding(20.dp),
+                    .padding(16.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(340.dp)
-                        .clip(RoundedCornerShape(20.dp))
-                        .background(DarkBackground)
-                        .border(1.dp, Color(0x33FFFFFF), RoundedCornerShape(20.dp))
+                        .height(320.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(colors.surfaceElevated)
+                        .border(0.5.dp, colors.border, RoundedCornerShape(16.dp))
                 ) {
                     ProductImage(
                         imageUrl = product.imageUrl,

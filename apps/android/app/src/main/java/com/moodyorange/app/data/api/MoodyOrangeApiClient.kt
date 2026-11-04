@@ -225,9 +225,13 @@ class MoodyOrangeApiClient(
         }
     }
 
-    suspend fun updateProfile(fullName: String, token: String): Result<CustomerProfile> = withContext(Dispatchers.IO) {
+    suspend fun updateProfile(fullName: String, email: String? = null, token: String): Result<CustomerProfile> = withContext(Dispatchers.IO) {
         val payload = JSONObject().apply {
+            put("fullName", fullName)
             put("full_name", fullName)
+            if (email != null) {
+                put("email", email)
+            }
         }.toString()
         val headers = mapOf("Authorization" to "Bearer $token")
         executeWithFallback("/profile", "PUT", payload, headers) { body ->
@@ -359,15 +363,27 @@ class MoodyOrangeApiClient(
 
         return Product(
             id = obj.getString("id"),
-            categoryId = obj.getString("categoryId"),
-            categoryName = obj.optString("categoryName", "Boutique"),
-            categorySlug = obj.optString("categorySlug", "boutique"),
+            categoryId = obj.optString("categoryId", obj.optString("category_id", "")),
+            categoryName = obj.optString("categoryName", obj.optString("category_name", "Boutique")),
+            categorySlug = obj.optString("categorySlug", obj.optString("category_slug", "boutique")),
             name = obj.getString("name"),
             slug = obj.getString("slug"),
             description = if (obj.isNull("description")) null else obj.getString("description"),
             basePrice = obj.getLong("basePrice"),
             taxRatePct = obj.optDouble("taxRatePct", 5.0),
-            isVeg = obj.optBoolean("isVeg", true),
+            isVeg = if (obj.has("isVeg") && !obj.isNull("isVeg")) {
+                obj.getBoolean("isVeg")
+            } else if (obj.has("is_veg") && !obj.isNull("is_veg")) {
+                obj.getBoolean("is_veg")
+            } else if (obj.has("foodClassification") && !obj.isNull("foodClassification")) {
+                when (obj.getString("foodClassification")) {
+                    "vegetarian" -> true
+                    "non_vegetarian" -> false
+                    else -> null
+                }
+            } else {
+                null
+            },
             allergens = allergensList,
             prepTimeMinutes = obj.optInt("prepTimeMinutes", 15),
             imageUrl = if (obj.isNull("imageUrl")) null else obj.getString("imageUrl"),
@@ -457,11 +473,31 @@ class MoodyOrangeApiClient(
     fun parseProfileResponse(jsonString: String): CustomerProfile {
         val root = JSONObject(jsonString)
         val profile = root.getJSONObject("profile")
+        val fullName = if (profile.has("fullName") && !profile.isNull("fullName")) {
+            profile.getString("fullName")
+        } else if (profile.has("full_name") && !profile.isNull("full_name")) {
+            profile.getString("full_name")
+        } else {
+            null
+        }
+        val email = if (profile.has("email") && !profile.isNull("email")) {
+            profile.getString("email")
+        } else {
+            null
+        }
+        val createdAt = if (profile.has("createdAt") && !profile.isNull("createdAt")) {
+            profile.getString("createdAt")
+        } else if (profile.has("created_at") && !profile.isNull("created_at")) {
+            profile.getString("created_at")
+        } else {
+            null
+        }
         return CustomerProfile(
             id = profile.getString("id"),
             phone = profile.getString("phone"),
-            fullName = if (profile.isNull("full_name")) null else profile.getString("full_name"),
-            createdAt = if (profile.isNull("created_at")) null else profile.getString("created_at")
+            fullName = fullName,
+            email = email,
+            createdAt = createdAt
         )
     }
 

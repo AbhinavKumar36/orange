@@ -10,30 +10,30 @@ export function BrandStory(): ReactElement {
         <div className="brand-story-grid">
           {/* Left Column: Editorial Statement */}
           <div className="story-editorial-col">
-            <div className="section-subtitle">The Moody Orange Philosophy</div>
+            <div className="section-subtitle">The Mangala Enterprises Heritage</div>
             <h2 className="story-heading">
-              Where Precision Craft Meets Uncompromising Flavor.
+              Where Culinary Craft Meets Uncompromising Purity.
             </h2>
             <div className="story-divider" />
             <p className="story-lead">
-              Moody Orange was born from a singular obsession: to bring together the bright, untamed vitality of fresh citrus with the decadent, velvety richness of single-origin dark chocolate.
+              Mangala Enterprises is dedicated to elevating everyday culinary indulgence into an art form. We unite time-honored boutique baking techniques with cold-pressed natural fruit nectars and single-origin gourmet chocolates.
             </p>
             <p className="story-text">
-              We do not mass-produce. Every morning, our patisserie kitchen begins by measuring single-origin cacao, hand-pressing Valencia citrus, and layering sponge bases for counter pickup. Every pastry, juice, and praline is crafted with pure ingredients, natural fats, and genuine respect for culinary balance.
+              We do not mass-produce. Every morning, our chefs begin by tempering single-origin cacao, cold-pressing sun-ripened fruits, and layering boutique sponge bases for immediate counter pickup. Every pastry, juice, and chocolate praline is crafted with pure ingredients, authentic fats, and clear dietary declarations.
             </p>
 
             <div className="story-stats-row">
               <div className="story-stat-card">
                 <div className="story-stat-val">100%</div>
-                <div className="story-stat-lbl">Pure Fruit Cold-Pressed Daily</div>
+                <div className="story-stat-lbl">Pure Cold-Pressed Fruit Extracts</div>
               </div>
               <div className="story-stat-card">
                 <div className="story-stat-val">70%</div>
-                <div className="story-stat-lbl">Belgian Dark Cacao Standard</div>
+                <div className="story-stat-lbl">Single-Origin Cacao Couverture</div>
               </div>
               <div className="story-stat-card">
                 <div className="story-stat-val">~15m</div>
-                <div className="story-stat-lbl">Avg. Fresh Counter Pickup Lead</div>
+                <div className="story-stat-lbl">Fresh Kitchen Preparation Lead</div>
               </div>
             </div>
 
@@ -48,33 +48,33 @@ export function BrandStory(): ReactElement {
           <div className="story-visual-col">
             <div className="story-art-card">
               <div className="story-art-glow" />
-              <div className="story-art-badge">Artisanal Quick-Commerce</div>
+              <div className="story-art-badge">Boutique Kitchen Craft</div>
 
               <div className="story-quote-box">
                 <span className="quote-mark">“</span>
                 <p className="quote-text">
                   True luxury in confectionery is not excessive sweetness—it is depth, texture, and uncompromising freshness.
                 </p>
-                <div className="quote-author">— Moody Orange Kitchen Standards</div>
+                <div className="quote-author">— Mangala Enterprises Culinary Standards</div>
               </div>
 
               <div className="story-feature-list">
                 <div className="story-feature-item">
-                  <div className="feature-bullet">🍊</div>
+                  <div className="feature-bullet">🌿</div>
                   <div>
-                    <strong>Valencia Orange Focus:</strong> Sourced at peak ripeness for natural pectin, aromatic oils, and bright sweetness.
+                    <strong>Purity & Transparency:</strong> Recognized food indicators with clear vegetarian and non-vegetarian declarations.
                   </div>
                 </div>
                 <div className="story-feature-item">
                   <div className="feature-bullet">🍫</div>
                   <div>
-                    <strong>Single-Origin Couverture:</strong> Slow-conched dark chocolate with deep roasted notes and silky melting curves.
+                    <strong>Single-Origin Couverture:</strong> Slow-conched Belgian dark chocolate with deep roasted notes and silky melting curves.
                   </div>
                 </div>
                 <div className="story-feature-item">
                   <div className="feature-bullet">⏱️</div>
                   <div>
-                    <strong>Instant Kitchen Sync:</strong> Live stock counts ensure you never order an item that isn&apos;t ready for fresh counter pickup.
+                    <strong>Live Inventory Sync:</strong> Real-time kitchen tracking ensures you only order items ready for fresh counter pickup.
                   </div>
                 </div>
               </div>

@@ -20,24 +20,19 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.moodyorange.app.ui.theme.BorderMuted
-import com.moodyorange.app.ui.theme.CardBackground
-import com.moodyorange.app.ui.theme.OrangeLight
-import com.moodyorange.app.ui.theme.OrangePrimary
-import com.moodyorange.app.ui.theme.TextMuted
-import com.moodyorange.app.ui.theme.TextPrimary
-import com.moodyorange.app.ui.theme.TextSecondary
+import com.moodyorange.app.ui.theme.MangalaTheme
+import com.moodyorange.app.ui.theme.WhiteSurface
 
 @Composable
 fun LoadingStateView(
-    message: String = "Fetching boutique items...",
+    message: String = "Loading artisanal delicacies...",
     modifier: Modifier = Modifier
 ) {
+    val colors = MangalaTheme.colors
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -46,15 +41,15 @@ fun LoadingStateView(
         verticalArrangement = Arrangement.Center
     ) {
         CircularProgressIndicator(
-            color = OrangePrimary,
-            strokeWidth = 3.dp,
-            modifier = Modifier.size(42.dp)
+            color = colors.primary,
+            strokeWidth = 2.5.dp,
+            modifier = Modifier.size(38.dp)
         )
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(14.dp))
         Text(
             text = message,
-            fontSize = 14.sp,
-            color = TextSecondary,
+            fontSize = 13.5.sp,
+            color = colors.textSecondary,
             fontWeight = FontWeight.Medium
         )
     }
@@ -66,58 +61,62 @@ fun ErrorStateView(
     onRetry: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val colors = MangalaTheme.colors
+    val isDark = colors.isDark
+
     Column(
         modifier = modifier
             .fillMaxWidth()
             .padding(24.dp)
-            .clip(RoundedCornerShape(16.dp))
-            .background(CardBackground)
-            .border(1.dp, BorderMuted, RoundedCornerShape(16.dp))
+            .clip(RoundedCornerShape(14.dp))
+            .background(colors.surface)
+            .border(0.5.dp, colors.border, RoundedCornerShape(14.dp))
             .padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
         Box(
             modifier = Modifier
-                .size(48.dp)
+                .size(46.dp)
                 .clip(CircleShape)
-                .background(OrangeLight),
+                .background(colors.surfaceElevated),
             contentAlignment = Alignment.Center
         ) {
-            Text(text = "⚠️", fontSize = 22.sp)
+            Text(text = "⚠️", fontSize = 20.sp)
         }
 
-        Spacer(modifier = Modifier.height(14.dp))
+        Spacer(modifier = Modifier.height(12.dp))
 
         Text(
             text = "Store Catalog Unavailable",
-            fontSize = 16.sp,
+            fontSize = 15.sp,
             fontWeight = FontWeight.Bold,
-            color = TextPrimary
+            color = colors.textPrimary
         )
 
         Spacer(modifier = Modifier.height(6.dp))
 
         Text(
             text = message,
-            fontSize = 13.sp,
-            color = TextSecondary,
+            fontSize = 12.5.sp,
+            color = colors.textSecondary,
             textAlign = TextAlign.Center
         )
 
-        Spacer(modifier = Modifier.height(18.dp))
+        Spacer(modifier = Modifier.height(16.dp))
 
         Button(
             onClick = onRetry,
             colors = ButtonDefaults.buttonColors(
-                containerColor = OrangePrimary,
-                contentColor = Color.White
+                containerColor = colors.primary,
+                contentColor = if (isDark) colors.canvas else WhiteSurface
             ),
             shape = RoundedCornerShape(10.dp)
         ) {
             Text(
                 text = "Try Again",
-                fontWeight = FontWeight.SemiBold
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 13.sp
             )
         }
     }
@@ -125,11 +124,14 @@ fun ErrorStateView(
 
 @Composable
 fun EmptyStateView(
-    title: String = "No Treats Found",
-    message: String = "Try clearing your search or explore other artisanal categories.",
+    title: String = "No Confections Found",
+    message: String = "Try adjusting your search or explore other boutique categories.",
     onClear: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
+    val colors = MangalaTheme.colors
+    val isDark = colors.isDark
+
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -139,29 +141,29 @@ fun EmptyStateView(
     ) {
         Box(
             modifier = Modifier
-                .size(56.dp)
+                .size(52.dp)
                 .clip(CircleShape)
-                .background(OrangeLight),
+                .background(colors.surfaceElevated),
             contentAlignment = Alignment.Center
         ) {
-            Text(text = "🍰", fontSize = 26.sp)
+            Text(text = "🌿", fontSize = 24.sp)
         }
 
-        Spacer(modifier = Modifier.height(14.dp))
+        Spacer(modifier = Modifier.height(12.dp))
 
         Text(
             text = title,
-            fontSize = 16.sp,
+            fontSize = 15.sp,
             fontWeight = FontWeight.Bold,
-            color = TextPrimary
+            color = colors.textPrimary
         )
 
         Spacer(modifier = Modifier.height(6.dp))
 
         Text(
             text = message,
-            fontSize = 13.sp,
-            color = TextMuted,
+            fontSize = 12.5.sp,
+            color = colors.textMuted,
             textAlign = TextAlign.Center
         )
 
@@ -170,17 +172,17 @@ fun EmptyStateView(
             Button(
                 onClick = onClear,
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = OrangePrimary,
-                    contentColor = Color.White
+                    containerColor = colors.primary,
+                    contentColor = if (isDark) colors.canvas else WhiteSurface
                 ),
                 shape = RoundedCornerShape(10.dp)
             ) {
                 Text(
                     text = "Clear Filter",
-                    fontWeight = FontWeight.SemiBold
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 13.sp
                 )
             }
         }
     }
 }
-

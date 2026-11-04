@@ -37,19 +37,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.moodyorange.app.data.model.Order
 import com.moodyorange.app.ui.components.HeaderBar
-import com.moodyorange.app.ui.theme.BorderMuted
-import com.moodyorange.app.ui.theme.CardBackground
-import com.moodyorange.app.ui.theme.CreamBackground
 import com.moodyorange.app.ui.theme.EditorialSerif
-import com.moodyorange.app.ui.theme.InStockBg
-import com.moodyorange.app.ui.theme.InStockGreen
-import com.moodyorange.app.ui.theme.OrangeLight
-import com.moodyorange.app.ui.theme.OrangePrimary
-import com.moodyorange.app.ui.theme.OutOfStockBg
-import com.moodyorange.app.ui.theme.OutOfStockRed
-import com.moodyorange.app.ui.theme.TextMuted
-import com.moodyorange.app.ui.theme.TextPrimary
-import com.moodyorange.app.ui.theme.TextSecondary
+import com.moodyorange.app.ui.theme.MangalaTheme
+import com.moodyorange.app.ui.theme.WhiteSurface
 import com.moodyorange.app.ui.viewmodel.ShopViewModel
 import com.moodyorange.app.util.CurrencyFormatter
 import java.util.Locale
@@ -60,9 +50,12 @@ fun OrdersScreen(
     cartItemCount: Int = 0,
     onCartClick: () -> Unit = {},
     onProfileClick: () -> Unit = {},
+    onThemeToggle: (() -> Unit)? = null,
     onNavigateToShop: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    val colors = MangalaTheme.colors
+    val isDark = colors.isDark
     val session by shopViewModel.sessionState.collectAsState()
     val orders by shopViewModel.orders.collectAsState()
     val isLoading by shopViewModel.isOrdersLoading.collectAsState()
@@ -77,7 +70,7 @@ fun OrdersScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(CreamBackground)
+            .background(colors.canvas)
     ) {
         HeaderBar(
             cartItemCount = cartItemCount,
@@ -85,32 +78,33 @@ fun OrdersScreen(
             isLoggedIn = session != null,
             customerName = session?.fullName,
             onProfileClick = onProfileClick,
-            isDark = false
+            onThemeToggle = onThemeToggle,
+            isDark = isDark
         )
 
         // Title and Refresh Row
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 12.dp),
+                .padding(horizontal = 16.dp, vertical = 10.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column {
                 Text(
                     text = "ORDER HISTORY",
-                    fontSize = 11.sp,
+                    fontSize = 10.5.sp,
                     fontWeight = FontWeight.Bold,
-                    color = OrangePrimary,
+                    color = colors.primary,
                     letterSpacing = 1.sp
                 )
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
-                    text = "Boutique Reservations",
+                    text = "Counter Reservations",
                     fontFamily = EditorialSerif,
-                    fontSize = 20.sp,
+                    fontSize = 19.sp,
                     fontWeight = FontWeight.Bold,
-                    color = TextPrimary
+                    color = colors.textPrimary
                 )
             }
 
@@ -120,7 +114,7 @@ fun OrdersScreen(
                         text = "Refresh ↺",
                         fontSize = 12.sp,
                         fontWeight = FontWeight.SemiBold,
-                        color = OrangePrimary
+                        color = colors.primary
                     )
                 }
             }
@@ -137,51 +131,51 @@ fun OrdersScreen(
             ) {
                 Box(
                     modifier = Modifier
-                        .size(64.dp)
+                        .size(56.dp)
                         .clip(CircleShape)
-                        .background(OrangeLight),
+                        .background(colors.surfaceElevated),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(text = "📦", fontSize = 28.sp)
+                    Text(text = "📦", fontSize = 24.sp)
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(14.dp))
 
                 Text(
                     text = "Track Your Counter Pickups",
                     fontFamily = EditorialSerif,
-                    fontSize = 20.sp,
+                    fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
-                    color = TextPrimary,
+                    color = colors.textPrimary,
                     textAlign = TextAlign.Center
                 )
 
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(6.dp))
 
                 Text(
                     text = "Sign in with your mobile number to view live order preparation status and pickup references.",
-                    fontSize = 13.sp,
-                    lineHeight = 19.sp,
-                    color = TextSecondary,
+                    fontSize = 12.5.sp,
+                    lineHeight = 18.sp,
+                    color = colors.textSecondary,
                     textAlign = TextAlign.Center
                 )
 
-                Spacer(modifier = Modifier.height(20.dp))
+                Spacer(modifier = Modifier.height(18.dp))
 
                 Button(
                     onClick = { shopViewModel.openAuth() },
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = OrangePrimary,
-                        contentColor = Color.White
+                        containerColor = colors.primary,
+                        contentColor = if (isDark) colors.canvas else WhiteSurface
                     ),
-                    shape = RoundedCornerShape(12.dp)
+                    shape = RoundedCornerShape(10.dp)
                 ) {
-                    Text("Sign In with Mobile OTP", fontWeight = FontWeight.Bold)
+                    Text("Sign In with Mobile OTP", fontWeight = FontWeight.Bold, fontSize = 13.5.sp)
                 }
             }
         } else if (isLoading) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = OrangePrimary, modifier = Modifier.size(36.dp), strokeWidth = 3.dp)
+                CircularProgressIndicator(color = colors.primary, modifier = Modifier.size(34.dp), strokeWidth = 2.5.dp)
             }
         } else if (orders.isEmpty()) {
             Column(
@@ -193,51 +187,51 @@ fun OrdersScreen(
             ) {
                 Box(
                     modifier = Modifier
-                        .size(64.dp)
+                        .size(56.dp)
                         .clip(CircleShape)
-                        .background(OrangeLight),
+                        .background(colors.surfaceElevated),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(text = "🍰", fontSize = 28.sp)
+                    Text(text = "🛍️", fontSize = 24.sp)
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(14.dp))
 
                 Text(
                     text = "No Orders Placed Yet",
                     fontFamily = EditorialSerif,
-                    fontSize = 20.sp,
+                    fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
-                    color = TextPrimary
+                    color = colors.textPrimary
                 )
 
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(6.dp))
 
                 Text(
-                    text = "Your counter pickup reservations and order receipts will appear here.",
-                    fontSize = 13.sp,
-                    color = TextSecondary,
+                    text = "Your counter pickup reservations and receipts will appear here.",
+                    fontSize = 12.5.sp,
+                    color = colors.textSecondary,
                     textAlign = TextAlign.Center
                 )
 
-                Spacer(modifier = Modifier.height(20.dp))
+                Spacer(modifier = Modifier.height(18.dp))
 
                 Button(
                     onClick = onNavigateToShop,
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = OrangePrimary,
-                        contentColor = Color.White
+                        containerColor = colors.primary,
+                        contentColor = if (isDark) colors.canvas else WhiteSurface
                     ),
-                    shape = RoundedCornerShape(12.dp)
+                    shape = RoundedCornerShape(10.dp)
                 ) {
-                    Text("Browse Boutique Menu", fontWeight = FontWeight.Bold)
+                    Text("Browse Boutique Menu", fontWeight = FontWeight.Bold, fontSize = 13.5.sp)
                 }
             }
         } else {
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(horizontal = 20.dp, vertical = 10.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp)
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 items(orders, key = { it.id }) { order ->
                     OrderCard(order)
@@ -249,18 +243,19 @@ fun OrdersScreen(
 
 @Composable
 private fun OrderCard(order: Order) {
+    val colors = MangalaTheme.colors
     val isConfirmed = order.orderStatus.equals("confirmed", ignoreCase = true)
     val isCompleted = order.orderStatus.equals("completed", ignoreCase = true)
-    val statusBg = if (isConfirmed || isCompleted) InStockBg else OutOfStockBg
-    val statusColor = if (isConfirmed || isCompleted) InStockGreen else OutOfStockRed
+    val statusBg = if (isConfirmed || isCompleted) colors.inStockBg else colors.outOfStockBg
+    val statusColor = if (isConfirmed || isCompleted) colors.inStockGreen else colors.outOfStockRed
 
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .background(CardBackground)
-            .border(1.dp, BorderMuted, RoundedCornerShape(16.dp))
-            .padding(16.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .background(colors.surface)
+            .border(0.5.dp, colors.border, RoundedCornerShape(14.dp))
+            .padding(14.dp)
     ) {
         // Order Number & Status Badge
         Row(
@@ -273,7 +268,7 @@ private fun OrderCard(order: Order) {
                     modifier = Modifier
                         .size(32.dp)
                         .clip(CircleShape)
-                        .background(OrangeLight),
+                        .background(colors.surfaceElevated),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(text = "📦", fontSize = 14.sp)
@@ -282,34 +277,34 @@ private fun OrderCard(order: Order) {
                 Column {
                     Text(
                         text = "Order #${order.orderNumber}",
-                        fontSize = 14.sp,
+                        fontSize = 13.5.sp,
                         fontWeight = FontWeight.Bold,
-                        color = TextPrimary
+                        color = colors.textPrimary
                     )
                     Text(
                         text = "Counter Pickup",
-                        fontSize = 11.sp,
-                        color = TextMuted
+                        fontSize = 10.5.sp,
+                        color = colors.textMuted
                     )
                 }
             }
 
             Box(
                 modifier = Modifier
-                    .clip(RoundedCornerShape(6.dp))
+                    .clip(RoundedCornerShape(5.dp))
                     .background(statusBg)
-                    .padding(horizontal = 8.dp, vertical = 3.dp)
+                    .padding(horizontal = 7.dp, vertical = 3.dp)
             ) {
                 Text(
                     text = order.orderStatus.replace('_', ' ').uppercase(Locale.ROOT),
-                    fontSize = 10.sp,
+                    fontSize = 9.5.sp,
                     fontWeight = FontWeight.Bold,
                     color = statusColor
                 )
             }
         }
 
-        Spacer(modifier = Modifier.height(14.dp))
+        Spacer(modifier = Modifier.height(12.dp))
 
         // Items list snapshot
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -320,28 +315,29 @@ private fun OrderCard(order: Order) {
                 ) {
                     Text(
                         text = "${item.quantity}× ${item.productNameSnapshot}",
-                        fontSize = 13.sp,
-                        color = TextSecondary
+                        fontSize = 12.5.sp,
+                        color = colors.textSecondary
                     )
                     Text(
                         text = CurrencyFormatter.formatPaiseToInr(item.lineTotal),
-                        fontSize = 13.sp,
-                        color = TextPrimary
+                        fontSize = 12.5.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = colors.textPrimary
                     )
                 }
             }
         }
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(10.dp))
 
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(1.dp)
-                .background(BorderMuted)
+                .height(0.5.dp)
+                .background(colors.border)
         )
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(10.dp))
 
         // Order Total & Payment status
         Row(
@@ -352,17 +348,18 @@ private fun OrderCard(order: Order) {
             Column {
                 Text(
                     text = "Payment: ${order.paymentStatus.replace('_', ' ').uppercase()}",
-                    fontSize = 11.sp,
+                    fontSize = 10.5.sp,
                     fontWeight = FontWeight.SemiBold,
-                    color = TextMuted
+                    color = colors.textMuted
                 )
             }
 
             Text(
                 text = CurrencyFormatter.formatPaiseToInr(order.totalAmount),
-                fontSize = 16.sp,
+                fontFamily = EditorialSerif,
+                fontSize = 15.sp,
                 fontWeight = FontWeight.Bold,
-                color = OrangePrimary
+                color = colors.primary
             )
         }
     }

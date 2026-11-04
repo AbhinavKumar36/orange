@@ -28,7 +28,7 @@ import com.moodyorange.app.ui.screens.HomeScreen
 import com.moodyorange.app.ui.screens.OrdersScreen
 import com.moodyorange.app.ui.screens.ProductDetailScreen
 import com.moodyorange.app.ui.screens.ShopScreen
-import com.moodyorange.app.ui.theme.DarkBackground
+import com.moodyorange.app.ui.theme.MangalaTheme
 import com.moodyorange.app.ui.theme.MoodyOrangeTheme
 import com.moodyorange.app.ui.viewmodel.CatalogViewModel
 import com.moodyorange.app.ui.viewmodel.CheckoutUiState
@@ -47,10 +47,11 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            MoodyOrangeTheme {
+            val themeMode by shopViewModel.themeMode.collectAsState()
+            MoodyOrangeTheme(themeMode = themeMode) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
-                    color = DarkBackground
+                    color = MangalaTheme.colors.canvas
                 ) {
                     MoodyOrangeApp(
                         catalogViewModel = catalogViewModel,
@@ -70,6 +71,7 @@ fun MoodyOrangeApp(
     var currentDestination by remember { mutableStateOf<AppDestination>(AppDestination.Main) }
     var selectedTab by remember { mutableStateOf(NavTab.HOME) }
 
+    val colors = MangalaTheme.colors
     val cartItems by shopViewModel.cartItems.collectAsState()
     val session by shopViewModel.sessionState.collectAsState()
     val isCartOpen by shopViewModel.isCartOpen.collectAsState()
@@ -105,6 +107,7 @@ fun MoodyOrangeApp(
 
         is AppDestination.Main -> {
             Scaffold(
+                containerColor = colors.canvas,
                 bottomBar = {
                     BottomNavBar(
                         selectedTab = selectedTab,
@@ -128,6 +131,7 @@ fun MoodyOrangeApp(
                                         shopViewModel.openAuth()
                                     }
                                 },
+                                onThemeToggle = { shopViewModel.toggleTheme(colors.isDark) },
                                 onProductClick = { product ->
                                     currentDestination = AppDestination.ProductDetail(product.id)
                                 },
@@ -157,6 +161,7 @@ fun MoodyOrangeApp(
                                         shopViewModel.openAuth()
                                     }
                                 },
+                                onThemeToggle = { shopViewModel.toggleTheme(colors.isDark) },
                                 onProductClick = { product ->
                                     currentDestination = AppDestination.ProductDetail(product.id)
                                 },
@@ -178,6 +183,7 @@ fun MoodyOrangeApp(
                                         shopViewModel.openAuth()
                                     }
                                 },
+                                onThemeToggle = { shopViewModel.toggleTheme(colors.isDark) },
                                 onNavigateToShop = {
                                     selectedTab = NavTab.SHOP
                                 }
@@ -188,7 +194,11 @@ fun MoodyOrangeApp(
                             AccountScreen(
                                 shopViewModel = shopViewModel,
                                 cartItemCount = totalItemCount,
-                                onCartClick = { shopViewModel.openCart() }
+                                onCartClick = { shopViewModel.openCart() },
+                                onNavigateToOrders = {
+                                    selectedTab = NavTab.ORDERS
+                                },
+                                onThemeToggle = { shopViewModel.toggleTheme(colors.isDark) }
                             )
                         }
                     }

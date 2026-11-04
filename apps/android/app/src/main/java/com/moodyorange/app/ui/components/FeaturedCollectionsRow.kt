@@ -20,19 +20,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.moodyorange.app.data.model.Category
-import com.moodyorange.app.ui.theme.DarkBackground
-import com.moodyorange.app.ui.theme.DarkBorder
-import com.moodyorange.app.ui.theme.DarkTextPrimary
-import com.moodyorange.app.ui.theme.DarkTextSecondary
 import com.moodyorange.app.ui.theme.EditorialSerif
-import com.moodyorange.app.ui.theme.OrangeLight
-import com.moodyorange.app.ui.theme.OrangePrimary
+import com.moodyorange.app.ui.theme.MangalaTheme
 
 @Composable
 fun FeaturedCollectionsRow(
@@ -40,43 +34,44 @@ fun FeaturedCollectionsRow(
     onCategoryClick: (Category) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val colors = MangalaTheme.colors
     val scrollState = rememberScrollState()
 
     Column(modifier = modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 20.dp),
+                .padding(horizontal = 16.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column {
                 Text(
                     text = "CURATED COLLECTIONS",
-                    fontSize = 11.sp,
+                    fontSize = 10.5.sp,
                     fontWeight = FontWeight.Bold,
-                    color = OrangePrimary,
+                    color = colors.primary,
                     letterSpacing = 1.sp
                 )
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     text = "Boutique Flavours",
                     fontFamily = EditorialSerif,
-                    fontSize = 20.sp,
+                    fontSize = 19.sp,
                     fontWeight = FontWeight.Bold,
-                    color = DarkTextPrimary
+                    color = colors.textPrimary
                 )
             }
         }
 
-        Spacer(modifier = Modifier.height(14.dp))
+        Spacer(modifier = Modifier.height(12.dp))
 
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .horizontalScroll(scrollState)
-                .padding(horizontal = 20.dp),
-            horizontalArrangement = Arrangement.spacedBy(14.dp)
+                .padding(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             categories.forEach { category ->
                 CollectionPanelCard(
@@ -93,14 +88,9 @@ private fun CollectionPanelCard(
     category: Category,
     onClick: () -> Unit
 ) {
+    val colors = MangalaTheme.colors
     val isCake = category.slug.contains("cake")
     val isJuice = category.slug.contains("juice")
-
-    val bgGradient = when {
-        isCake -> listOf(Color(0xFF261811), Color(0xFF140C08))
-        isJuice -> listOf(Color(0xFF331A05), Color(0xFF1A0D02))
-        else -> listOf(Color(0xFF1F1510), Color(0xFF0F0A08))
-    }
 
     val iconText = when {
         isCake -> "🍰"
@@ -110,13 +100,13 @@ private fun CollectionPanelCard(
 
     Box(
         modifier = Modifier
-            .width(220.dp)
-            .height(130.dp)
-            .clip(RoundedCornerShape(18.dp))
-            .background(Brush.verticalGradient(bgGradient))
-            .border(1.dp, DarkBorder, RoundedCornerShape(18.dp))
+            .width(210.dp)
+            .height(120.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .background(colors.surface)
+            .border(0.5.dp, colors.border, RoundedCornerShape(14.dp))
             .clickable(onClick = onClick)
-            .padding(16.dp)
+            .padding(14.dp)
     ) {
         Column(
             modifier = Modifier.fillMaxWidth(),
@@ -129,19 +119,19 @@ private fun CollectionPanelCard(
             ) {
                 Text(
                     text = iconText,
-                    fontSize = 26.sp
+                    fontSize = 24.sp
                 )
                 Box(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(Color(0x33FF5500))
-                        .padding(horizontal = 8.dp, vertical = 3.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(colors.primaryContainer)
+                        .padding(horizontal = 7.dp, vertical = 2.5.dp)
                 ) {
                     Text(
                         text = "EXPLORE →",
                         fontSize = 9.sp,
                         fontWeight = FontWeight.Bold,
-                        color = OrangePrimary,
+                        color = colors.primary,
                         letterSpacing = 0.5.sp
                     )
                 }
@@ -153,16 +143,19 @@ private fun CollectionPanelCard(
                 Text(
                     text = category.name,
                     fontFamily = EditorialSerif,
-                    fontSize = 16.sp,
+                    fontSize = 15.sp,
                     fontWeight = FontWeight.Bold,
-                    color = DarkTextPrimary
+                    color = colors.textPrimary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
                 if (!category.description.isNullOrBlank()) {
                     Text(
                         text = category.description,
                         fontSize = 11.sp,
-                        color = DarkTextSecondary,
-                        maxLines = 1
+                        color = colors.textSecondary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
             }

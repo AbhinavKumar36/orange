@@ -16,6 +16,8 @@ import {
   fetchAdminProducts,
   createAdminProduct,
   updateAdminProduct,
+  deleteAdminProduct,
+  uploadAdminProductImage,
   toggleAdminProductStatus,
   fetchAdminCategories,
   createAdminCategory,
@@ -32,6 +34,54 @@ import {
 } from '../lib/api';
 
 type AdminTab = 'queue' | 'overview' | 'products' | 'categories' | 'inventory';
+
+function FoodIndicator({ classification, size = 16 }: { classification?: 'vegetarian' | 'non_vegetarian' | null; size?: number }) {
+  if (!classification) {
+    return <span style={{ color: 'var(--color-text-muted)', fontSize: '0.8rem' }} title="Unclassified / Non-food">—</span>;
+  }
+  const isVeg = classification === 'vegetarian';
+  return (
+    <span
+      title={isVeg ? 'Vegetarian' : 'Non-Vegetarian'}
+      aria-label={isVeg ? 'Vegetarian' : 'Non-Vegetarian'}
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        width: `${size}px`,
+        height: `${size}px`,
+        border: `1.5px solid ${isVeg ? '#168A45' : '#D32F2F'}`,
+        borderRadius: '3px',
+        padding: '2px',
+        background: '#FFFFFF',
+        verticalAlign: 'middle',
+      }}
+    >
+      {isVeg ? (
+        <span
+          style={{
+            width: `${Math.max(size - 8, 6)}px`,
+            height: `${Math.max(size - 8, 6)}px`,
+            borderRadius: '50%',
+            backgroundColor: '#168A45',
+            display: 'inline-block',
+          }}
+        />
+      ) : (
+        <span
+          style={{
+            width: 0,
+            height: 0,
+            borderLeft: `${Math.max((size - 8) / 2, 3)}px solid transparent`,
+            borderRight: `${Math.max((size - 8) / 2, 3)}px solid transparent`,
+            borderBottom: `${Math.max(size - 8, 6)}px solid #D32F2F`,
+            display: 'inline-block',
+          }}
+        />
+      )}
+    </span>
+  );
+}
 
 export default function AdminDashboardPage(): ReactElement {
   const {
@@ -66,11 +116,19 @@ export default function AdminDashboardPage(): ReactElement {
     categoryId: '',
     description: '',
     priceRupees: '',
+    foodClassification: 'vegetarian' as 'vegetarian' | 'non_vegetarian' | 'unclassified',
     isVeg: true,
     prepTime: 15,
     initialStock: 10,
     lowStockThreshold: 5,
+    imageUrl: '',
   });
+
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [imageUploadError, setImageUploadError] = useState<string | null>(null);
+
+  const [deletingProduct, setDeletingProduct] = useState<AdminProductItem | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [categoryForm, setCategoryForm] = useState({
@@ -220,8 +278,8 @@ export default function AdminDashboardPage(): ReactElement {
       <main style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.5rem' }}>
         <div style={{ maxWidth: '440px', width: '100%', background: '#FFF', borderRadius: '12px', padding: '2rem', border: '1px solid #E8E2D9', boxShadow: 'var(--shadow-md)' }}>
           <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
-            <span style={{ fontSize: '2.5rem' }}>🍊</span>
-            <h1 style={{ fontSize: '1.4rem', fontWeight: 700, margin: '0.5rem 0' }}>Moody Orange</h1>
+            <span style={{ fontSize: '2.5rem' }}>🌿</span>
+            <h1 style={{ fontSize: '1.4rem', fontWeight: 700, margin: '0.5rem 0', color: 'var(--color-brand-primary)' }}>Mangala Enterprises</h1>
             <p style={{ fontSize: '0.9rem', color: 'var(--color-text-muted)' }}>Staff & Counter Administration Portal</p>
           </div>
 
@@ -432,9 +490,9 @@ export default function AdminDashboardPage(): ReactElement {
       {/* Header */}
       <header style={{ background: '#FFF', borderBottom: '1px solid var(--color-border)', padding: '0.8rem 1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
-          <span style={{ fontSize: '1.6rem' }}>🍊</span>
+          <span style={{ fontSize: '1.6rem' }}>🌿</span>
           <div>
-            <h1 style={{ fontSize: '1.1rem', fontWeight: 700, margin: 0 }}>Moody Orange</h1>
+            <h1 style={{ fontSize: '1.1rem', fontWeight: 700, margin: 0, color: 'var(--color-brand-primary)' }}>Mangala Enterprises</h1>
             <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>Staff Operations & Dispatch</span>
           </div>
         </div>
@@ -822,11 +880,14 @@ export default function AdminDashboardPage(): ReactElement {
                       categoryId: initialCatId,
                       description: '',
                       priceRupees: '',
+                      foodClassification: 'vegetarian',
                       isVeg: true,
                       prepTime: 15,
                       initialStock: 10,
                       lowStockThreshold: 5,
+                      imageUrl: '',
                     });
+                    setImageUploadError(null);
                     setIsProductModalOpen(true);
                   }}
                 >
@@ -843,7 +904,7 @@ export default function AdminDashboardPage(): ReactElement {
                     <th style={{ padding: '0.75rem 1rem' }}>Category</th>
                     <th style={{ padding: '0.75rem 1rem' }}>Price</th>
                     <th style={{ padding: '0.75rem 1rem' }}>Stock</th>
-                    <th style={{ padding: '0.75rem 1rem' }}>Veg</th>
+                    <th style={{ padding: '0.75rem 1rem' }}>Dietary</th>
                     <th style={{ padding: '0.75rem 1rem' }}>Active</th>
                     {isManager && <th style={{ padding: '0.75rem 1rem' }}>Actions</th>}
                   </tr>
@@ -852,8 +913,35 @@ export default function AdminDashboardPage(): ReactElement {
                   {products.map((p) => (
                     <tr key={p.id} style={{ borderBottom: '1px solid var(--color-border-light)' }}>
                       <td style={{ padding: '0.75rem 1rem' }}>
-                        <strong>{p.name}</strong>
-                        <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>{p.slug}</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                          {p.imageUrl ? (
+                            <img
+                              src={p.imageUrl}
+                              alt={p.name}
+                              style={{ width: '36px', height: '36px', objectFit: 'cover', borderRadius: '6px', border: '1px solid var(--color-border)' }}
+                            />
+                          ) : (
+                            <div
+                              style={{
+                                width: '36px',
+                                height: '36px',
+                                borderRadius: '6px',
+                                background: 'var(--color-bg-cream)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontSize: '1rem',
+                                color: 'var(--color-text-muted)',
+                              }}
+                            >
+                              🍃
+                            </div>
+                          )}
+                          <div>
+                            <strong>{p.name}</strong>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>{p.slug}</div>
+                          </div>
+                        </div>
                       </td>
                       <td style={{ padding: '0.75rem 1rem' }}>{p.categoryName}</td>
                       <td style={{ padding: '0.75rem 1rem' }}>{formatPaiseToRupees(p.basePrice)}</td>
@@ -863,7 +951,18 @@ export default function AdminDashboardPage(): ReactElement {
                         </span>
                         <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}> ({p.physicalStock} phys / {p.reservedStock} res)</span>
                       </td>
-                      <td style={{ padding: '0.75rem 1rem' }}>{p.isVeg ? '🌱 Veg' : '🥩 Non-Veg'}</td>
+                      <td style={{ padding: '0.75rem 1rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                          <FoodIndicator classification={p.foodClassification ?? (p.isVeg ? 'vegetarian' : 'non_vegetarian')} />
+                          <span style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
+                            {p.foodClassification === 'vegetarian' || (!p.foodClassification && p.isVeg)
+                              ? 'Veg'
+                              : p.foodClassification === 'non_vegetarian' || (!p.foodClassification && !p.isVeg)
+                              ? 'Non-Veg'
+                              : 'Non-Food'}
+                          </span>
+                        </div>
+                      </td>
                       <td style={{ padding: '0.75rem 1rem' }}>
                         <button
                           type="button"
@@ -886,28 +985,41 @@ export default function AdminDashboardPage(): ReactElement {
                       </td>
                       {isManager && (
                         <td style={{ padding: '0.75rem 1rem' }}>
-                          <button
-                            type="button"
-                            className="btn-secondary"
-                            style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
-                            onClick={() => {
-                              setEditingProduct(p);
-                              setProductForm({
-                                name: p.name,
-                                slug: p.slug,
-                                categoryId: p.categoryId,
-                                description: p.description || '',
-                                priceRupees: (p.basePrice / 100).toString(),
-                                isVeg: p.isVeg,
-                                prepTime: p.prepTimeMinutes,
-                                initialStock: p.physicalStock,
-                                lowStockThreshold: p.lowStockThreshold,
-                              });
-                              setIsProductModalOpen(true);
-                            }}
-                          >
-                            Edit
-                          </button>
+                          <div style={{ display: 'flex', gap: '0.4rem' }}>
+                            <button
+                              type="button"
+                              className="btn-secondary"
+                              style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
+                              onClick={() => {
+                                setEditingProduct(p);
+                                setProductForm({
+                                  name: p.name,
+                                  slug: p.slug,
+                                  categoryId: p.categoryId,
+                                  description: p.description || '',
+                                  priceRupees: (p.basePrice / 100).toString(),
+                                  foodClassification: p.foodClassification ?? (p.isVeg ? 'vegetarian' : 'non_vegetarian'),
+                                  isVeg: p.isVeg,
+                                  prepTime: p.prepTimeMinutes,
+                                  initialStock: p.physicalStock,
+                                  lowStockThreshold: p.lowStockThreshold,
+                                  imageUrl: p.imageUrl || '',
+                                });
+                                setImageUploadError(null);
+                                setIsProductModalOpen(true);
+                              }}
+                            >
+                              Edit
+                            </button>
+                            <button
+                              type="button"
+                              className="btn-danger"
+                              style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', background: '#FEECEB', color: '#DC3545' }}
+                              onClick={() => setDeletingProduct(p)}
+                            >
+                              Delete
+                            </button>
+                          </div>
                         </td>
                       )}
                     </tr>
@@ -1330,15 +1442,134 @@ export default function AdminDashboardPage(): ReactElement {
                 />
               </div>
 
-              <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+              {/* Food Classification */}
+              <div style={{ marginBottom: '1rem', padding: '0.75rem', background: 'var(--color-bg-cream)', borderRadius: '8px', border: '1px solid var(--color-border)' }}>
+                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, marginBottom: '0.5rem' }}>
+                  Dietary / Food Classification
+                </label>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.85rem' }}>
+                    <input
+                      type="radio"
+                      name="foodClassification"
+                      value="vegetarian"
+                      checked={productForm.foodClassification === 'vegetarian'}
+                      onChange={() => setProductForm({ ...productForm, foodClassification: 'vegetarian', isVeg: true })}
+                      style={{ width: 'auto' }}
+                    />
+                    <FoodIndicator classification="vegetarian" size={16} />
+                    <span>Vegetarian</span>
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.85rem' }}>
+                    <input
+                      type="radio"
+                      name="foodClassification"
+                      value="non_vegetarian"
+                      checked={productForm.foodClassification === 'non_vegetarian'}
+                      onChange={() => setProductForm({ ...productForm, foodClassification: 'non_vegetarian', isVeg: false })}
+                      style={{ width: 'auto' }}
+                    />
+                    <FoodIndicator classification="non_vegetarian" size={16} />
+                    <span>Non-Vegetarian</span>
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.85rem' }}>
+                    <input
+                      type="radio"
+                      name="foodClassification"
+                      value="unclassified"
+                      checked={productForm.foodClassification === 'unclassified'}
+                      onChange={() => setProductForm({ ...productForm, foodClassification: 'unclassified', isVeg: false })}
+                      style={{ width: 'auto' }}
+                    />
+                    <span style={{ color: 'var(--color-text-muted)' }}>—</span>
+                    <span>Not Applicable / Non-Food</span>
+                  </label>
+                </div>
+              </div>
+
+              {/* Image Upload */}
+              <div style={{ marginBottom: '0.8rem' }}>
+                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '0.3rem' }}>
+                  Product Image (Device Upload to Supabase Storage)
+                </label>
+                
+                {productForm.imageUrl && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', marginBottom: '0.5rem', padding: '0.5rem', background: '#FFF', border: '1px solid var(--color-border)', borderRadius: '6px' }}>
+                    <img
+                      src={productForm.imageUrl}
+                      alt="Product preview"
+                      style={{ width: '56px', height: '56px', objectFit: 'cover', borderRadius: '4px' }}
+                    />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {productForm.imageUrl}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      className="btn-danger"
+                      style={{ fontSize: '0.75rem', padding: '0.3rem 0.6rem' }}
+                      onClick={() => setProductForm({ ...productForm, imageUrl: '' })}
+                    >
+                      Remove
+                    </button>
+                  </div>
+                )}
+
                 <input
-                  type="checkbox"
-                  checked={productForm.isVeg}
-                  onChange={(e) => setProductForm({ ...productForm, isVeg: e.target.checked })}
-                  style={{ width: 'auto' }}
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                  disabled={isUploadingImage}
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file || !token) return;
+                    if (!file.type.startsWith('image/')) {
+                      setImageUploadError('Please select a valid image file (JPEG, PNG, WebP, SVG).');
+                      return;
+                    }
+                    if (file.size > 5 * 1024 * 1024) {
+                      setImageUploadError('Image size exceeds 5MB limit.');
+                      return;
+                    }
+                    setIsUploadingImage(true);
+                    setImageUploadError(null);
+                    try {
+                      const reader = new FileReader();
+                      reader.onload = async () => {
+                        const base64 = reader.result as string;
+                        try {
+                          const res = await uploadAdminProductImage(token, base64, file.name, file.type);
+                          setProductForm((prev) => ({ ...prev, imageUrl: res.url }));
+                          setStatusMessage('Image uploaded successfully to Supabase Storage.');
+                        } catch (err: unknown) {
+                          setImageUploadError(err instanceof Error ? err.message : 'Failed to upload image.');
+                        } finally {
+                          setIsUploadingImage(false);
+                        }
+                      };
+                      reader.onerror = () => {
+                        setImageUploadError('Failed to read image file.');
+                        setIsUploadingImage(false);
+                      };
+                      reader.readAsDataURL(file);
+                    } catch (err: unknown) {
+                      setImageUploadError(err instanceof Error ? err.message : 'Upload failed.');
+                      setIsUploadingImage(false);
+                    }
+                  }}
+                  style={{ fontSize: '0.85rem' }}
                 />
-                <span style={{ fontSize: '0.85rem' }}>🌱 Vegetarian / Eggless Delicacy</span>
-              </label>
+                {isUploadingImage && (
+                  <div style={{ fontSize: '0.8rem', color: 'var(--color-brand-primary)', marginTop: '0.3rem' }}>
+                    ⏳ Uploading image to storage bucket...
+                  </div>
+                )}
+                {imageUploadError && (
+                  <div style={{ fontSize: '0.8rem', color: '#DC3545', marginTop: '0.3rem' }}>
+                    {imageUploadError}
+                  </div>
+                )}
+              </div>
             </div>
 
             <div className="modal-footer">
@@ -1346,6 +1577,7 @@ export default function AdminDashboardPage(): ReactElement {
               <button
                 type="button"
                 className="btn-primary"
+                disabled={isUploadingImage}
                 onClick={async () => {
                   if (!token) return;
                   const pricePaise = Math.round(parseFloat(productForm.priceRupees) * 100);
@@ -1360,6 +1592,12 @@ export default function AdminDashboardPage(): ReactElement {
                     return;
                   }
 
+                  const foodClassification =
+                    productForm.foodClassification === 'unclassified'
+                      ? null
+                      : productForm.foodClassification;
+                  const isVeg = productForm.foodClassification === 'vegetarian';
+
                   try {
                     if (editingProduct) {
                       await updateAdminProduct(token, editingProduct.id, {
@@ -1368,8 +1606,10 @@ export default function AdminDashboardPage(): ReactElement {
                         categoryId: selectedCategoryId,
                         description: productForm.description,
                         basePrice: pricePaise,
-                        isVeg: productForm.isVeg,
+                        foodClassification,
+                        isVeg,
                         prepTimeMinutes: productForm.prepTime,
+                        imageUrl: productForm.imageUrl ? productForm.imageUrl : null,
                       });
                     } else {
                       await createAdminProduct(token, {
@@ -1378,10 +1618,12 @@ export default function AdminDashboardPage(): ReactElement {
                         categoryId: selectedCategoryId,
                         description: productForm.description,
                         basePrice: pricePaise,
-                        isVeg: productForm.isVeg,
+                        foodClassification,
+                        isVeg,
                         prepTimeMinutes: productForm.prepTime,
                         initialStock: productForm.initialStock,
                         lowStockThreshold: productForm.lowStockThreshold,
+                        imageUrl: productForm.imageUrl ? productForm.imageUrl : null,
                         taxRatePct: 5,
                         allergens: [],
                         isActive: true,
@@ -1396,6 +1638,61 @@ export default function AdminDashboardPage(): ReactElement {
                 }}
               >
                 Save Product
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Product Confirmation Modal */}
+      {deletingProduct && (
+        <div className="modal-backdrop">
+          <div className="modal-card" style={{ maxWidth: '460px' }}>
+            <div className="modal-header">
+              <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#DC3545' }}>Confirm Product Removal</h3>
+              <button type="button" onClick={() => setDeletingProduct(null)}>✕</button>
+            </div>
+            <div className="modal-body">
+              <p style={{ fontSize: '0.9rem', marginBottom: '0.8rem' }}>
+                Are you sure you want to remove <strong>{deletingProduct.name}</strong>?
+              </p>
+              <div style={{ padding: '0.75rem', background: 'var(--color-bg-cream)', borderRadius: '6px', border: '1px solid var(--color-border)', fontSize: '0.8rem', color: 'var(--color-text-muted)', lineHeight: '1.4' }}>
+                ℹ️ <strong>Safe Deletion Policy:</strong> If this product has existing customer orders, it will be safely deactivated/archived to protect historical receipts. If it has no order history, it will be permanently removed.
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button
+                type="button"
+                className="btn-secondary"
+                disabled={isDeleting}
+                onClick={() => setDeletingProduct(null)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn-danger"
+                disabled={isDeleting}
+                onClick={async () => {
+                  if (!token || !deletingProduct) return;
+                  setIsDeleting(true);
+                  try {
+                    const res = await deleteAdminProduct(token, deletingProduct.id);
+                    setStatusMessage(
+                      res.archived
+                        ? `Product "${deletingProduct.name}" has order history and was deactivated/archived.`
+                        : `Product "${deletingProduct.name}" was permanently removed.`
+                    );
+                    setDeletingProduct(null);
+                    loadData();
+                  } catch (err: unknown) {
+                    alert(`Failed to delete product: ${err instanceof Error ? err.message : 'Unknown error'}`);
+                  } finally {
+                    setIsDeleting(false);
+                  }
+                }}
+              >
+                {isDeleting ? 'Deleting...' : 'Confirm Delete / Deactivate'}
               </button>
             </div>
           </div>

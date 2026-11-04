@@ -26,28 +26,25 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.moodyorange.app.ui.theme.BorderMuted
-import com.moodyorange.app.ui.theme.CardBackground
-import com.moodyorange.app.ui.theme.OrangePrimary
-import com.moodyorange.app.ui.theme.TextMuted
-import com.moodyorange.app.ui.theme.TextPrimary
+import com.moodyorange.app.ui.theme.MangalaTheme
 
 @Composable
 fun SearchBar(
     query: String,
     onQueryChange: (String) -> Unit,
     modifier: Modifier = Modifier,
-    placeholderText: String = "Search cakes, cold juices, pralines..."
+    placeholderText: String = "Search artisanal delicacies, juices, confections..."
 ) {
+    val colors = MangalaTheme.colors
     val focusManager = LocalFocusManager.current
 
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(CardBackground)
-            .border(1.dp, BorderMuted, RoundedCornerShape(12.dp))
-            .padding(horizontal = 14.dp, vertical = 12.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .background(colors.surface)
+            .border(0.5.dp, colors.border, RoundedCornerShape(10.dp))
+            .padding(horizontal = 14.dp, vertical = 11.dp)
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -55,7 +52,7 @@ fun SearchBar(
         ) {
             Text(
                 text = "🔍",
-                fontSize = 15.sp
+                fontSize = 14.sp
             )
 
             Spacer(modifier = Modifier.width(10.dp))
@@ -64,8 +61,8 @@ fun SearchBar(
                 if (query.isEmpty()) {
                     Text(
                         text = placeholderText,
-                        color = TextMuted,
-                        fontSize = 14.sp
+                        color = colors.textMuted,
+                        fontSize = 13.5.sp
                     )
                 }
 
@@ -74,11 +71,11 @@ fun SearchBar(
                     onValueChange = onQueryChange,
                     singleLine = true,
                     textStyle = TextStyle(
-                        color = TextPrimary,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Medium
+                        color = colors.textPrimary,
+                        fontSize = 13.5.sp,
+                        fontWeight = FontWeight.Normal
                     ),
-                    cursorBrush = SolidColor(OrangePrimary),
+                    cursorBrush = SolidColor(colors.primary),
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                     keyboardActions = KeyboardActions(onSearch = {
                         focusManager.clearFocus()
@@ -100,12 +97,10 @@ fun SearchBar(
                     Text(
                         text = "✕",
                         fontSize = 12.sp,
-                        color = TextMuted,
-                        fontWeight = FontWeight.Bold
+                        color = colors.textMuted
                     )
                 }
             }
         }
     }
 }
-

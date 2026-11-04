@@ -48,7 +48,7 @@ export function CartDrawer({ isOpen, onClose }: CartDrawerProps): ReactElement |
           {/* Header */}
           <div className="drawer-header">
             <div className="drawer-brand-badge">
-              <span className="brand-logo-mark" aria-hidden="true">🍊</span>
+              <span className="brand-logo-mark" aria-hidden="true">🌿</span>
               <div>
                 <h2 className="drawer-title">Shopping Bag</h2>
                 <span className="drawer-count-subtitle">

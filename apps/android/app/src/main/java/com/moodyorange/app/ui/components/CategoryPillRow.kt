@@ -15,16 +15,14 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.moodyorange.app.data.model.Category
-import com.moodyorange.app.ui.theme.BorderMuted
-import com.moodyorange.app.ui.theme.CardBackground
-import com.moodyorange.app.ui.theme.OrangePrimary
-import com.moodyorange.app.ui.theme.TextPrimary
-import com.moodyorange.app.ui.theme.TextSecondary
+import com.moodyorange.app.ui.theme.ForestGreen
+import com.moodyorange.app.ui.theme.MangalaTheme
+import com.moodyorange.app.ui.theme.MutedGold
+import com.moodyorange.app.ui.theme.WhiteSurface
 
 @Composable
 fun CategoryPillRow(
@@ -39,7 +37,7 @@ fun CategoryPillRow(
         modifier = modifier
             .fillMaxWidth()
             .horizontalScroll(scrollState)
-            .padding(horizontal = 20.dp, vertical = 6.dp),
+            .padding(horizontal = 16.dp, vertical = 6.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         // "All Products" pill
@@ -69,24 +67,40 @@ fun CategoryPill(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val bg = if (isSelected) OrangePrimary else CardBackground
-    val textColor = if (isSelected) Color.White else TextSecondary
-    val borderColor = if (isSelected) OrangePrimary else BorderMuted
+    val colors = MangalaTheme.colors
+    val isDark = colors.isDark
+
+    val bg = if (isSelected) {
+        if (isDark) MutedGold else ForestGreen
+    } else {
+        colors.surfaceElevated
+    }
+
+    val textColor = if (isSelected) {
+        if (isDark) colors.canvas else WhiteSurface
+    } else {
+        colors.textSecondary
+    }
+
+    val borderColor = if (isSelected) {
+        if (isDark) MutedGold else ForestGreen
+    } else {
+        colors.border
+    }
 
     Box(
         modifier = modifier
-            .clip(RoundedCornerShape(20.dp))
+            .clip(RoundedCornerShape(10.dp))
             .background(bg)
-            .border(1.dp, borderColor, RoundedCornerShape(20.dp))
+            .border(0.5.dp, borderColor, RoundedCornerShape(10.dp))
             .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .padding(horizontal = 14.dp, vertical = 7.dp)
     ) {
         Text(
             text = label,
-            fontSize = 13.sp,
-            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
+            fontSize = 12.sp,
+            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
             color = textColor
         )
     }
 }
-

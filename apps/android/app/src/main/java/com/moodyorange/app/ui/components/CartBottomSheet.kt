@@ -32,21 +32,14 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.moodyorange.app.data.model.CartItem
-import com.moodyorange.app.ui.theme.BorderMuted
-import com.moodyorange.app.ui.theme.CardBackground
-import com.moodyorange.app.ui.theme.CreamBackground
 import com.moodyorange.app.ui.theme.EditorialSerif
-import com.moodyorange.app.ui.theme.OrangeLight
-import com.moodyorange.app.ui.theme.OrangePrimary
-import com.moodyorange.app.ui.theme.OutOfStockRed
-import com.moodyorange.app.ui.theme.TextMuted
-import com.moodyorange.app.ui.theme.TextPrimary
-import com.moodyorange.app.ui.theme.TextSecondary
+import com.moodyorange.app.ui.theme.MangalaTheme
+import com.moodyorange.app.ui.theme.WhiteSurface
 import com.moodyorange.app.ui.viewmodel.ShopViewModel
 import com.moodyorange.app.util.CurrencyFormatter
 
@@ -56,6 +49,8 @@ fun CartBottomSheet(
     shopViewModel: ShopViewModel,
     onDismiss: () -> Unit
 ) {
+    val colors = MangalaTheme.colors
+    val isDark = colors.isDark
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val cartItems by shopViewModel.cartItems.collectAsState()
     val session by shopViewModel.sessionState.collectAsState()
@@ -66,14 +61,14 @@ fun CartBottomSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = CardBackground,
-        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
+        containerColor = colors.surface,
+        shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .fillMaxHeight(0.85f)
-                .padding(horizontal = 20.dp, vertical = 10.dp)
+                .padding(horizontal = 16.dp, vertical = 8.dp)
         ) {
             // Header
             Row(
@@ -85,34 +80,34 @@ fun CartBottomSheet(
                     Text(
                         text = "Shopping Bag",
                         fontFamily = EditorialSerif,
-                        fontSize = 22.sp,
+                        fontSize = 20.sp,
                         fontWeight = FontWeight.Bold,
-                        color = TextPrimary
+                        color = colors.textPrimary
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Box(
                         modifier = Modifier
                             .clip(CircleShape)
-                            .background(OrangeLight)
-                            .padding(horizontal = 8.dp, vertical = 3.dp)
+                            .background(colors.primaryContainer)
+                            .padding(horizontal = 8.dp, vertical = 2.5.dp)
                     ) {
                         Text(
                             text = "$totalItems items",
-                            fontSize = 11.sp,
+                            fontSize = 10.5.sp,
                             fontWeight = FontWeight.Bold,
-                            color = OrangePrimary
+                            color = colors.primary
                         )
                     }
                 }
 
                 if (cartItems.isNotEmpty()) {
                     TextButton(onClick = { shopViewModel.clearCart() }) {
-                        Text("Clear All", color = OutOfStockRed, fontSize = 12.sp)
+                        Text("Clear All", color = colors.outOfStockRed, fontSize = 11.5.sp)
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(14.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
             if (cartItems.isEmpty()) {
                 // Empty state
@@ -125,38 +120,39 @@ fun CartBottomSheet(
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(64.dp)
+                            .size(56.dp)
                             .clip(CircleShape)
-                            .background(OrangeLight),
+                            .background(colors.surfaceElevated),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(text = "🛍️", fontSize = 28.sp)
+                        Text(text = "🛍️", fontSize = 24.sp)
                     }
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
                     Text(
                         text = "Your Bag is Empty",
                         fontFamily = EditorialSerif,
-                        fontSize = 18.sp,
+                        fontSize = 17.sp,
                         fontWeight = FontWeight.Bold,
-                        color = TextPrimary
+                        color = colors.textPrimary
                     )
-                    Spacer(modifier = Modifier.height(6.dp))
+                    Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "Browse our artisanal cakes, cold juices, and fresh confections.",
-                        fontSize = 13.sp,
-                        color = TextSecondary,
-                        modifier = Modifier.padding(horizontal = 30.dp)
+                        text = "Browse our handcrafted delicacies and cold extracts for pickup.",
+                        fontSize = 12.5.sp,
+                        color = colors.textSecondary,
+                        modifier = Modifier.padding(horizontal = 24.dp),
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
                     )
-                    Spacer(modifier = Modifier.height(20.dp))
+                    Spacer(modifier = Modifier.height(16.dp))
                     Button(
                         onClick = onDismiss,
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = OrangePrimary,
-                            contentColor = Color.White
+                            containerColor = colors.primary,
+                            contentColor = if (isDark) colors.canvas else WhiteSurface
                         ),
-                        shape = RoundedCornerShape(12.dp)
+                        shape = RoundedCornerShape(10.dp)
                     ) {
-                        Text("Explore Boutique Menu", fontWeight = FontWeight.Bold)
+                        Text("Explore Boutique Menu", fontWeight = FontWeight.Bold, fontSize = 13.5.sp)
                     }
                 }
             } else {
@@ -165,8 +161,8 @@ fun CartBottomSheet(
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f),
-                    contentPadding = PaddingValues(vertical = 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    contentPadding = PaddingValues(vertical = 4.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     items(cartItems, key = { it.productId }) { item ->
                         CartItemRow(
@@ -178,16 +174,16 @@ fun CartBottomSheet(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(10.dp))
 
                 // Bottom Subtotal & Checkout Action
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(18.dp))
-                        .background(CreamBackground)
-                        .border(1.dp, BorderMuted, RoundedCornerShape(18.dp))
-                        .padding(16.dp)
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(colors.surfaceElevated)
+                        .border(0.5.dp, colors.border, RoundedCornerShape(14.dp))
+                        .padding(14.dp)
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -196,25 +192,26 @@ fun CartBottomSheet(
                     ) {
                         Text(
                             text = "Estimated Subtotal",
-                            fontSize = 14.sp,
-                            color = TextSecondary
+                            fontSize = 13.sp,
+                            color = colors.textSecondary
                         )
                         Text(
                             text = CurrencyFormatter.formatPaiseToInr(subtotalPaise),
-                            fontSize = 18.sp,
+                            fontFamily = EditorialSerif,
+                            fontSize = 17.sp,
                             fontWeight = FontWeight.Bold,
-                            color = TextPrimary
+                            color = colors.textPrimary
                         )
                     }
 
-                    Spacer(modifier = Modifier.height(4.dp))
+                    Spacer(modifier = Modifier.height(3.dp))
                     Text(
-                        text = "Counter pickup in 15 mins. Tax and packaging calculated at checkout.",
-                        fontSize = 11.sp,
-                        color = TextMuted
+                        text = "Counter pickup in ~15 mins. Taxes calculated at checkout.",
+                        fontSize = 10.5.sp,
+                        color = colors.textMuted
                     )
 
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
 
                     Button(
                         onClick = {
@@ -226,23 +223,23 @@ fun CartBottomSheet(
                             }
                         },
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = OrangePrimary,
-                            contentColor = Color.White
+                            containerColor = colors.primary,
+                            contentColor = if (isDark) colors.canvas else WhiteSurface
                         ),
-                        shape = RoundedCornerShape(14.dp),
+                        shape = RoundedCornerShape(10.dp),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(50.dp)
+                            .height(46.dp)
                     ) {
                         Text(
                             text = if (session == null) "Sign In to Checkout" else "Proceed to Counter Pickup",
                             fontWeight = FontWeight.Bold,
-                            fontSize = 15.sp
+                            fontSize = 14.sp
                         )
                     }
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(12.dp))
             }
         }
     }
@@ -256,46 +253,60 @@ fun CartItemRow(
     onRemove: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val colors = MangalaTheme.colors
+
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
-            .background(CardBackground)
-            .border(1.dp, BorderMuted, RoundedCornerShape(14.dp))
-            .padding(12.dp),
+            .clip(RoundedCornerShape(12.dp))
+            .background(colors.surface)
+            .border(0.5.dp, colors.border, RoundedCornerShape(12.dp))
+            .padding(10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Thumbnail Image or Vector Placeholder
+        // Thumbnail Image
         Box(
             modifier = Modifier
-                .size(60.dp)
-                .clip(RoundedCornerShape(10.dp))
+                .size(54.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .background(colors.surfaceElevated)
         ) {
             ProductImage(
                 imageUrl = item.product.imageUrl,
                 categorySlug = item.product.categorySlug,
                 contentDescription = item.product.name,
-                modifier = Modifier.size(60.dp)
+                modifier = Modifier.size(54.dp)
             )
         }
 
-        Spacer(modifier = Modifier.width(12.dp))
+        Spacer(modifier = Modifier.width(10.dp))
 
-        // Product details
+        // Product details & dietary classification
         Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = item.product.name,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = TextPrimary,
-                maxLines = 1
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                FoodClassificationIndicator(
+                    isVeg = item.product.isVeg,
+                    size = 14.dp
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(
+                    text = item.product.name,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = colors.textPrimary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+
             Spacer(modifier = Modifier.height(2.dp))
+
             Text(
                 text = CurrencyFormatter.formatPaiseToInr(item.product.basePrice),
+                fontFamily = EditorialSerif,
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Bold,
-                color = OrangePrimary
+                color = colors.primary
             )
         }
 
@@ -303,35 +314,35 @@ fun CartItemRow(
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
-                .clip(RoundedCornerShape(8.dp))
-                .border(1.dp, BorderMuted, RoundedCornerShape(8.dp))
-                .background(CreamBackground)
+                .clip(RoundedCornerShape(6.dp))
+                .border(0.5.dp, colors.border, RoundedCornerShape(6.dp))
+                .background(colors.surfaceElevated)
                 .padding(horizontal = 4.dp, vertical = 2.dp)
         ) {
             Box(
                 modifier = Modifier
-                    .size(28.dp)
+                    .size(26.dp)
                     .clickable { onDecrement() },
                 contentAlignment = Alignment.Center
             ) {
-                Text(text = "−", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                Text(text = "−", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = colors.textPrimary)
             }
 
             Text(
                 text = "${item.quantity}",
-                fontSize = 13.sp,
+                fontSize = 12.sp,
                 fontWeight = FontWeight.Bold,
-                color = TextPrimary,
-                modifier = Modifier.padding(horizontal = 8.dp)
+                color = colors.textPrimary,
+                modifier = Modifier.padding(horizontal = 6.dp)
             )
 
             Box(
                 modifier = Modifier
-                    .size(28.dp)
+                    .size(26.dp)
                     .clickable { onIncrement() },
                 contentAlignment = Alignment.Center
             ) {
-                Text(text = "+", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                Text(text = "+", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = colors.textPrimary)
             }
         }
     }

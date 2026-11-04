@@ -29,14 +29,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.moodyorange.app.ui.theme.DarkBackground
-import com.moodyorange.app.ui.theme.DarkBorder
-import com.moodyorange.app.ui.theme.DarkTextMuted
-import com.moodyorange.app.ui.theme.OrangeLight
-import com.moodyorange.app.ui.theme.OrangePrimary
+import com.moodyorange.app.ui.theme.ForestGreen
+import com.moodyorange.app.ui.theme.MangalaTheme
+import com.moodyorange.app.ui.theme.MutedGold
+import com.moodyorange.app.ui.theme.SoftSageSubtle
 
 enum class NavTab(val label: String, val icon: String) {
-    HOME("Home", "🍊"),
+    HOME("Home", "🏠"),
     SHOP("Shop", "🛍️"),
     ORDERS("Orders", "📦"),
     ACCOUNT("Account", "👤")
@@ -48,13 +47,22 @@ fun BottomNavBar(
     onTabSelected: (NavTab) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val colors = MangalaTheme.colors
+    val isDark = colors.isDark
+    val activeColor = if (isDark) MutedGold else ForestGreen
+    val activePillBg = if (isDark) colors.surfaceElevated else SoftSageSubtle
+
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .background(DarkBackground)
-            .border(width = 1.dp, color = DarkBorder, shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
+            .background(colors.surface)
+            .border(
+                width = 0.5.dp,
+                color = colors.border,
+                shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)
+            )
             .navigationBarsPadding()
-            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .padding(horizontal = 12.dp, vertical = 6.dp)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -64,8 +72,8 @@ fun BottomNavBar(
             NavTab.entries.forEach { tab ->
                 val isSelected = selectedTab == tab
                 val iconColor by animateColorAsState(
-                    targetValue = if (isSelected) OrangePrimary else DarkTextMuted,
-                    animationSpec = tween(250),
+                    targetValue = if (isSelected) activeColor else colors.textMuted,
+                    animationSpec = tween(220),
                     label = "tabColor"
                 )
 
@@ -79,18 +87,18 @@ fun BottomNavBar(
                             interactionSource = interactionSource,
                             indication = null
                         ) { onTabSelected(tab) }
-                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                        .padding(horizontal = 12.dp, vertical = 4.dp)
                 ) {
                     Box(
                         modifier = Modifier
                             .size(34.dp)
                             .clip(CircleShape)
-                            .background(if (isSelected) Color(0x33FF5500) else Color.Transparent),
+                            .background(if (isSelected) activePillBg else Color.Transparent),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
                             text = tab.icon,
-                            fontSize = 18.sp
+                            fontSize = 17.sp
                         )
                     }
 
@@ -100,7 +108,7 @@ fun BottomNavBar(
                         text = tab.label,
                         fontSize = 11.sp,
                         fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                        color = if (isSelected) OrangePrimary else DarkTextMuted
+                        color = iconColor
                     )
                 }
             }

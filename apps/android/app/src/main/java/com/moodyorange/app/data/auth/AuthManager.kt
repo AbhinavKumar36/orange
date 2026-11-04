@@ -296,14 +296,35 @@ class AuthManager(
         Result.failure(lastException ?: Exception("Network error verifying OTP code."))
     }
 
-    suspend fun updateFullName(name: String): Result<CustomerProfile> = withContext(Dispatchers.IO) {
+    suspend fun updateFullName(name: String): Result<CustomerProfile> = updateProfile(name, null)
+
+    suspend fun updateProfile(fullName: String, email: String? = null): Result<CustomerProfile> = withContext(Dispatchers.IO) {
         val currentSession = _sessionState.value
             ?: return@withContext Result.failure(IllegalStateException("No customer session found"))
 
-        val result = apiClient.updateProfile(name, currentSession.accessToken)
+        val result = apiClient.updateProfile(fullName, email, currentSession.accessToken)
         result.onSuccess { profile ->
-            val updatedSession = currentSession.copy(fullName = profile.fullName)
+            val updatedSession = currentSession.copy(
+                fullName = profile.fullName,
+                email = profile.email
+            )
             persistSession(updatedSession)
+        }
+        result
+    }
+
+    suspend fun fetchProfile(): Result<CustomerProfile> = withContext(Dispatchers.IO) {
+        val currentSession = _sessionState.value
+            ?: return@withContext Result.failure(IllegalStateException("No customer session found"))
+        val result = apiClient.getProfile(currentSession.accessToken)
+        result.onSuccess { profile ->
+            if (profile.fullName != currentSession.fullName || profile.email != currentSession.email) {
+                val updatedSession = currentSession.copy(
+                    fullName = profile.fullName,
+                    email = profile.email
+                )
+                persistSession(updatedSession)
+            }
         }
         result
     }

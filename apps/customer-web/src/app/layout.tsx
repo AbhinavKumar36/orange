@@ -1,9 +1,11 @@
 import type { ReactNode } from 'react';
 import './globals.css';
+import { ThemeProvider } from '../components/ThemeProvider';
 
 export const metadata = {
-  title: 'Moody Orange — Artisanal Quick-Commerce',
-  description: 'Boutique artisanal cakes, fresh cold-pressed juices, and gourmet chocolates',
+  title: 'Mangala Enterprises — Boutique Artisanal Commerce',
+  description:
+    'Mangala Enterprises — Handcrafted boutique artisanal cakes, pure cold-pressed nectars, and single-origin gourmet chocolates for fresh counter pickup.',
 };
 
 export default function RootLayout({
@@ -12,9 +14,19 @@ export default function RootLayout({
   children: ReactNode;
 }) {
   return (
-    <html lang="en">
-      <body>{children}</body>
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var t=localStorage.getItem('mangala_theme')||'light';var r=t;if(t==='system'){r=window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}document.documentElement.setAttribute('data-theme',r);if(r==='dark'){document.documentElement.classList.add('dark');}}catch(e){}})();`,
+          }}
+        />
+      </head>
+      <body>
+        <ThemeProvider>
+          {children}
+        </ThemeProvider>
+      </body>
     </html>
   );
 }
-

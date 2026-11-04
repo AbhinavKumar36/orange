@@ -2,43 +2,108 @@ package com.moodyorange.app.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// Obsidian & Midnight Charcoal (Dark Luxury Surfaces)
-val DarkBackground = Color(0xFF090807)
-val DarkSurface = Color(0xFF141210)
-val DarkSurfaceVariant = Color(0xFF1C1916)
-val DarkBorder = Color(0x33FFFFFF) // Subtle 20% white hairline
-val DarkBorderSubtle = Color(0x1AFFFFFF) // 10% white hairline
-val DarkTextPrimary = Color(0xFFFDFBF7)
-val DarkTextSecondary = Color(0xFFB8AEA4)
-val DarkTextMuted = Color(0xFF7D746C)
+// ==============================================================================
+// MANGALA ENTERPRISES — OPTION B: ELEGANT MINIMAL COLOR PALETTE
+// Palette:
+// Forest Green: #123D30
+// Warm Ivory:   #F6F1E7
+// Muted Gold:   #D7A34A
+// Charcoal:     #252923
+// Soft Sage:    #DCE5DB
+// White:        #FFFFFF
+// ==============================================================================
 
-// Warm Cream & Ivory (Editorial Daytime Surfaces)
-val CreamBackground = Color(0xFFFFFDF9)
-val CreamSurface = Color(0xFFFAF6F0)
-val CreamSurfaceVariant = Color(0xFFF3ECE1)
-val CreamBorder = Color(0xFFE8DFD0)
-val CardBackground = Color(0xFFFFFFFF)
+// Primary Brand Anchors
+val ForestGreen = Color(0xFF123D30)
+val ForestGreenHover = Color(0xFF0B2920)
+val ForestGreenDark = Color(0xFF071F17)
+val ForestGreenGlow = Color(0x38123D30)
 
-// Primary Brand Accents (Moody Orange & Amber Glow)
-val OrangePrimary = Color(0xFFFF5500) // Signature Moody Orange
-val OrangeSecondary = Color(0xFFFF7A00) // Warm Amber Orange
-val OrangeLight = Color(0xFFFFF0E6) // Soft Orange Glow Pill
-val OrangeDark = Color(0xFFD43D00) // Deep Amber
-val OrangeGlow = Color(0x40FF5500) // 25% Orange Glow for radial/glows
-val AmberGold = Color(0xFFFF9E00) // High-end Citrus Amber
-val GourmetGold = Color(0xFFD4AF37) // Metallic Gold Accent
-val GoldGlow = Color(0x33D4AF37)
+val MutedGold = Color(0xFFD7A34A)
+val MutedGoldHover = Color(0xFFC6933B)
+val MutedGoldLight = Color(0xFFF7EBD3)
+val MutedGoldGlow = Color(0x40D7A34A)
 
-// Text Hierarchy
-val TextPrimary = Color(0xFF141210) // Near-black charcoal
-val TextSecondary = Color(0xFF5E554D) // Refined warm grey
-val TextMuted = Color(0xFF968D84) // Editorial caption muted
-val BorderMuted = Color(0xFFE8DFD0) // Card hairline border
+val SoftSage = Color(0xFFDCE5DB)
+val SoftSageSubtle = Color(0xFFEAF0E9)
 
-// Dietary, Availability & Status Accents
-val VegGreen = Color(0xFF1B6B38)
-val VegGreenBg = Color(0xFFEAF5EC)
-val InStockGreen = Color(0xFF238636)
-val InStockBg = Color(0xFFEAF5EC)
+// Light Mode Surfaces (Warm Ivory & Pure White)
+val WarmIvoryCanvas = Color(0xFFF6F1E7)
+val WhiteSurface = Color(0xFFFFFFFF)
+val SurfaceElevatedLight = Color(0xFFFAF6EF)
+val SurfaceHoverLight = Color(0xFFEFE9DD)
+val CardBorderLight = Color(0xFFE2DBD0)
+val DividerLight = Color(0xFFE5DFD4)
+
+// Dark Mode Surfaces (Deep Forest Charcoal & Obsidian)
+val DeepCharcoalCanvas = Color(0xFF0A1612)
+val DeepForestSurface = Color(0xFF11221B)
+val SurfaceElevatedDark = Color(0xFF182E25)
+val SurfaceHoverDark = Color(0xFF1F3A2F)
+val CardBorderDark = Color(0xFF1F3A2F)
+val CardBorderGoldDark = Color(0x33D7A34A)
+val DividerDark = Color(0xFF1E332B)
+
+// Typography Hierarchies
+// Light Mode:
+val CharcoalTextPrimary = Color(0xFF252923)
+val CharcoalTextSecondary = Color(0xFF3F453B)
+val CharcoalTextMuted = Color(0xFF6B7266)
+val CharcoalTextSubtle = Color(0xFF8F968B)
+
+// Dark Mode:
+val WarmIvoryTextPrimary = Color(0xFFF6F1E7)
+val SoftSageTextSecondary = Color(0xFFDCE5DB)
+val MutedTextDark = Color(0xFF8F968B)
+
+// FSSAI Food Classification & Stock Status Accents (Indian Statutory Standards)
+val FssaiVegGreen = Color(0xFF168A45)
+val FssaiVegBgLight = Color(0xFFE8F5EC)
+val FssaiVegBgDark = Color(0x26168A45)
+
+val FssaiNonVegRed = Color(0xFFD32F2F)
+val FssaiNonVegBgLight = Color(0xFFFFEBEE)
+val FssaiNonVegBgDark = Color(0x26D32F2F)
+
+val InStockGreen = Color(0xFF168A45)
+val InStockBg = Color(0xFFE8F5EC)
+val InStockBgDark = Color(0x26168A45)
+
 val OutOfStockRed = Color(0xFFD32F2F)
-val OutOfStockBg = Color(0xFFFDE8E8)
+val OutOfStockBg = Color(0xFFFFEBEE)
+val OutOfStockBgDark = Color(0x26D32F2F)
+
+// ==============================================================================
+// Legacy Compatibility Mappings (Mapped directly to Option B Elegant Minimal)
+// ==============================================================================
+val OrangePrimary = ForestGreen
+val OrangeSecondary = MutedGold
+val OrangeLight = SoftSageSubtle
+val OrangeDark = ForestGreenDark
+val OrangeGlow = ForestGreenGlow
+val AmberGold = MutedGold
+val GourmetGold = MutedGold
+val GoldGlow = MutedGoldGlow
+
+val CreamBackground = WarmIvoryCanvas
+val CreamSurface = SurfaceElevatedLight
+val CreamSurfaceVariant = SurfaceHoverLight
+val CreamBorder = CardBorderLight
+val CardBackground = WhiteSurface
+
+val DarkBackground = DeepCharcoalCanvas
+val DarkSurface = DeepForestSurface
+val DarkSurfaceVariant = SurfaceElevatedDark
+val DarkBorder = CardBorderDark
+val DarkBorderSubtle = CardBorderGoldDark
+val DarkTextPrimary = WarmIvoryTextPrimary
+val DarkTextSecondary = SoftSageTextSecondary
+val DarkTextMuted = MutedTextDark
+
+val TextPrimary = CharcoalTextPrimary
+val TextSecondary = CharcoalTextSecondary
+val TextMuted = CharcoalTextMuted
+val BorderMuted = CardBorderLight
+
+val VegGreen = FssaiVegGreen
+val VegGreenBg = FssaiVegBgLight

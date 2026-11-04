@@ -94,7 +94,7 @@ class CatalogParsingTest {
         assertEquals(2, product.allergens.size)
         assertTrue(product.allergens.contains("dairy"))
         assertTrue(product.allergens.contains("gluten"))
-        assertTrue(product.isVeg)
+        assertEquals(true, product.isVeg)
         assertEquals(20, product.prepTimeMinutes)
         assertNull(product.imageUrl)
         assertTrue(product.isInStock)
@@ -192,6 +192,55 @@ class CatalogParsingTest {
         val json = """{ "products": [] }"""
         val products = apiClient.parseProducts(json)
         assertTrue(products.isEmpty())
+    }
+
+    @Test
+    fun testFoodClassificationParsing() {
+        val json = """
+            {
+              "products": [
+                {
+                  "id": "veg-01",
+                  "categoryId": "cat-01",
+                  "name": "Pistachio Cake",
+                  "slug": "pistachio-cake",
+                  "basePrice": 45000,
+                  "isVeg": true,
+                  "isInStock": true
+                },
+                {
+                  "id": "non-veg-01",
+                  "categoryId": "cat-01",
+                  "name": "Classic Tiramisu with Gelatin",
+                  "slug": "classic-tiramisu",
+                  "basePrice": 52000,
+                  "isVeg": false,
+                  "isInStock": true
+                },
+                {
+                  "id": "merch-01",
+                  "categoryId": "cat-02",
+                  "name": "Boutique Ceramic Mug",
+                  "slug": "ceramic-mug",
+                  "basePrice": 25000,
+                  "isVeg": null,
+                  "isInStock": true
+                }
+              ]
+            }
+        """.trimIndent()
+
+        val products = apiClient.parseProducts(json)
+        assertEquals(3, products.size)
+
+        assertEquals(true, products[0].isVeg)
+        assertEquals("vegetarian", products[0].foodClassification)
+
+        assertEquals(false, products[1].isVeg)
+        assertEquals("non_vegetarian", products[1].foodClassification)
+
+        assertNull(products[2].isVeg)
+        assertNull(products[2].foodClassification)
     }
 }
 

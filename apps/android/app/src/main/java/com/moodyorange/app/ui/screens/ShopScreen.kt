@@ -14,13 +14,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -34,7 +31,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -47,19 +43,7 @@ import com.moodyorange.app.ui.components.HeaderBar
 import com.moodyorange.app.ui.components.ProductCard
 import com.moodyorange.app.ui.components.ProductCardSkeleton
 import com.moodyorange.app.ui.components.SearchBar
-import com.moodyorange.app.ui.theme.BorderMuted
-import com.moodyorange.app.ui.theme.CardBackground
-import com.moodyorange.app.ui.theme.CreamBackground
-import com.moodyorange.app.ui.theme.DarkBackground
-import com.moodyorange.app.ui.theme.DarkBorder
-import com.moodyorange.app.ui.theme.EditorialSerif
-import com.moodyorange.app.ui.theme.InStockGreen
-import com.moodyorange.app.ui.theme.OrangeLight
-import com.moodyorange.app.ui.theme.OrangePrimary
-import com.moodyorange.app.ui.theme.TextMuted
-import com.moodyorange.app.ui.theme.TextPrimary
-import com.moodyorange.app.ui.theme.TextSecondary
-import com.moodyorange.app.ui.theme.VegGreen
+import com.moodyorange.app.ui.theme.MangalaTheme
 import com.moodyorange.app.ui.viewmodel.CatalogViewModel
 import com.moodyorange.app.ui.viewmodel.SortOption
 import com.moodyorange.app.ui.viewmodel.UiState
@@ -74,8 +58,10 @@ fun ShopScreen(
     isLoggedIn: Boolean = false,
     customerName: String? = null,
     onProfileClick: () -> Unit = {},
+    onThemeToggle: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
+    val colors = MangalaTheme.colors
     val categoriesState by viewModel.categoriesState.collectAsState()
     val productsState by viewModel.productsState.collectAsState()
     val selectedCategory by viewModel.selectedCategory.collectAsState()
@@ -89,20 +75,21 @@ fun ShopScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(CreamBackground)
+            .background(colors.canvas)
     ) {
-        // Sticky Header
+        // Sticky Header with theme toggle
         HeaderBar(
             cartItemCount = cartItemCount,
             onCartClick = onCartClick,
             isLoggedIn = isLoggedIn,
             customerName = customerName,
             onProfileClick = onProfileClick,
-            isDark = false
+            onThemeToggle = onThemeToggle,
+            isDark = colors.isDark
         )
 
         // Search Input
-        Box(modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)) {
+        Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) {
             SearchBar(
                 query = searchQuery,
                 onQueryChange = { viewModel.onSearchQueryChanged(it) }
@@ -129,13 +116,13 @@ fun ShopScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .horizontalScroll(filterScrollState)
-                .padding(horizontal = 20.dp, vertical = 6.dp),
+                .padding(horizontal = 16.dp, vertical = 4.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             // Veg Only Toggle Chip
             FilterChip(
-                label = "🌱 Veg Only",
+                label = "🌿 Veg Only",
                 isActive = isVegOnly,
                 onClick = { viewModel.toggleVegOnly() }
             )
@@ -151,22 +138,22 @@ fun ShopScreen(
             Box {
                 Box(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(if (sortOption != SortOption.FEATURED) OrangeLight else CardBackground)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(if (sortOption != SortOption.FEATURED) colors.primaryContainer else colors.surface)
                         .border(
-                            1.dp,
-                            if (sortOption != SortOption.FEATURED) OrangePrimary else BorderMuted,
-                            RoundedCornerShape(16.dp)
+                            0.5.dp,
+                            if (sortOption != SortOption.FEATURED) colors.primary else colors.border,
+                            RoundedCornerShape(8.dp)
                         )
                         .clickable { showSortMenu = true }
-                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                        .padding(horizontal = 11.dp, vertical = 6.dp)
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
                             text = "⇅ ${sortOption.label}",
-                            fontSize = 12.sp,
+                            fontSize = 11.5.sp,
                             fontWeight = if (sortOption != SortOption.FEATURED) FontWeight.Bold else FontWeight.Medium,
-                            color = if (sortOption != SortOption.FEATURED) OrangePrimary else TextSecondary
+                            color = if (sortOption != SortOption.FEATURED) colors.primary else colors.textSecondary
                         )
                     }
                 }
@@ -180,9 +167,9 @@ fun ShopScreen(
                             text = {
                                 Text(
                                     text = option.label,
-                                    fontSize = 13.sp,
+                                    fontSize = 12.5.sp,
                                     fontWeight = if (sortOption == option) FontWeight.Bold else FontWeight.Normal,
-                                    color = if (sortOption == option) OrangePrimary else TextPrimary
+                                    color = if (sortOption == option) colors.primary else colors.textPrimary
                                 )
                             },
                             onClick = {
@@ -222,7 +209,7 @@ fun ShopScreen(
                 var products = state.data
 
                 if (isVegOnly) {
-                    products = products.filter { it.isVeg }
+                    products = products.filter { it.isVeg == true }
                 }
                 if (isInStockOnly) {
                     products = products.filter { it.isInStock }
@@ -271,23 +258,25 @@ private fun FilterChip(
     isActive: Boolean,
     onClick: () -> Unit
 ) {
+    val colors = MangalaTheme.colors
+
     Box(
         modifier = Modifier
-            .clip(RoundedCornerShape(16.dp))
-            .background(if (isActive) OrangeLight else CardBackground)
+            .clip(RoundedCornerShape(8.dp))
+            .background(if (isActive) colors.primaryContainer else colors.surface)
             .border(
-                1.dp,
-                if (isActive) OrangePrimary else BorderMuted,
-                RoundedCornerShape(16.dp)
+                0.5.dp,
+                if (isActive) colors.primary else colors.border,
+                RoundedCornerShape(8.dp)
             )
             .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 6.dp)
+            .padding(horizontal = 11.dp, vertical = 6.dp)
     ) {
         Text(
             text = label,
-            fontSize = 12.sp,
+            fontSize = 11.5.sp,
             fontWeight = if (isActive) FontWeight.Bold else FontWeight.Medium,
-            color = if (isActive) OrangePrimary else TextSecondary
+            color = if (isActive) colors.primary else colors.textSecondary
         )
     }
 }

@@ -11,6 +11,7 @@ import { CartDrawer } from '../../../components/CartDrawer';
 import { ProductIllustration } from '../../../components/ProductIllustration';
 import { Product3DViewer, type ProductModelType } from '../../../components/3d/Product3DViewer';
 import { ProductCard } from '../../../components/ProductCard';
+import { FoodIndicator } from '../../../components/FoodIndicator';
 import { addToCart } from '../../../lib/cart';
 
 export default function ProductDetailPage(): ReactElement {
@@ -258,15 +259,17 @@ export default function ProductDetailPage(): ReactElement {
                 <div className="detail-header-row">
                   <span className="category-tag">{product.categoryName}</span>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                    {product.isVeg && (
-                      <div
-                        className="badge-veg"
-                        title="100% Vegetarian / Eggless"
-                        aria-label="Vegetarian"
-                      >
-                        <span className="badge-veg-dot" />
-                      </div>
-                    )}
+                    <FoodIndicator
+                      classification={
+                        product.foodClassification !== undefined
+                          ? product.foodClassification
+                          : product.isVeg
+                          ? 'vegetarian'
+                          : 'non_vegetarian'
+                      }
+                      size={20}
+                      showLabel={true}
+                    />
                     <span
                       className={`badge-stock ${
                         product.isInStock ? 'badge-in-stock' : 'badge-sold-out'
@@ -307,7 +310,25 @@ export default function ProductDetailPage(): ReactElement {
                   </div>
                   <div className="spec-row">
                     <span className="spec-label">Dietary Classification</span>
-                    <span className="spec-value">{product.isVeg ? '🌱 100% Vegetarian / Eggless' : 'Contains Egg'}</span>
+                    <span className="spec-value" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <FoodIndicator
+                        classification={
+                          product.foodClassification !== undefined
+                            ? product.foodClassification
+                            : product.isVeg
+                            ? 'vegetarian'
+                            : 'non_vegetarian'
+                        }
+                        size={16}
+                      />
+                      <span>
+                        {product.foodClassification === 'vegetarian' || (!product.foodClassification && product.isVeg)
+                          ? 'Vegetarian (Green Symbol)'
+                          : product.foodClassification === 'non_vegetarian' || (!product.foodClassification && !product.isVeg)
+                          ? 'Non-Vegetarian (Red Symbol)'
+                          : 'Not Applicable / Non-Food'}
+                      </span>
+                    </span>
                   </div>
                   <div className="spec-row">
                     <span className="spec-label">Prep Lead Time</span>

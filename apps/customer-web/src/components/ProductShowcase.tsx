@@ -4,6 +4,7 @@ import { useState, useMemo, type ReactElement } from 'react';
 import Link from 'next/link';
 import { type Product, formatPaiseToRupees } from '@orange/api-contracts';
 import { Product3DViewer, type ProductModelType } from './3d/Product3DViewer';
+import { FoodIndicator } from './FoodIndicator';
 import { addToCart } from '../lib/cart';
 
 interface ProductShowcaseProps {
@@ -192,8 +193,24 @@ export function ProductShowcase({ products, onOpenCart }: ProductShowcaseProps):
                 </div>
                 <div className="showcase-spec-item">
                   <span className="spec-item-label">Dietary</span>
-                  <span className="spec-item-value">
-                    {current.product.isVeg ? '🌱 100% Vegetarian' : 'Contains Egg'}
+                  <span className="spec-item-value" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <FoodIndicator
+                      classification={
+                        current.product.foodClassification !== undefined
+                          ? current.product.foodClassification
+                          : current.product.isVeg
+                          ? 'vegetarian'
+                          : 'non_vegetarian'
+                      }
+                      size={15}
+                    />
+                    <span>
+                      {current.product.foodClassification === 'vegetarian' || (!current.product.foodClassification && current.product.isVeg)
+                        ? 'Vegetarian'
+                        : current.product.foodClassification === 'non_vegetarian' || (!current.product.foodClassification && !current.product.isVeg)
+                        ? 'Non-Vegetarian'
+                        : 'Non-Food'}
+                    </span>
                   </span>
                 </div>
                 <div className="showcase-spec-item">

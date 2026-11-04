@@ -14,7 +14,7 @@ export function Hero(): ReactElement {
   };
 
   return (
-    <section className="hero-section" aria-label="Moody Orange Cinematic Showcase">
+    <section className="hero-section" aria-label="Mangala Enterprises Showcase">
       {/* Background Ambient Radiance & Vignette */}
       <div className="hero-atmosphere" aria-hidden="true">
         <div className="hero-radial-glow" />
@@ -27,19 +27,19 @@ export function Hero(): ReactElement {
           <div className="hero-content">
             <div className="hero-pill">
               <span className="pill-dot" aria-hidden="true" />
-              <span className="pill-text">Artisanal Patisserie & Cold-Pressed Citrus</span>
+              <span className="pill-text">Boutique Artisanal Delicacies & Fresh Confections</span>
             </div>
 
             <div className="hero-brand-marquee" aria-hidden="true">
-              MOODY ORANGE
+              MANGALA ENTERPRISES
             </div>
 
             <h1 className="hero-title">
-              Pure Citrus Nectar & <span className="hero-title-highlight">Dark Couverture</span>
+              Exquisite Patisserie & <span className="hero-title-highlight">Fine Confections</span>
             </h1>
 
             <p className="hero-copy">
-              Handcrafted in small daily batches using single-origin Belgian cacao and freshly pressed Valencia oranges. Available for fresh in-store counter pickup.
+              Handcrafted in small daily batches using single-origin Belgian cacao, pure cold-pressed fruit extracts, and farm-fresh ingredients. Available for fresh in-store counter pickup.
             </p>
 
             <div className="hero-cta-group">
@@ -62,7 +62,7 @@ export function Hero(): ReactElement {
                 <span className="hero-feature-icon" aria-hidden="true">
                   ✓
                 </span>
-                <span>Vegetarian & Eggless Options</span>
+                <span>FSSAI Certified Fresh Daily Bakes</span>
               </div>
               <div className="hero-feature-item">
                 <span className="hero-feature-icon" aria-hidden="true">
@@ -74,7 +74,7 @@ export function Hero(): ReactElement {
                 <span className="hero-feature-icon" aria-hidden="true">
                   ✓
                 </span>
-                <span>Real-Time Kitchen Stock</span>
+                <span>Real-Time Kitchen Availability</span>
               </div>
             </div>
           </div>
@@ -86,9 +86,9 @@ export function Hero(): ReactElement {
 
               {/* Floating Editorial Badge on 3D Stage */}
               <div className="hero-stage-badge">
-                <div className="badge-flair">INTERACTIVE 3D</div>
-                <div className="badge-name">Valencia Citrus Sculpture</div>
-                <div className="badge-sub">Drag or move mouse to tilt</div>
+                <div className="badge-flair">INTERACTIVE ART</div>
+                <div className="badge-name">Botanical & Culinary Form</div>
+                <div className="badge-sub">Drag or move mouse to interact</div>
               </div>
             </div>
           </div>

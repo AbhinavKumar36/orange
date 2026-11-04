@@ -4,6 +4,7 @@ import { useState, type ReactElement } from 'react';
 import Link from 'next/link';
 import { CartDrawer } from './CartDrawer';
 import { AuthModal } from './AuthModal';
+import { ThemeToggle } from './ThemeProvider';
 import { useCart } from '../lib/cart';
 import { useCustomerAuth } from '../lib/auth';
 
@@ -42,18 +43,18 @@ export function Header({ onCategorySelect }: HeaderProps): ReactElement {
       {/* Announcement Bar */}
       <div className="announcement-bar">
         <span className="announcement-dot" aria-hidden="true" />
-        <span>Moody Orange • Artisanal Patisserie & Cold-Pressed Nectars • Fresh In-Store Counter Pickup</span>
+        <span>Mangala Enterprises • Artisanal Delicacies & Fresh Gourmet Confections • Fresh Counter Pickup</span>
       </div>
 
       <header className="site-header">
         <div className="container header-inner">
           {/* Brand Logo */}
-          <Link href="/" className="brand-logo" aria-label="Moody Orange Home">
+          <Link href="/" className="brand-logo" aria-label="Mangala Enterprises Home">
             <span className="brand-logo-mark" aria-hidden="true">
-              🍊
+              🌿
             </span>
             <span className="brand-logo-text">
-              Moody Orange
+              Mangala Enterprises
             </span>
           </Link>
 
@@ -97,6 +98,9 @@ export function Header({ onCategorySelect }: HeaderProps): ReactElement {
 
           {/* Header Action Controls */}
           <div className="header-actions">
+            {/* Light / Dark Mode Toggle */}
+            <ThemeToggle />
+
             {/* Quick Search Trigger */}
             <button
               type="button"
@@ -129,20 +133,46 @@ export function Header({ onCategorySelect }: HeaderProps): ReactElement {
                   href="/orders"
                   className="orders-link-pill"
                   aria-label="View My Orders"
+                  title="My Orders"
                 >
                   <span className="orders-icon">📋</span>
-                  <span>My Orders</span>
+                  <span>Orders</span>
                 </Link>
-                <span className="user-profile-badge" title={session?.user.phone}>
-                  👤 {session?.user.fullName ? session.user.fullName.split(' ')[0] : session?.user.phone}
-                </span>
+
+                <Link
+                  href="/account"
+                  className="account-link-pill"
+                  aria-label="View Customer Account Profile"
+                  title={session?.user.phone}
+                >
+                  <span className="account-icon">👤</span>
+                  <span>{session?.user.fullName ? session.user.fullName.split(' ')[0] : 'Account'}</span>
+                </Link>
+
+                {/* Refined subtle sign-out button (no aggressive red background) */}
                 <button
                   type="button"
                   onClick={logout}
-                  className="btn-signout"
+                  className="btn-signout-subtle"
                   aria-label="Sign out"
+                  title="Sign out of account"
                 >
-                  Sign Out
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                    <polyline points="16 17 21 12 16 7" />
+                    <line x1="21" y1="12" x2="9" y2="12" />
+                  </svg>
+                  <span>Sign Out</span>
                 </button>
               </div>
             ) : (
@@ -200,6 +230,11 @@ export function Header({ onCategorySelect }: HeaderProps): ReactElement {
         {/* Mobile Slide-down Navigation Panel */}
         {isMobileMenuOpen && (
           <div className="mobile-nav-panel" role="dialog" aria-label="Mobile Navigation">
+            <div className="mobile-theme-row">
+              <span style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>Display Theme:</span>
+              <ThemeToggle />
+            </div>
+
             <Link
               href="/#menu"
               className="mobile-nav-link"
@@ -251,6 +286,13 @@ export function Header({ onCategorySelect }: HeaderProps): ReactElement {
 
             {isAuthenticated ? (
               <div className="mobile-user-row">
+                <Link
+                  href="/account"
+                  className="mobile-account-btn"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                >
+                  👤 Account Profile
+                </Link>
                 <Link
                   href="/orders"
                   className="mobile-orders-btn"

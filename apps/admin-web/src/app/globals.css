@@ -1,13 +1,14 @@
 :root {
-  --color-bg-cream: #FAF7F2;
+  --color-bg-cream: #F6F1E7;
   --color-surface: #FFFFFF;
-  --color-brand-primary: #D9531E;
-  --color-brand-hover: #BF4314;
-  --color-brand-light: #FFF0EB;
-  --color-text-main: #1B1817;
-  --color-text-muted: #6E6863;
-  --color-border: #E8E2D9;
-  --color-border-light: #F2ECE3;
+  --color-brand-primary: #123D30;
+  --color-brand-hover: #0E3026;
+  --color-brand-light: #DCE5DB;
+  --color-gold: #D7A34A;
+  --color-text-main: #252923;
+  --color-text-muted: #6E7369;
+  --color-border: #E2DDD3;
+  --color-border-light: #ECE7DE;
   --color-success-bg: #EBF8EE;
   --color-success-text: #198754;
   --color-warning-bg: #FFF8E6;

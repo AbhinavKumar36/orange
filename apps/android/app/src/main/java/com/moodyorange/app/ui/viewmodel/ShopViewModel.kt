@@ -33,14 +33,58 @@ sealed interface CheckoutUiState {
     data class Error(val message: String) : CheckoutUiState
 }
 
+sealed interface ProfileUpdateUiState {
+    object Idle : ProfileUpdateUiState
+    object Loading : ProfileUpdateUiState
+    data class Success(val profile: CustomerProfile) : ProfileUpdateUiState
+    data class Error(val message: String) : ProfileUpdateUiState
+}
+
 class ShopViewModel(application: Application) : AndroidViewModel(application) {
 
     val apiClient = MoodyOrangeApiClient()
     val authManager = AuthManager(application.applicationContext, apiClient)
     val cartManager = CartManager(application.applicationContext)
+    val themeManager = com.moodyorange.app.data.theme.ThemeManager.getInstance(application.applicationContext)
 
     val sessionState: StateFlow<CustomerSession?> = authManager.sessionState
     val cartItems: StateFlow<List<CartItem>> = cartManager.items
+    val themeMode: StateFlow<com.moodyorange.app.data.theme.ThemeMode> = themeManager.themeMode
+
+    private val _profileUpdateState = MutableStateFlow<ProfileUpdateUiState>(ProfileUpdateUiState.Idle)
+    val profileUpdateState: StateFlow<ProfileUpdateUiState> = _profileUpdateState.asStateFlow()
+
+    fun setThemeMode(mode: com.moodyorange.app.data.theme.ThemeMode) {
+        themeManager.setThemeMode(mode)
+    }
+
+    fun toggleTheme(isCurrentlyDark: Boolean) {
+        themeManager.toggleTheme(isCurrentlyDark)
+    }
+
+    fun clearProfileUpdateState() {
+        _profileUpdateState.value = ProfileUpdateUiState.Idle
+    }
+
+    fun updateProfile(fullName: String, email: String?) {
+        viewModelScope.launch {
+            _profileUpdateState.value = ProfileUpdateUiState.Loading
+            val res = authManager.updateProfile(fullName.trim(), email?.trim()?.takeIf { it.isNotBlank() })
+            res.onSuccess { profile ->
+                _profileUpdateState.value = ProfileUpdateUiState.Success(profile)
+            }.onFailure { err ->
+                _profileUpdateState.value = ProfileUpdateUiState.Error(
+                    err.message ?: "Failed to update profile. Please try again."
+                )
+            }
+        }
+    }
+
+    fun refreshProfile() {
+        viewModelScope.launch {
+            authManager.fetchProfile()
+        }
+    }
 
     private val _isCartOpen = MutableStateFlow(false)
     val isCartOpen: StateFlow<Boolean> = _isCartOpen.asStateFlow()

@@ -27,19 +27,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.moodyorange.app.ui.theme.BorderMuted
-import com.moodyorange.app.ui.theme.CardBackground
-import com.moodyorange.app.ui.theme.DarkBackground
-import com.moodyorange.app.ui.theme.DarkBorder
-import com.moodyorange.app.ui.theme.DarkTextPrimary
-import com.moodyorange.app.ui.theme.DarkTextSecondary
 import com.moodyorange.app.ui.theme.EditorialSerif
-import com.moodyorange.app.ui.theme.GourmetGold
-import com.moodyorange.app.ui.theme.OrangeLight
-import com.moodyorange.app.ui.theme.OrangePrimary
+import com.moodyorange.app.ui.theme.ForestGreen
+import com.moodyorange.app.ui.theme.MangalaTheme
+import com.moodyorange.app.ui.theme.MutedGold
+import com.moodyorange.app.ui.theme.WhiteSurface
 
 @Composable
 fun HeaderBar(
@@ -48,13 +45,15 @@ fun HeaderBar(
     isLoggedIn: Boolean = false,
     customerName: String? = null,
     onProfileClick: () -> Unit = {},
-    isDark: Boolean = true,
+    onThemeToggle: (() -> Unit)? = null,
+    isDark: Boolean = MangalaTheme.colors.isDark,
     modifier: Modifier = Modifier
 ) {
-    val bgColor = if (isDark) DarkBackground else CardBackground
-    val textPrimary = if (isDark) DarkTextPrimary else Color(0xFF141210)
-    val textSecondary = if (isDark) DarkTextSecondary else Color(0xFF756A63)
-    val borderCol = if (isDark) DarkBorder else BorderMuted
+    val colors = MangalaTheme.colors
+    val bgColor = colors.surface
+    val textPrimary = colors.textPrimary
+    val textSecondary = colors.textSecondary
+    val borderCol = colors.border
 
     val badgeScale by animateFloatAsState(
         targetValue = if (cartItemCount > 0) 1f else 0.8f,
@@ -71,74 +70,110 @@ fun HeaderBar(
             .background(bgColor)
             .statusBarsPadding()
             .border(width = 0.5.dp, color = borderCol)
-            .padding(horizontal = 20.dp, vertical = 12.dp),
+            .padding(horizontal = 16.dp, vertical = 10.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
         // Logo & Brand Typography
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.weight(1f, fill = false)
+        ) {
             Box(
                 modifier = Modifier
-                    .size(38.dp)
-                    .clip(CircleShape)
-                    .background(Color(0x33FF5500))
-                    .border(1.dp, Color(0x66FF5500), CircleShape),
+                    .size(36.dp)
+                    .clip(RoundedCornerShape(9.dp))
+                    .background(if (isDark) MutedGold else ForestGreen)
+                    .border(1.dp, if (isDark) MutedGold else ForestGreen, RoundedCornerShape(9.dp)),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = "🍊",
-                    fontSize = 18.sp
+                    text = "M",
+                    fontFamily = EditorialSerif,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp,
+                    color = if (isDark) colors.canvas else WhiteSurface
                 )
             }
 
-            Spacer(modifier = Modifier.width(12.dp))
+            Spacer(modifier = Modifier.width(10.dp))
 
             Column {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = "MOODY ORANGE",
-                        fontFamily = EditorialSerif,
-                        fontSize = 17.sp,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 1.sp,
-                        color = textPrimary
-                    )
-                }
                 Text(
-                    text = if (isLoggedIn && !customerName.isNullOrBlank()) "Welcome, $customerName" else "Artisanal Digital Patisserie",
-                    fontSize = 11.sp,
-                    color = textSecondary
+                    text = "MANGALA ENTERPRISES",
+                    fontFamily = EditorialSerif,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 1.1.sp,
+                    color = textPrimary,
+                    maxLines = 1
+                )
+                Text(
+                    text = if (isLoggedIn && !customerName.isNullOrBlank()) {
+                        "Welcome, $customerName"
+                    } else {
+                        "Artisanal Delicacies & Fresh Confections"
+                    },
+                    fontSize = 10.5.sp,
+                    color = textSecondary,
+                    maxLines = 1
                 )
             }
         }
 
-        // Action shortcuts: Profile & Cart
+        Spacer(modifier = Modifier.width(8.dp))
+
+        // Action shortcuts: Theme Toggle, Profile & Cart
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
+            // Theme toggle (Sun / Moon)
+            if (onThemeToggle != null) {
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .border(1.dp, borderCol, CircleShape)
+                        .background(colors.surfaceElevated)
+                        .clickable(onClick = onThemeToggle)
+                        .semantics {
+                            contentDescription = if (isDark) "Switch to light theme" else "Switch to dark theme"
+                        },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = if (isDark) "☀️" else "🌙",
+                        fontSize = 14.sp
+                    )
+                }
+            }
+
             // Profile shortcut
             Box(
                 modifier = Modifier
-                    .size(38.dp)
+                    .size(36.dp)
                     .clip(CircleShape)
                     .border(1.dp, borderCol, CircleShape)
-                    .background(if (isLoggedIn) Color(0x33FF5500) else Color(0x1AFFFFFF))
-                    .clickable { onProfileClick() },
+                    .background(if (isLoggedIn) colors.primaryContainer else colors.surfaceElevated)
+                    .clickable(onClick = onProfileClick)
+                    .semantics {
+                        contentDescription = if (isLoggedIn) "Account profile" else "Sign in"
+                    },
                 contentAlignment = Alignment.Center
             ) {
                 if (isLoggedIn) {
                     val initial = customerName?.firstOrNull()?.uppercaseChar()?.toString() ?: "✓"
                     Text(
                         text = initial,
-                        fontSize = 14.sp,
+                        fontSize = 13.sp,
                         fontWeight = FontWeight.Bold,
-                        color = OrangePrimary
+                        color = colors.primary
                     )
                 } else {
                     Text(
                         text = "👤",
-                        fontSize = 15.sp
+                        fontSize = 14.sp
                     )
                 }
             }
@@ -146,27 +181,30 @@ fun HeaderBar(
             // Shopping Bag with animated badge
             Box(
                 modifier = Modifier
-                    .size(38.dp)
-                    .clip(RoundedCornerShape(10.dp))
-                    .border(1.dp, borderCol, RoundedCornerShape(10.dp))
-                    .background(if (cartItemCount > 0) Color(0x33FF5500) else Color(0x1AFFFFFF))
-                    .clickable { onCartClick() },
+                    .size(36.dp)
+                    .clip(RoundedCornerShape(9.dp))
+                    .border(1.dp, borderCol, RoundedCornerShape(9.dp))
+                    .background(if (cartItemCount > 0) colors.primaryContainer else colors.surfaceElevated)
+                    .clickable(onClick = onCartClick)
+                    .semantics {
+                        contentDescription = "Shopping cart with $cartItemCount items"
+                    },
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     text = "🛍️",
-                    fontSize = 16.sp
+                    fontSize = 15.sp
                 )
 
                 if (cartItemCount > 0) {
                     Box(
                         modifier = Modifier
                             .align(Alignment.TopEnd)
-                            .offset(x = 5.dp, y = (-5).dp)
-                            .size(19.dp)
+                            .offset(x = 4.dp, y = (-4).dp)
+                            .size(18.dp)
                             .scale(badgeScale)
                             .clip(CircleShape)
-                            .background(OrangePrimary)
+                            .background(if (isDark) MutedGold else ForestGreen)
                             .border(1.5.dp, bgColor, CircleShape),
                         contentAlignment = Alignment.Center
                     ) {
@@ -174,7 +212,7 @@ fun HeaderBar(
                             text = if (cartItemCount > 99) "99+" else "$cartItemCount",
                             fontSize = 9.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color.White
+                            color = if (isDark) colors.canvas else WhiteSurface
                         )
                     }
                 }

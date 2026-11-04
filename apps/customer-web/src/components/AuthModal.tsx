@@ -139,7 +139,7 @@ export function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps): React
         <div className="drawer-header">
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <span className="brand-logo-mark" style={{ width: '1.5rem', height: '1.5rem' }}>
-              🍊
+              🌿
             </span>
             <h2 className="drawer-title">
               {step === 'PHONE' && 'Sign In / Register'}

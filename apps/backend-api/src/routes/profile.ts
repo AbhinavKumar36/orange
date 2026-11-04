@@ -33,7 +33,7 @@ export const profileRoutes: FastifyPluginAsync<ProfilePluginOptions> = async (ap
       // Query Supabase public.profiles table
       const baseUrl = config.SUPABASE_URL.replace(/\/+$/, '');
       const apiKey = config.SUPABASE_SERVICE_ROLE_KEY || config.SUPABASE_ANON_KEY || '';
-      const url = `${baseUrl}/rest/v1/profiles?id=eq.${encodeURIComponent(user.id)}&select=id,phone,full_name,email`;
+      const url = `${baseUrl}/rest/v1/profiles?id=eq.${encodeURIComponent(user.id)}&select=id,phone,full_name,email,created_at`;
 
       try {
         const res = await fetch(url, {
@@ -50,6 +50,7 @@ export const profileRoutes: FastifyPluginAsync<ProfilePluginOptions> = async (ap
             phone: string;
             full_name: string | null;
             email: string | null;
+            created_at?: string | null;
           }>;
 
           if (rows && rows.length > 0) {
@@ -59,6 +60,7 @@ export const profileRoutes: FastifyPluginAsync<ProfilePluginOptions> = async (ap
               phone: row.phone,
               fullName: row.full_name,
               email: row.email,
+              createdAt: row.created_at || undefined,
             };
             return reply.status(200).send({ profile });
           }
@@ -72,6 +74,7 @@ export const profileRoutes: FastifyPluginAsync<ProfilePluginOptions> = async (ap
         phone: user.phone,
         fullName: user.fullName || null,
         email: user.email || null,
+        createdAt: new Date().toISOString(),
       };
 
       return reply.status(200).send({ profile });
@@ -96,23 +99,37 @@ export const profileRoutes: FastifyPluginAsync<ProfilePluginOptions> = async (ap
         });
       }
 
-      const { fullName } = parseResult.data;
+      const { fullName, email } = parseResult.data;
+      const normalizedEmail = email !== undefined ? (email === '' ? null : email) : undefined;
 
       // Update in-memory mock if enabled
+      let existingMock = mockProfiles.get(user.id);
       if (config.ALLOW_MOCK_SERVICES) {
         const updated: CustomerProfile = {
           id: user.id,
           phone: user.phone,
           fullName,
-          email: user.email || null,
+          email: normalizedEmail !== undefined ? normalizedEmail : (existingMock?.email ?? user.email ?? null),
+          createdAt: existingMock?.createdAt ?? new Date().toISOString(),
         };
         mockProfiles.set(user.id, updated);
+        existingMock = updated;
       }
 
       // Upsert into Supabase public.profiles table
       const baseUrl = config.SUPABASE_URL.replace(/\/+$/, '');
       const apiKey = config.SUPABASE_SERVICE_ROLE_KEY || config.SUPABASE_ANON_KEY || '';
       const url = `${baseUrl}/rest/v1/profiles`;
+
+      const updateBody: Record<string, unknown> = {
+        id: user.id,
+        phone: user.phone,
+        full_name: fullName,
+        updated_at: new Date().toISOString(),
+      };
+      if (normalizedEmail !== undefined) {
+        updateBody.email = normalizedEmail;
+      }
 
       try {
         await fetch(url, {
@@ -123,13 +140,7 @@ export const profileRoutes: FastifyPluginAsync<ProfilePluginOptions> = async (ap
             'Content-Type': 'application/json',
             Prefer: 'resolution=merge-duplicates',
           },
-          body: JSON.stringify({
-            id: user.id,
-            phone: user.phone,
-            full_name: fullName,
-            email: user.email || null,
-            updated_at: new Date().toISOString(),
-          }),
+          body: JSON.stringify(updateBody),
         });
       } catch {
         // Log in production
@@ -139,7 +150,8 @@ export const profileRoutes: FastifyPluginAsync<ProfilePluginOptions> = async (ap
         id: user.id,
         phone: user.phone,
         fullName,
-        email: user.email || null,
+        email: normalizedEmail !== undefined ? normalizedEmail : (existingMock?.email ?? user.email ?? null),
+        createdAt: existingMock?.createdAt,
       };
 
       return reply.status(200).send({ profile });

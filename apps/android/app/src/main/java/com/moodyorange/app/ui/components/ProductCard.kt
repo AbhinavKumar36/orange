@@ -12,8 +12,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -23,23 +21,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.moodyorange.app.data.model.Product
-import com.moodyorange.app.ui.theme.BorderMuted
-import com.moodyorange.app.ui.theme.CardBackground
-import com.moodyorange.app.ui.theme.InStockBg
-import com.moodyorange.app.ui.theme.InStockGreen
-import com.moodyorange.app.ui.theme.OrangeLight
-import com.moodyorange.app.ui.theme.OrangePrimary
-import com.moodyorange.app.ui.theme.OutOfStockBg
-import com.moodyorange.app.ui.theme.OutOfStockRed
-import com.moodyorange.app.ui.theme.TextMuted
-import com.moodyorange.app.ui.theme.TextPrimary
-import com.moodyorange.app.ui.theme.TextSecondary
-import com.moodyorange.app.ui.theme.VegGreen
+import com.moodyorange.app.ui.theme.EditorialSerif
+import com.moodyorange.app.ui.theme.MangalaTheme
+import com.moodyorange.app.ui.theme.WhiteSurface
 
 @Composable
 fun ProductCard(
@@ -48,14 +39,17 @@ fun ProductCard(
     onQuickAdd: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
+    val colors = MangalaTheme.colors
+    val isDark = colors.isDark
+
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(18.dp))
-            .border(1.dp, BorderMuted, RoundedCornerShape(18.dp))
+            .clip(RoundedCornerShape(14.dp))
+            .border(0.5.dp, colors.border, RoundedCornerShape(14.dp))
             .clickable(onClick = onClick),
-        colors = CardDefaults.cardColors(containerColor = CardBackground),
-        shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(containerColor = colors.surface),
+        shape = RoundedCornerShape(14.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Column {
@@ -63,7 +57,8 @@ fun ProductCard(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(145.dp)
+                    .height(140.dp)
+                    .background(colors.surfaceElevated)
             ) {
                 ProductImage(
                     imageUrl = product.imageUrl,
@@ -71,65 +66,50 @@ fun ProductCard(
                     contentDescription = product.name,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(145.dp)
+                        .height(140.dp)
                 )
 
-                // Top badges row: Veg icon & Stock status
+                // Top badges row: FSSAI Dietary Indicator & Stock status
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(10.dp),
+                        .padding(8.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Vegetarian square icon with green dot
-                    if (product.isVeg) {
-                        Box(
-                            modifier = Modifier
-                                .size(18.dp)
-                                .clip(RoundedCornerShape(3.dp))
-                                .border(1.5.dp, VegGreen, RoundedCornerShape(3.dp))
-                                .background(CardBackground),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(7.dp)
-                                    .clip(CircleShape)
-                                    .background(VegGreen)
-                            )
-                        }
-                    } else {
-                        Spacer(modifier = Modifier.width(1.dp))
-                    }
+                    // Vegetarian / Non-Vegetarian symbol
+                    FoodClassificationIndicator(
+                        isVeg = product.isVeg,
+                        size = 18.dp
+                    )
 
                     // Stock status chip
                     if (product.isInStock) {
                         Box(
                             modifier = Modifier
-                                .clip(RoundedCornerShape(6.dp))
-                                .background(InStockBg)
-                                .padding(horizontal = 7.dp, vertical = 3.dp)
+                                .clip(RoundedCornerShape(5.dp))
+                                .background(colors.inStockBg)
+                                .padding(horizontal = 6.dp, vertical = 2.5.dp)
                         ) {
                             Text(
                                 text = "In Stock",
                                 fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = InStockGreen
+                                fontWeight = FontWeight.SemiBold,
+                                color = colors.inStockGreen
                             )
                         }
                     } else {
                         Box(
                             modifier = Modifier
-                                .clip(RoundedCornerShape(6.dp))
-                                .background(OutOfStockBg)
-                                .padding(horizontal = 7.dp, vertical = 3.dp)
+                                .clip(RoundedCornerShape(5.dp))
+                                .background(colors.outOfStockBg)
+                                .padding(horizontal = 6.dp, vertical = 2.5.dp)
                         ) {
                             Text(
                                 text = "Unavailable",
                                 fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = OutOfStockRed
+                                fontWeight = FontWeight.SemiBold,
+                                color = colors.outOfStockRed
                             )
                         }
                     }
@@ -140,7 +120,7 @@ fun ProductCard(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(14.dp)
+                    .padding(12.dp)
             ) {
                 // Category & Prep Time row
                 Row(
@@ -150,43 +130,46 @@ fun ProductCard(
                 ) {
                     Text(
                         text = product.categoryName.uppercase(),
-                        fontSize = 10.sp,
+                        fontSize = 9.5.sp,
                         fontWeight = FontWeight.Bold,
-                        color = OrangePrimary,
-                        letterSpacing = 0.8.sp
+                        color = colors.primary,
+                        letterSpacing = 0.8.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false)
                     )
 
                     Text(
                         text = "⏱️ ${product.prepTimeMinutes}m",
                         fontSize = 10.sp,
-                        color = TextMuted
+                        color = colors.textMuted
                     )
                 }
 
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(3.dp))
 
                 // Product Name
                 Text(
                     text = product.name,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = TextPrimary,
+                    fontSize = 14.5.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = colors.textPrimary,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
 
                 if (!product.description.isNullOrBlank()) {
-                    Spacer(modifier = Modifier.height(4.dp))
+                    Spacer(modifier = Modifier.height(3.dp))
                     Text(
                         text = product.description,
-                        fontSize = 12.sp,
-                        color = TextSecondary,
+                        fontSize = 11.5.sp,
+                        color = colors.textSecondary,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
                 }
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(10.dp))
 
                 // Price & Quick Add Button Row
                 Row(
@@ -196,33 +179,37 @@ fun ProductCard(
                 ) {
                     Text(
                         text = product.formattedPrice,
+                        fontFamily = EditorialSerif,
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Bold,
-                        color = TextPrimary
+                        color = colors.primary
                     )
 
                     if (onQuickAdd != null && product.isInStock) {
                         Box(
                             modifier = Modifier
-                                .size(32.dp)
+                                .size(30.dp)
                                 .clip(RoundedCornerShape(8.dp))
-                                .background(OrangePrimary)
-                                .clickable { onQuickAdd() },
+                                .background(colors.primary)
+                                .clickable { onQuickAdd() }
+                                .semantics {
+                                    contentDescription = "Add ${product.name} to cart"
+                                },
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
                                 text = "+",
-                                fontSize = 18.sp,
+                                fontSize = 17.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = Color.White
+                                color = if (isDark) colors.canvas else WhiteSurface
                             )
                         }
                     } else {
                         Text(
                             text = "Details →",
                             fontSize = 11.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = OrangePrimary
+                            fontWeight = FontWeight.Medium,
+                            color = colors.primary
                         )
                     }
                 }

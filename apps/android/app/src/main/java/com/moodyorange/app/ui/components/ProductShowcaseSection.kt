@@ -21,29 +21,28 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.moodyorange.app.ui.components.`3d`.Product3DViewer
-import com.moodyorange.app.ui.theme.DarkBackground
-import com.moodyorange.app.ui.theme.DarkBorder
-import com.moodyorange.app.ui.theme.DarkTextPrimary
-import com.moodyorange.app.ui.theme.DarkTextSecondary
 import com.moodyorange.app.ui.theme.EditorialSerif
-import com.moodyorange.app.ui.theme.OrangePrimary
+import com.moodyorange.app.ui.theme.ForestGreen
+import com.moodyorange.app.ui.theme.MangalaTheme
+import com.moodyorange.app.ui.theme.MutedGold
+import com.moodyorange.app.ui.theme.WhiteSurface
 
 @Composable
 fun ProductShowcaseSection(
     onExploreShop: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val colors = MangalaTheme.colors
     var selectedModelCategory by remember { mutableStateOf("cake") }
 
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 20.dp)
+            .padding(horizontal = 16.dp)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -53,18 +52,18 @@ fun ProductShowcaseSection(
             Column {
                 Text(
                     text = "3D TACTILE STUDIO",
-                    fontSize = 11.sp,
+                    fontSize = 10.5.sp,
                     fontWeight = FontWeight.Bold,
-                    color = OrangePrimary,
+                    color = colors.primary,
                     letterSpacing = 1.sp
                 )
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
-                    text = "Interactive Inspection",
+                    text = "Interactive Product View",
                     fontFamily = EditorialSerif,
-                    fontSize = 20.sp,
+                    fontSize = 19.sp,
                     fontWeight = FontWeight.Bold,
-                    color = DarkTextPrimary
+                    color = colors.textPrimary
                 )
             }
         }
@@ -77,19 +76,19 @@ fun ProductShowcaseSection(
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             ModelTab(
-                label = "Ganache Cake",
+                label = "Boutique Cake",
                 isSelected = selectedModelCategory == "cake",
                 onClick = { selectedModelCategory = "cake" },
                 modifier = Modifier.weight(1f)
             )
             ModelTab(
-                label = "Citrus Elixir",
+                label = "Cold Nectar",
                 isSelected = selectedModelCategory == "juice",
                 onClick = { selectedModelCategory = "juice" },
                 modifier = Modifier.weight(1f)
             )
             ModelTab(
-                label = "Praline Box",
+                label = "Fine Truffles",
                 isSelected = selectedModelCategory == "chocolates",
                 onClick = { selectedModelCategory = "chocolates" },
                 modifier = Modifier.weight(1f)
@@ -103,25 +102,39 @@ fun ProductShowcaseSection(
             categorySlug = selectedModelCategory,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(240.dp)
+                .height(220.dp)
         )
 
         Spacer(modifier = Modifier.height(10.dp))
 
-        // Chef notes under 3D viewer
+        // Chef notes under 3D viewer with dietary indicator
         val tastingNote = when (selectedModelCategory) {
-            "cake" -> "Layered 70% dark ganache infused with slow-reduced Valencia zest and gold flakes."
-            "juice" -> "Pure cold-pressed Valencia citrus with hints of bergamot and wild amber."
-            else -> "Single-origin Peruvian cacao truffles dusted in roasted orange nibs."
+            "cake" -> "Layered 70% dark Belgian ganache with cold-pressed natural fruit extract glaze."
+            "juice" -> "Pure sun-ripened cold-pressed fruit extract with natural floral notes."
+            else -> "Single-origin cacao truffles dusted in roasted nibs and cocoa butter."
         }
 
-        Text(
-            text = "Chef's Tasting Note: $tastingNote",
-            fontSize = 12.sp,
-            color = DarkTextSecondary,
-            lineHeight = 17.sp,
-            modifier = Modifier.padding(horizontal = 4.dp)
-        )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 4.dp)
+        ) {
+            Text(
+                text = "Chef's Tasting Note: $tastingNote",
+                fontSize = 11.5.sp,
+                color = colors.textSecondary,
+                lineHeight = 16.sp,
+                modifier = Modifier.weight(1f)
+            )
+
+            FoodClassificationIndicator(
+                isVeg = true,
+                size = 16.dp,
+                modifier = Modifier.padding(start = 8.dp)
+            )
+        }
     }
 }
 
@@ -132,24 +145,39 @@ private fun ModelTab(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val colors = MangalaTheme.colors
+    val isDark = colors.isDark
+
+    val bg = if (isSelected) {
+        if (isDark) MutedGold else ForestGreen
+    } else {
+        colors.surfaceElevated
+    }
+
+    val textColor = if (isSelected) {
+        if (isDark) colors.canvas else WhiteSurface
+    } else {
+        colors.textSecondary
+    }
+
     Box(
         modifier = modifier
-            .clip(RoundedCornerShape(10.dp))
-            .background(if (isSelected) OrangePrimary else Color(0x1AFFFFFF))
+            .clip(RoundedCornerShape(8.dp))
+            .background(bg)
             .border(
-                1.dp,
-                if (isSelected) OrangePrimary else DarkBorder,
-                RoundedCornerShape(10.dp)
+                0.5.dp,
+                if (isSelected) (if (isDark) MutedGold else ForestGreen) else colors.border,
+                RoundedCornerShape(8.dp)
             )
             .clickable(onClick = onClick)
-            .padding(vertical = 8.dp),
+            .padding(vertical = 7.dp),
         contentAlignment = Alignment.Center
     ) {
         Text(
             text = label,
-            fontSize = 11.sp,
+            fontSize = 11.5.sp,
             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-            color = if (isSelected) Color.White else DarkTextSecondary
+            color = textColor
         )
     }
 }

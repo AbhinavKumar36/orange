@@ -1,6 +1,7 @@
 package com.moodyorange.app.ui.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,22 +21,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.moodyorange.app.data.model.CheckoutResponse
-import com.moodyorange.app.ui.theme.CardBackground
-import com.moodyorange.app.ui.theme.CreamBackground
 import com.moodyorange.app.ui.theme.EditorialSerif
-import com.moodyorange.app.ui.theme.InStockBg
-import com.moodyorange.app.ui.theme.InStockGreen
-import com.moodyorange.app.ui.theme.OrangePrimary
-import com.moodyorange.app.ui.theme.TextMuted
-import com.moodyorange.app.ui.theme.TextPrimary
-import com.moodyorange.app.ui.theme.TextSecondary
+import com.moodyorange.app.ui.theme.MangalaTheme
 import com.moodyorange.app.util.CurrencyFormatter
 
 @Composable
@@ -43,13 +36,15 @@ fun OrderConfirmationDialog(
     order: CheckoutResponse,
     onDismiss: () -> Unit
 ) {
+    val colors = MangalaTheme.colors
+
     Dialog(onDismissRequest = onDismiss) {
         Surface(
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(20.dp)),
-            color = CardBackground,
-            tonalElevation = 8.dp
+                .clip(RoundedCornerShape(16.dp)),
+            color = colors.surface,
+            tonalElevation = 6.dp
         ) {
             Column(
                 modifier = Modifier
@@ -62,10 +57,10 @@ fun OrderConfirmationDialog(
                     modifier = Modifier
                         .size(56.dp)
                         .clip(CircleShape)
-                        .background(InStockBg),
+                        .background(colors.inStockBg),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(text = "✓", fontSize = 28.sp, color = InStockGreen, fontWeight = FontWeight.Bold)
+                    Text(text = "✓", fontSize = 28.sp, color = colors.inStockGreen, fontWeight = FontWeight.Bold)
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -75,15 +70,15 @@ fun OrderConfirmationDialog(
                     fontFamily = EditorialSerif,
                     fontSize = 22.sp,
                     fontWeight = FontWeight.Bold,
-                    color = TextPrimary
+                    color = colors.textPrimary
                 )
 
                 Spacer(modifier = Modifier.height(4.dp))
 
                 Text(
-                    text = "Thank you for shopping with Moody Orange.",
+                    text = "Thank you for shopping with Mangala Enterprises.",
                     fontSize = 13.sp,
-                    color = TextSecondary,
+                    color = colors.textSecondary,
                     textAlign = TextAlign.Center
                 )
 
@@ -94,15 +89,16 @@ fun OrderConfirmationDialog(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(12.dp))
-                        .background(CreamBackground)
+                        .background(colors.canvas)
+                        .border(1.dp, colors.border, RoundedCornerShape(12.dp))
                         .padding(16.dp)
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text("Order Reference", fontSize = 12.sp, color = TextMuted)
-                        Text(order.orderNumber, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                        Text("Order Reference", fontSize = 12.sp, color = colors.textMuted)
+                        Text(order.orderNumber, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = colors.textPrimary)
                     }
 
                     Spacer(modifier = Modifier.height(8.dp))
@@ -111,22 +107,12 @@ fun OrderConfirmationDialog(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text("Order Status", fontSize = 12.sp, color = TextMuted)
-                        Text(order.orderStatus.uppercase(), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = OrangePrimary)
-                    }
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text("Total Amount", fontSize = 12.sp, color = TextMuted)
+                        Text("Order Status", fontSize = 12.sp, color = colors.textMuted)
                         Text(
-                            CurrencyFormatter.formatPaiseToInr(order.totalAmount),
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = TextPrimary
+                            order.orderStatus.uppercase(),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = if (colors.isDark) colors.gold else colors.primary
                         )
                     }
 
@@ -136,17 +122,37 @@ fun OrderConfirmationDialog(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text("Payment Status", fontSize = 12.sp, color = TextMuted)
-                        Text(order.paymentStatus.replace('_', ' ').uppercase(), fontSize = 12.sp, fontWeight = FontWeight.Medium, color = TextSecondary)
+                        Text("Total Amount", fontSize = 12.sp, color = colors.textMuted)
+                        Text(
+                            CurrencyFormatter.formatPaiseToInr(order.totalAmount),
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = colors.textPrimary
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("Payment Status", fontSize = 12.sp, color = colors.textMuted)
+                        Text(
+                            order.paymentStatus.replace('_', ' ').uppercase(),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = colors.textSecondary
+                        )
                     }
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
 
                 Text(
-                    text = "Please present this order reference at the boutique pickup counter.",
+                    text = "Please present this order reference at the Mangala Enterprises pickup counter.",
                     fontSize = 12.sp,
-                    color = TextSecondary,
+                    color = colors.textSecondary,
                     textAlign = TextAlign.Center
                 )
 
@@ -155,18 +161,17 @@ fun OrderConfirmationDialog(
                 Button(
                     onClick = onDismiss,
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = OrangePrimary,
-                        contentColor = Color.White
+                        containerColor = colors.primary,
+                        contentColor = colors.onPrimary
                     ),
                     shape = RoundedCornerShape(12.dp),
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(48.dp)
                 ) {
-                    Text("Back to Boutique", fontWeight = FontWeight.SemiBold)
+                    Text("Back to Storefront", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
                 }
             }
         }
     }
 }
-

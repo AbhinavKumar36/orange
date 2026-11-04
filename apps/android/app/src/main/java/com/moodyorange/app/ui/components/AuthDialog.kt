@@ -40,16 +40,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
-import com.moodyorange.app.ui.theme.BorderMuted
-import com.moodyorange.app.ui.theme.CardBackground
-import com.moodyorange.app.ui.theme.CreamBackground
 import com.moodyorange.app.ui.theme.EditorialSerif
-import com.moodyorange.app.ui.theme.OrangeLight
-import com.moodyorange.app.ui.theme.OrangePrimary
-import com.moodyorange.app.ui.theme.OutOfStockRed
-import com.moodyorange.app.ui.theme.TextMuted
-import com.moodyorange.app.ui.theme.TextPrimary
-import com.moodyorange.app.ui.theme.TextSecondary
+import com.moodyorange.app.ui.theme.MangalaTheme
 import com.moodyorange.app.ui.viewmodel.ShopViewModel
 import kotlinx.coroutines.delay
 
@@ -58,6 +50,7 @@ fun AuthDialog(
     shopViewModel: ShopViewModel,
     onDismiss: () -> Unit
 ) {
+    val colors = MangalaTheme.colors
     var step by remember { mutableStateOf(1) } // 1: Phone input, 2: OTP input, 3: Full name onboarding
     var phoneInput by remember { mutableStateOf("") }
     var otpInput by remember { mutableStateOf("") }
@@ -77,9 +70,9 @@ fun AuthDialog(
         Surface(
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(20.dp)),
-            color = CardBackground,
-            tonalElevation = 8.dp
+                .clip(RoundedCornerShape(16.dp)),
+            color = colors.surface,
+            tonalElevation = 6.dp
         ) {
             Column(
                 modifier = Modifier
@@ -87,15 +80,22 @@ fun AuthDialog(
                     .padding(24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Brand Header Icon
+                // Brand Header Monogram
                 Box(
                     modifier = Modifier
                         .size(48.dp)
                         .clip(CircleShape)
-                        .background(OrangeLight),
+                        .background(colors.primaryContainer)
+                        .border(1.dp, colors.gold.copy(alpha = 0.5f), CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(text = "🍊", fontSize = 22.sp)
+                    Text(
+                        text = "M",
+                        fontFamily = EditorialSerif,
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (colors.isDark) colors.gold else colors.primary
+                    )
                 }
 
                 Spacer(modifier = Modifier.height(14.dp))
@@ -109,30 +109,39 @@ fun AuthDialog(
                     fontFamily = EditorialSerif,
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Bold,
-                    color = TextPrimary
+                    color = colors.textPrimary
                 )
 
                 Spacer(modifier = Modifier.height(6.dp))
 
                 Text(
                     text = when (step) {
-                        1 -> "Enter your mobile number to checkout and track orders across website and mobile."
-                        2 -> "We sent a 6-digit verification code to $phoneInput"
+                        1 -> "Enter your mobile number to checkout and track orders with Mangala Enterprises."
+                        2 -> "We sent a 6-digit verification code to +91 $phoneInput"
                         else -> "Tell us your name for orders and boutique counter pickup."
                     },
                     fontSize = 13.sp,
-                    color = TextSecondary,
+                    color = colors.textSecondary,
                     textAlign = TextAlign.Center
                 )
 
                 if (errorMessage != null) {
                     Spacer(modifier = Modifier.height(12.dp))
-                    Text(
-                        text = errorMessage ?: "",
-                        fontSize = 12.sp,
-                        color = OutOfStockRed,
-                        textAlign = TextAlign.Center
-                    )
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(colors.outOfStockBg)
+                            .padding(horizontal = 12.dp, vertical = 8.dp)
+                    ) {
+                        Text(
+                            text = errorMessage ?: "",
+                            fontSize = 12.sp,
+                            color = colors.outOfStockRed,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(20.dp))
@@ -145,27 +154,29 @@ fun AuthDialog(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(12.dp))
-                                .border(1.dp, BorderMuted, RoundedCornerShape(12.dp))
-                                .background(CreamBackground)
+                                .border(1.dp, colors.border, RoundedCornerShape(12.dp))
+                                .background(colors.canvas)
                                 .padding(horizontal = 14.dp, vertical = 4.dp)
                         ) {
                             Text(
                                 text = "🇮🇳 +91",
-                                fontSize = 15.sp,
+                                fontSize = 14.sp,
                                 fontWeight = FontWeight.SemiBold,
-                                color = TextPrimary
+                                color = colors.textPrimary
                             )
                             Spacer(modifier = Modifier.width(10.dp))
                             OutlinedTextField(
                                 value = phoneInput,
                                 onValueChange = { phoneInput = it.filter { char -> char.isDigit() }.take(10) },
-                                placeholder = { Text("98765 43210", color = TextMuted) },
+                                placeholder = { Text("98765 43210", color = colors.textMuted) },
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                 colors = OutlinedTextFieldDefaults.colors(
                                     focusedBorderColor = Color.Transparent,
                                     unfocusedBorderColor = Color.Transparent,
                                     focusedContainerColor = Color.Transparent,
-                                    unfocusedContainerColor = Color.Transparent
+                                    unfocusedContainerColor = Color.Transparent,
+                                    focusedTextColor = colors.textPrimary,
+                                    unfocusedTextColor = colors.textPrimary
                                 ),
                                 modifier = Modifier.fillMaxWidth()
                             )
@@ -187,14 +198,16 @@ fun AuthDialog(
                                         step = 2
                                         cooldownSec = 60
                                     }.onFailure { err ->
-                                        errorMessage = err.message ?: "Failed to send OTP. Please try again."
+                                        errorMessage = err.message ?: "Failed to send verification code. Please try again."
                                     }
                                 }
                             },
                             enabled = !isLoading && phoneInput.length == 10,
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = OrangePrimary,
-                                contentColor = Color.White
+                                containerColor = colors.primary,
+                                contentColor = colors.onPrimary,
+                                disabledContainerColor = colors.primary.copy(alpha = 0.4f),
+                                disabledContentColor = colors.onPrimary.copy(alpha = 0.6f)
                             ),
                             shape = RoundedCornerShape(12.dp),
                             modifier = Modifier
@@ -202,9 +215,9 @@ fun AuthDialog(
                                 .height(48.dp)
                         ) {
                             if (isLoading) {
-                                CircularProgressIndicator(color = Color.White, modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                                CircularProgressIndicator(color = colors.onPrimary, modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
                             } else {
-                                Text("Send Verification Code", fontWeight = FontWeight.SemiBold)
+                                Text("Send Verification Code", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
                             }
                         }
                     }
@@ -214,13 +227,15 @@ fun AuthDialog(
                         OutlinedTextField(
                             value = otpInput,
                             onValueChange = { otpInput = it.filter { char -> char.isDigit() }.take(6) },
-                            placeholder = { Text("6-digit code", color = TextMuted) },
+                            placeholder = { Text("6-digit code", color = colors.textMuted) },
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                             colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = OrangePrimary,
-                                unfocusedBorderColor = BorderMuted,
-                                focusedContainerColor = CreamBackground,
-                                unfocusedContainerColor = CreamBackground
+                                focusedBorderColor = colors.primary,
+                                unfocusedBorderColor = colors.border,
+                                focusedContainerColor = colors.canvas,
+                                unfocusedContainerColor = colors.canvas,
+                                focusedTextColor = colors.textPrimary,
+                                unfocusedTextColor = colors.textPrimary
                             ),
                             shape = RoundedCornerShape(12.dp),
                             modifier = Modifier.fillMaxWidth()
@@ -234,14 +249,14 @@ fun AuthDialog(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             TextButton(onClick = { step = 1 }) {
-                                Text("Change Number", color = TextSecondary, fontSize = 12.sp)
+                                Text("Change Number", color = colors.textSecondary, fontSize = 12.sp)
                             }
 
                             if (cooldownSec > 0) {
                                 Text(
                                     text = "Resend in ${cooldownSec}s",
                                     fontSize = 12.sp,
-                                    color = TextMuted
+                                    color = colors.textMuted
                                 )
                             } else {
                                 TextButton(
@@ -250,7 +265,12 @@ fun AuthDialog(
                                         shopViewModel.requestOtp(phoneInput) { }
                                     }
                                 ) {
-                                    Text("Resend Code", color = OrangePrimary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                                    Text(
+                                        text = "Resend Code",
+                                        color = if (colors.isDark) colors.gold else colors.primary,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
                                 }
                             }
                         }
@@ -280,8 +300,10 @@ fun AuthDialog(
                             },
                             enabled = !isLoading && otpInput.length == 6,
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = OrangePrimary,
-                                contentColor = Color.White
+                                containerColor = colors.primary,
+                                contentColor = colors.onPrimary,
+                                disabledContainerColor = colors.primary.copy(alpha = 0.4f),
+                                disabledContentColor = colors.onPrimary.copy(alpha = 0.6f)
                             ),
                             shape = RoundedCornerShape(12.dp),
                             modifier = Modifier
@@ -289,9 +311,9 @@ fun AuthDialog(
                                 .height(48.dp)
                         ) {
                             if (isLoading) {
-                                CircularProgressIndicator(color = Color.White, modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                                CircularProgressIndicator(color = colors.onPrimary, modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
                             } else {
-                                Text("Verify & Continue", fontWeight = FontWeight.SemiBold)
+                                Text("Verify & Continue", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
                             }
                         }
                     }
@@ -301,12 +323,14 @@ fun AuthDialog(
                         OutlinedTextField(
                             value = nameInput,
                             onValueChange = { nameInput = it },
-                            placeholder = { Text("Your full name (e.g. Priya Sharma)", color = TextMuted) },
+                            placeholder = { Text("Your full name (e.g. Priya Sharma)", color = colors.textMuted) },
                             colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = OrangePrimary,
-                                unfocusedBorderColor = BorderMuted,
-                                focusedContainerColor = CreamBackground,
-                                unfocusedContainerColor = CreamBackground
+                                focusedBorderColor = colors.primary,
+                                unfocusedBorderColor = colors.border,
+                                focusedContainerColor = colors.canvas,
+                                unfocusedContainerColor = colors.canvas,
+                                focusedTextColor = colors.textPrimary,
+                                unfocusedTextColor = colors.textPrimary
                             ),
                             shape = RoundedCornerShape(12.dp),
                             modifier = Modifier.fillMaxWidth()
@@ -328,8 +352,8 @@ fun AuthDialog(
                             },
                             enabled = !isLoading,
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = OrangePrimary,
-                                contentColor = Color.White
+                                containerColor = colors.primary,
+                                contentColor = colors.onPrimary
                             ),
                             shape = RoundedCornerShape(12.dp),
                             modifier = Modifier
@@ -337,9 +361,9 @@ fun AuthDialog(
                                 .height(48.dp)
                         ) {
                             if (isLoading) {
-                                CircularProgressIndicator(color = Color.White, modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                                CircularProgressIndicator(color = colors.onPrimary, modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
                             } else {
-                                Text("Complete Profile", fontWeight = FontWeight.SemiBold)
+                                Text("Complete Profile", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
                             }
                         }
                     }
@@ -348,10 +372,9 @@ fun AuthDialog(
                 Spacer(modifier = Modifier.height(10.dp))
 
                 TextButton(onClick = onDismiss) {
-                    Text("Close", color = TextMuted, fontSize = 13.sp)
+                    Text("Close", color = colors.textSecondary, fontSize = 13.sp)
                 }
             }
         }
     }
 }
-

@@ -123,6 +123,31 @@ export async function toggleAdminProductStatus(
   });
 }
 
+export async function deleteAdminProduct(
+  token: string,
+  id: string
+): Promise<{ success: boolean; id: string; archived: boolean }> {
+  return request<{ success: boolean; id: string; archived: boolean }>(
+    `/admin/products/${encodeURIComponent(id)}`,
+    token,
+    {
+      method: 'DELETE',
+    }
+  );
+}
+
+export async function uploadAdminProductImage(
+  token: string,
+  base64: string,
+  fileName?: string,
+  contentType?: string
+): Promise<{ url: string; fileName: string }> {
+  return request<{ url: string; fileName: string }>('/admin/upload-image', token, {
+    method: 'POST',
+    body: JSON.stringify({ base64, fileName, contentType }),
+  });
+}
+
 export async function fetchAdminCategories(token: string): Promise<AdminCategoryItem[]> {
   const res = await request<{ categories: AdminCategoryItem[] }>('/admin/categories', token);
   return res.categories;

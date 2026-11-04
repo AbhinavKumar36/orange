@@ -27,7 +27,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -43,17 +42,11 @@ import com.moodyorange.app.ui.components.ProductCard
 import com.moodyorange.app.ui.components.ProductCardSkeleton
 import com.moodyorange.app.ui.components.ProductShowcaseSection
 import com.moodyorange.app.ui.components.`3d`.Hero3DObject
-import com.moodyorange.app.ui.theme.DarkBackground
-import com.moodyorange.app.ui.theme.DarkBorder
-import com.moodyorange.app.ui.theme.DarkTextMuted
-import com.moodyorange.app.ui.theme.DarkTextPrimary
-import com.moodyorange.app.ui.theme.DarkTextSecondary
 import com.moodyorange.app.ui.theme.EditorialSerif
-import com.moodyorange.app.ui.theme.GourmetGold
-import com.moodyorange.app.ui.theme.OrangeLight
-import com.moodyorange.app.ui.theme.OrangePrimary
-import com.moodyorange.app.ui.theme.TextMuted
-import com.moodyorange.app.ui.theme.TextPrimary
+import com.moodyorange.app.ui.theme.ForestGreen
+import com.moodyorange.app.ui.theme.MangalaTheme
+import com.moodyorange.app.ui.theme.MutedGold
+import com.moodyorange.app.ui.theme.WhiteSurface
 import com.moodyorange.app.ui.viewmodel.CatalogViewModel
 import com.moodyorange.app.ui.viewmodel.UiState
 
@@ -67,32 +60,35 @@ fun HomeScreen(
     isLoggedIn: Boolean = false,
     customerName: String? = null,
     onProfileClick: () -> Unit = {},
+    onThemeToggle: (() -> Unit)? = null,
     onNavigateToShop: (Category?) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    val colors = MangalaTheme.colors
     val categoriesState by viewModel.categoriesState.collectAsState()
     val productsState by viewModel.productsState.collectAsState()
 
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(DarkBackground)
+            .background(colors.canvas)
     ) {
-        // Sticky Frosted Header
+        // Sticky Header with Theme Toggle & Cart
         HeaderBar(
             cartItemCount = cartItemCount,
             onCartClick = onCartClick,
             isLoggedIn = isLoggedIn,
             customerName = customerName,
             onProfileClick = onProfileClick,
-            isDark = true
+            onThemeToggle = onThemeToggle,
+            isDark = colors.isDark
         )
 
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(bottom = 24.dp)
+            contentPadding = PaddingValues(bottom = 28.dp)
         ) {
-            // 1. Cinematic Hero Section with 3D Centerpiece
+            // 1. Luxury Editorial Hero Section with 3D Centerpiece
             item {
                 HeroSection(
                     onShopNow = { onNavigateToShop(null) }
@@ -103,7 +99,7 @@ fun HomeScreen(
             if (categoriesState is UiState.Success) {
                 val categories = (categoriesState as UiState.Success<List<Category>>).data
                 item {
-                    Spacer(modifier = Modifier.height(28.dp))
+                    Spacer(modifier = Modifier.height(24.dp))
                     FeaturedCollectionsRow(
                         categories = categories,
                         onCategoryClick = { category -> onNavigateToShop(category) }
@@ -113,7 +109,7 @@ fun HomeScreen(
 
             // 3. Tactile 3D Inspection Studio
             item {
-                Spacer(modifier = Modifier.height(32.dp))
+                Spacer(modifier = Modifier.height(28.dp))
                 ProductShowcaseSection(
                     onExploreShop = { onNavigateToShop(null) }
                 )
@@ -121,9 +117,9 @@ fun HomeScreen(
 
             // 4. Featured Confections Section
             item {
-                Spacer(modifier = Modifier.height(36.dp))
+                Spacer(modifier = Modifier.height(28.dp))
                 FeaturedConfectionsHeader(onViewAll = { onNavigateToShop(null) })
-                Spacer(modifier = Modifier.height(14.dp))
+                Spacer(modifier = Modifier.height(12.dp))
             }
 
             when (val state = productsState) {
@@ -132,7 +128,7 @@ fun HomeScreen(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 20.dp),
+                                .padding(horizontal = 16.dp),
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
                             ProductCardSkeleton(modifier = Modifier.weight(1f))
@@ -142,13 +138,12 @@ fun HomeScreen(
                 }
                 is UiState.Success -> {
                     val products = state.data.take(6)
-                    // Render in 2-column paired rows
                     val chunked = products.chunked(2)
                     items(chunked) { pair ->
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 20.dp, vertical = 6.dp),
+                                .padding(horizontal = 16.dp, vertical = 6.dp),
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
                             ProductCard(
@@ -180,7 +175,7 @@ fun HomeScreen(
                         ) {
                             Text(
                                 text = "Unable to load fresh confections. Pull to refresh.",
-                                color = DarkTextMuted,
+                                color = colors.textMuted,
                                 fontSize = 13.sp
                             )
                         }
@@ -189,21 +184,21 @@ fun HomeScreen(
                 UiState.Idle -> {}
             }
 
-            // 5. Brand Craft Story Spread
+            // 5. Brand Heritage & Story Spread
             item {
-                Spacer(modifier = Modifier.height(36.dp))
+                Spacer(modifier = Modifier.height(28.dp))
                 BrandStorySection()
             }
 
             // 6. Store Values & Guarantees
             item {
-                Spacer(modifier = Modifier.height(36.dp))
+                Spacer(modifier = Modifier.height(28.dp))
                 BrandValuesSection()
             }
 
             // 7. Boutique Footer
             item {
-                Spacer(modifier = Modifier.height(36.dp))
+                Spacer(modifier = Modifier.height(28.dp))
                 HomeFooter()
             }
         }
@@ -214,19 +209,14 @@ fun HomeScreen(
 private fun HeroSection(
     onShopNow: () -> Unit
 ) {
+    val colors = MangalaTheme.colors
+    val isDark = colors.isDark
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(
-                        DarkBackground,
-                        Color(0xFF140F0A),
-                        DarkBackground
-                    )
-                )
-            )
-            .padding(horizontal = 20.dp, vertical = 16.dp)
+            .background(colors.surfaceElevated)
+            .padding(horizontal = 16.dp, vertical = 20.dp)
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -235,50 +225,50 @@ private fun HeroSection(
             // Editorial Capsule Pill
             Box(
                 modifier = Modifier
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(Color(0x33FF5500))
-                    .border(1.dp, Color(0x66FF5500), RoundedCornerShape(20.dp))
-                    .padding(horizontal = 14.dp, vertical = 5.dp)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(colors.primaryContainer)
+                    .border(0.5.dp, colors.border, RoundedCornerShape(16.dp))
+                    .padding(horizontal = 12.dp, vertical = 4.5.dp)
             ) {
                 Text(
-                    text = "VALENCIA HARVEST 2026",
-                    fontSize = 10.sp,
+                    text = "MANGALA ENTERPRISES • ARTISANAL DELICACIES",
+                    fontSize = 9.5.sp,
                     fontWeight = FontWeight.Bold,
-                    color = OrangePrimary,
-                    letterSpacing = 1.2.sp
+                    color = colors.primary,
+                    letterSpacing = 1.sp
                 )
             }
 
-            Spacer(modifier = Modifier.height(14.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
             // Main Editorial Headline
             Text(
-                text = "Pure Citrus &\nSingle-Origin Cacao",
+                text = "Exquisite Patisserie &\nFine Confections",
                 fontFamily = EditorialSerif,
-                fontSize = 28.sp,
-                lineHeight = 34.sp,
+                fontSize = 26.sp,
+                lineHeight = 32.sp,
                 fontWeight = FontWeight.Bold,
                 textAlign = TextAlign.Center,
-                color = DarkTextPrimary
+                color = colors.textPrimary
             )
 
             Spacer(modifier = Modifier.height(8.dp))
 
             Text(
-                text = "Immersive digital commerce for artisanal cakes, cold-pressed elixirs and gourmet confections.",
-                fontSize = 13.sp,
+                text = "Handcrafted in small daily batches using single-origin cacao, pure cold-pressed fruit extracts, and farm-fresh ingredients. Available for fresh in-store counter pickup.",
+                fontSize = 12.5.sp,
                 lineHeight = 18.sp,
                 textAlign = TextAlign.Center,
-                color = DarkTextSecondary,
-                modifier = Modifier.padding(horizontal = 16.dp)
+                color = colors.textSecondary,
+                modifier = Modifier.padding(horizontal = 12.dp)
             )
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(14.dp))
 
-            // Interactive 3D Orange Centerpiece
+            // Interactive 3D Object
             Hero3DObject(
-                size = 230.dp,
-                modifier = Modifier.padding(vertical = 4.dp)
+                size = 210.dp,
+                modifier = Modifier.padding(vertical = 2.dp)
             )
 
             Spacer(modifier = Modifier.height(10.dp))
@@ -288,29 +278,29 @@ private fun HeroSection(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                HeroPill(text = "⚡ 15-Min Pickup")
-                HeroPill(text = "🌱 100% Eggless")
+                HeroPill(text = "🛍️ Counter Pickup")
+                HeroPill(text = "🌿 FSSAI Declared")
                 HeroPill(text = "✨ Small Batch")
             }
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(18.dp))
 
             // CTA Button
             Button(
                 onClick = onShopNow,
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = OrangePrimary,
-                    contentColor = Color.White
+                    containerColor = colors.primary,
+                    contentColor = if (isDark) colors.canvas else WhiteSurface
                 ),
-                shape = RoundedCornerShape(14.dp),
+                shape = RoundedCornerShape(10.dp),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(50.dp)
+                    .height(48.dp)
             ) {
                 Text(
-                    text = "Explore Boutique Catalog →",
+                    text = "Shop Live Menu →",
                     fontWeight = FontWeight.Bold,
-                    fontSize = 15.sp
+                    fontSize = 14.5.sp
                 )
             }
         }
@@ -319,61 +309,64 @@ private fun HeroSection(
 
 @Composable
 private fun HeroPill(text: String) {
+    val colors = MangalaTheme.colors
     Box(
         modifier = Modifier
-            .clip(RoundedCornerShape(12.dp))
-            .background(Color(0x1AFFFFFF))
-            .border(1.dp, DarkBorder, RoundedCornerShape(12.dp))
-            .padding(horizontal = 10.dp, vertical = 4.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(colors.surface)
+            .border(0.5.dp, colors.border, RoundedCornerShape(8.dp))
+            .padding(horizontal = 9.dp, vertical = 4.dp)
     ) {
         Text(
             text = text,
             fontSize = 10.sp,
             fontWeight = FontWeight.SemiBold,
-            color = DarkTextSecondary
+            color = colors.textSecondary
         )
     }
 }
 
 @Composable
 private fun FeaturedConfectionsHeader(onViewAll: () -> Unit) {
+    val colors = MangalaTheme.colors
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 20.dp),
+            .padding(horizontal = 16.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
         Column {
             Text(
                 text = "DAILY CREATIONS",
-                fontSize = 11.sp,
+                fontSize = 10.5.sp,
                 fontWeight = FontWeight.Bold,
-                color = OrangePrimary,
+                color = colors.primary,
                 letterSpacing = 1.sp
             )
             Spacer(modifier = Modifier.height(2.dp))
             Text(
                 text = "Chef's Featured Treats",
                 fontFamily = EditorialSerif,
-                fontSize = 20.sp,
+                fontSize = 19.sp,
                 fontWeight = FontWeight.Bold,
-                color = DarkTextPrimary
+                color = colors.textPrimary
             )
         }
 
         Box(
             modifier = Modifier
-                .clip(RoundedCornerShape(10.dp))
+                .clip(RoundedCornerShape(8.dp))
                 .clickable(onClick = onViewAll)
-                .background(Color(0x1AFFFFFF))
-                .padding(horizontal = 10.dp, vertical = 6.dp)
+                .background(colors.primaryContainer)
+                .padding(horizontal = 10.dp, vertical = 5.dp)
         ) {
             Text(
                 text = "View All →",
                 fontSize = 11.sp,
                 fontWeight = FontWeight.SemiBold,
-                color = OrangePrimary
+                color = colors.primary
             )
         }
     }
@@ -381,48 +374,57 @@ private fun FeaturedConfectionsHeader(onViewAll: () -> Unit) {
 
 @Composable
 private fun HomeFooter() {
+    val colors = MangalaTheme.colors
+    val isDark = colors.isDark
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 10.dp),
+            .padding(horizontal = 16.dp, vertical = 10.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Box(
             modifier = Modifier
-                .size(36.dp)
-                .clip(CircleShape)
-                .background(Color(0x33FF5500)),
+                .size(34.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .background(if (isDark) MutedGold else ForestGreen),
             contentAlignment = Alignment.Center
         ) {
-            Text(text = "🍊", fontSize = 18.sp)
+            Text(
+                text = "M",
+                fontFamily = EditorialSerif,
+                fontWeight = FontWeight.Bold,
+                fontSize = 16.sp,
+                color = if (isDark) colors.canvas else WhiteSurface
+            )
         }
 
-        Spacer(modifier = Modifier.height(10.dp))
+        Spacer(modifier = Modifier.height(8.dp))
 
         Text(
-            text = "MOODY ORANGE",
+            text = "MANGALA ENTERPRISES",
             fontFamily = EditorialSerif,
-            fontSize = 16.sp,
+            fontSize = 15.sp,
             fontWeight = FontWeight.Bold,
             letterSpacing = 1.sp,
-            color = DarkTextPrimary
+            color = colors.textPrimary
         )
 
         Spacer(modifier = Modifier.height(4.dp))
 
         Text(
-            text = "Counter Pickup Kitchen • Open 10:00 AM – 10:00 PM",
-            fontSize = 12.sp,
-            color = DarkTextSecondary,
+            text = "Boutique Counter Pickup • Open 10:00 AM – 10:00 PM",
+            fontSize = 11.5.sp,
+            color = colors.textSecondary,
             textAlign = TextAlign.Center
         )
 
         Spacer(modifier = Modifier.height(2.dp))
 
         Text(
-            text = "All items eggless, 100% vegetarian & freshly prepared.",
-            fontSize = 11.sp,
-            color = DarkTextMuted,
+            text = "Freshly prepared for immediate or scheduled collection.",
+            fontSize = 10.5.sp,
+            color = colors.textMuted,
             textAlign = TextAlign.Center
         )
     }

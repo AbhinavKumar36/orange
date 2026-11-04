@@ -77,6 +77,13 @@ export const RefundStatusEnum = [
 export const RefundStatusSchema = z.enum(RefundStatusEnum);
 export type RefundStatus = z.infer<typeof RefundStatusSchema>;
 
+export const FoodClassificationEnum = [
+  'vegetarian',
+  'non_vegetarian',
+] as const;
+export const FoodClassificationSchema = z.enum(FoodClassificationEnum);
+export type FoodClassification = z.infer<typeof FoodClassificationSchema>;
+
 // ============================================================================
 // Catalog Domain Contracts (Phase 3: Customer Web Catalog)
 // ============================================================================
@@ -106,6 +113,7 @@ export const ProductSchema = z.object({
   basePrice: MoneyInPaiseSchema,
   taxRatePct: z.number().nonnegative().default(5.0),
   isVeg: z.boolean().default(true),
+  foodClassification: z.enum(FoodClassificationEnum).nullable().optional(),
   allergens: z.array(z.string()).default([]),
   prepTimeMinutes: z.number().int().nonnegative().default(15),
   imageUrl: z.string().nullable().optional(),
@@ -256,6 +264,7 @@ export const CustomerProfileSchema = z.object({
   phone: z.string(),
   fullName: z.string().nullable(),
   email: z.string().nullable().optional(),
+  createdAt: z.string().optional(),
 });
 export type CustomerProfile = z.infer<typeof CustomerProfileSchema>;
 
@@ -266,6 +275,7 @@ export type CustomerProfileResponse = z.infer<typeof CustomerProfileResponseSche
 
 export const UpdateProfileRequestSchema = z.object({
   fullName: z.string().min(1).max(100),
+  email: z.string().email().nullable().optional().or(z.literal('')),
 });
 export type UpdateProfileRequest = z.infer<typeof UpdateProfileRequestSchema>;
 
@@ -346,6 +356,7 @@ export const AdminProductCreateSchema = z.object({
   basePrice: MoneyInPaiseSchema,
   taxRatePct: z.number().min(0).max(100).default(5.0),
   isVeg: z.boolean().default(true),
+  foodClassification: z.enum(FoodClassificationEnum).nullable().optional(),
   allergens: z.array(z.string()).default([]),
   prepTimeMinutes: z.number().int().min(0).max(300).default(15),
   imageUrl: z.string().url().nullable().optional(),
@@ -368,12 +379,19 @@ export const AdminProductUpdateSchema = z.object({
   basePrice: MoneyInPaiseSchema.optional(),
   taxRatePct: z.number().min(0).max(100).optional(),
   isVeg: z.boolean().optional(),
+  foodClassification: z.enum(FoodClassificationEnum).nullable().optional(),
   allergens: z.array(z.string()).optional(),
   prepTimeMinutes: z.number().int().min(0).max(300).optional(),
   imageUrl: z.string().url().nullable().optional(),
   isActive: z.boolean().optional(),
 });
 export type AdminProductUpdate = z.infer<typeof AdminProductUpdateSchema>;
+
+export const AdminUploadImageResponseSchema = z.object({
+  url: z.string().url(),
+  fileName: z.string(),
+});
+export type AdminUploadImageResponse = z.infer<typeof AdminUploadImageResponseSchema>;
 
 export const AdminCategoryItemSchema = CategorySchema.extend({
   isActive: z.boolean().default(true),

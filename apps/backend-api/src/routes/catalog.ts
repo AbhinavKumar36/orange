@@ -45,6 +45,7 @@ export const CANONICAL_PRODUCTS: Product[] = [
     basePrice: 65000, // integer INR paise (₹650)
     taxRatePct: 5.0,
     isVeg: true,
+    foodClassification: 'vegetarian',
     allergens: ['dairy', 'gluten'],
     prepTimeMinutes: 20,
     imageUrl: null,
@@ -61,6 +62,7 @@ export const CANONICAL_PRODUCTS: Product[] = [
     basePrice: 18000, // integer INR paise (₹180)
     taxRatePct: 5.0,
     isVeg: true,
+    foodClassification: 'vegetarian',
     allergens: [],
     prepTimeMinutes: 5,
     imageUrl: null,
@@ -77,6 +79,7 @@ export const CANONICAL_PRODUCTS: Product[] = [
     basePrice: 35000, // integer INR paise (₹350)
     taxRatePct: 5.0,
     isVeg: true,
+    foodClassification: 'vegetarian',
     allergens: ['nuts', 'dairy'],
     prepTimeMinutes: 10,
     imageUrl: null,
@@ -123,6 +126,7 @@ interface SupabaseProductRow {
   base_price: number | string;
   tax_rate_pct: number | string;
   is_veg: boolean;
+  food_classification?: string | null;
   allergens: string[];
   prep_time_minutes: number;
   image_url: string | null;
@@ -235,6 +239,12 @@ async function loadProducts(config: AppConfig): Promise<Product[] | null> {
       taxRatePct:
         typeof row.tax_rate_pct === 'string' ? parseFloat(row.tax_rate_pct) : row.tax_rate_pct,
       isVeg: row.is_veg,
+      foodClassification:
+        row.food_classification === 'vegetarian' || row.food_classification === 'non_vegetarian'
+          ? row.food_classification
+          : row.is_veg
+          ? 'vegetarian'
+          : 'non_vegetarian',
       allergens: Array.isArray(row.allergens) ? row.allergens : [],
       prepTimeMinutes: row.prep_time_minutes,
       imageUrl: row.image_url,

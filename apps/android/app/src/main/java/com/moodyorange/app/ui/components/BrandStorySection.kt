@@ -18,36 +18,27 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.moodyorange.app.ui.theme.DarkBackground
-import com.moodyorange.app.ui.theme.DarkBorder
-import com.moodyorange.app.ui.theme.DarkTextPrimary
-import com.moodyorange.app.ui.theme.DarkTextSecondary
 import com.moodyorange.app.ui.theme.EditorialSerif
-import com.moodyorange.app.ui.theme.GourmetGold
-import com.moodyorange.app.ui.theme.OrangePrimary
+import com.moodyorange.app.ui.theme.ForestGreen
+import com.moodyorange.app.ui.theme.MangalaTheme
+import com.moodyorange.app.ui.theme.MutedGold
 
 @Composable
 fun BrandStorySection(modifier: Modifier = Modifier) {
+    val colors = MangalaTheme.colors
+    val isDark = colors.isDark
+
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 20.dp)
-            .clip(RoundedCornerShape(22.dp))
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(
-                        Color(0xFF1F1813),
-                        Color(0xFF120E0B)
-                    )
-                )
-            )
-            .border(1.dp, DarkBorder, RoundedCornerShape(22.dp))
-            .padding(22.dp)
+            .padding(horizontal = 16.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .background(colors.surface)
+            .border(0.5.dp, colors.border, RoundedCornerShape(16.dp))
+            .padding(20.dp)
     ) {
         Column {
             Row(
@@ -58,13 +49,13 @@ fun BrandStorySection(modifier: Modifier = Modifier) {
                     modifier = Modifier
                         .size(6.dp)
                         .clip(CircleShape)
-                        .background(OrangePrimary)
+                        .background(if (isDark) MutedGold else ForestGreen)
                 )
                 Text(
-                    text = "OUR CULINARY PROMISE",
+                    text = "THE MANGALA ENTERPRISES HERITAGE",
                     fontSize = 10.sp,
                     fontWeight = FontWeight.Bold,
-                    color = OrangePrimary,
+                    color = colors.primary,
                     letterSpacing = 1.sp
                 )
             }
@@ -72,20 +63,21 @@ fun BrandStorySection(modifier: Modifier = Modifier) {
             Spacer(modifier = Modifier.height(10.dp))
 
             Text(
-                text = "The Art of Bitter & Sweet",
+                text = "Where Culinary Craft Meets Uncompromising Purity",
                 fontFamily = EditorialSerif,
-                fontSize = 22.sp,
+                fontSize = 20.sp,
                 fontWeight = FontWeight.Bold,
-                color = DarkTextPrimary
+                color = colors.textPrimary,
+                lineHeight = 26.sp
             )
 
             Spacer(modifier = Modifier.height(8.dp))
 
             Text(
-                text = "Moody Orange was born from a singular obsession: the harmonic tension between single-origin Peruvian cacao and sun-ripened Valencia citrus. Every gateau, cold elixir, and praline is handcrafted in small morning batches with zero compromises.",
-                fontSize = 13.sp,
-                lineHeight = 20.sp,
-                color = DarkTextSecondary
+                text = "Mangala Enterprises is dedicated to elevating everyday culinary indulgence into an art form. We unite time-honored boutique baking techniques with cold-pressed natural fruit nectars and single-origin gourmet chocolates. Every pastry, elixir, and chocolate praline is handcrafted in small daily batches with clear dietary declarations.",
+                fontSize = 12.5.sp,
+                lineHeight = 19.sp,
+                color = colors.textSecondary
             )
 
             Spacer(modifier = Modifier.height(18.dp))
@@ -95,9 +87,9 @@ fun BrandStorySection(modifier: Modifier = Modifier) {
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                MetricItem(number = "100%", label = "Eggless & Pure")
-                MetricItem(number = "15m", label = "Counter Pickup")
-                MetricItem(number = "0", label = "Artificial Essences")
+                MetricItem(number = "100%", label = "Pure Extracts")
+                MetricItem(number = "70%", label = "Origin Cacao")
+                MetricItem(number = "~15m", label = "Fresh Pickup")
             }
         }
     }
@@ -105,18 +97,19 @@ fun BrandStorySection(modifier: Modifier = Modifier) {
 
 @Composable
 private fun MetricItem(number: String, label: String) {
+    val colors = MangalaTheme.colors
     Column {
         Text(
             text = number,
             fontFamily = EditorialSerif,
-            fontSize = 20.sp,
+            fontSize = 19.sp,
             fontWeight = FontWeight.Bold,
-            color = GourmetGold
+            color = colors.gold
         )
         Text(
             text = label,
-            fontSize = 11.sp,
-            color = DarkTextSecondary
+            fontSize = 10.5.sp,
+            color = colors.textMuted
         )
     }
 }

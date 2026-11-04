@@ -273,7 +273,11 @@ export async function fetchProfileApi(token: string): Promise<CustomerProfile> {
   return parsed.profile;
 }
 
-export async function updateProfileApi(fullName: string, token: string): Promise<CustomerProfile> {
+export async function updateProfileApi(
+  payload: { fullName: string; email?: string | null } | string,
+  token: string
+): Promise<CustomerProfile> {
+  const body = typeof payload === 'string' ? { fullName: payload } : payload;
   const res = await fetch(`${API_BASE_URL}/profile`, {
     method: 'PUT',
     headers: {
@@ -281,7 +285,7 @@ export async function updateProfileApi(fullName: string, token: string): Promise
       Accept: 'application/json',
       Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify({ fullName }),
+    body: JSON.stringify(body),
   });
 
   if (!res.ok) {

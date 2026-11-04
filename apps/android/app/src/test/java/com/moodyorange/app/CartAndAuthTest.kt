@@ -161,6 +161,7 @@ class CartAndAuthTest {
                 "id": "usr_99",
                 "phone": "+919876543210",
                 "full_name": "Aarav Mehta",
+                "email": "aarav.mehta@example.com",
                 "created_at": "2026-11-02T10:00:00Z"
             }
         }
@@ -170,6 +171,26 @@ class CartAndAuthTest {
         assertEquals("usr_99", parsed.id)
         assertEquals("+919876543210", parsed.phone)
         assertEquals("Aarav Mehta", parsed.fullName)
+        assertEquals("aarav.mehta@example.com", parsed.email)
+    }
+
+    @Test
+    fun testParseProfileResponseWithoutEmail() {
+        val json = """
+        {
+            "profile": {
+                "id": "usr_100",
+                "phone": "+919876543211",
+                "full_name": "Priya Sharma"
+            }
+        }
+        """.trimIndent()
+
+        val parsed = apiClient.parseProfileResponse(json)
+        assertEquals("usr_100", parsed.id)
+        assertEquals("+919876543211", parsed.phone)
+        assertEquals("Priya Sharma", parsed.fullName)
+        assertNull(parsed.email)
     }
 
     @Test

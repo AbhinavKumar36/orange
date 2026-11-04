@@ -10,7 +10,7 @@ export function BrandValues(): ReactElement {
           <div className="section-subtitle">Store Standards</div>
           <h2 className="section-title">Crafted for Quality, Prepared for Pickup</h2>
           <p className="section-lead" style={{ maxWidth: '640px', margin: '0.75rem auto 0' }}>
-            We combine high patisserie standards with seamless digital convenience. Every order is freshly prepared for immediate or scheduled collection.
+            We combine high culinary standards with seamless digital convenience. Every order is freshly prepared for immediate or scheduled collection at Mangala Enterprises.
           </p>
         </div>
 
@@ -21,20 +21,20 @@ export function BrandValues(): ReactElement {
             </div>
             <h3 className="value-heading">Counter Pickup Service</h3>
             <p className="value-text">
-              Collect directly from our counter. Choose between immediate preparation (~15-20 minutes) or schedule a dedicated pickup window.
+              Collect directly from our store counter. Choose between immediate fresh preparation (~15-20 minutes) or schedule a dedicated pickup window.
             </p>
-            <div className="value-footer-note">Fresh at optimal temperature</div>
+            <div className="value-footer-note">Served fresh at optimal temperature</div>
           </div>
 
           <div className="value-card">
             <div className="value-icon-box" aria-hidden="true">
-              <span>🌱</span>
+              <span>🌿</span>
             </div>
-            <h3 className="value-heading">100% Vegetarian Selection</h3>
+            <h3 className="value-heading">FSSAI Food Classification</h3>
             <p className="value-text">
-              Every item in our boutique catalog clearly displays dietary attributes, eggless preparation status, and explicit allergen listings.
+              Every item in our boutique catalog clearly displays recognized Indian green (Vegetarian) and red (Non-Vegetarian) symbols alongside explicit allergen listings.
             </p>
-            <div className="value-footer-note">Transparent culinary standards</div>
+            <div className="value-footer-note">Transparent FSSAI standards</div>
           </div>
 
           <div className="value-card">
@@ -52,11 +52,11 @@ export function BrandValues(): ReactElement {
             <div className="value-icon-box" aria-hidden="true">
               <span>🔒</span>
             </div>
-            <h3 className="value-heading">Verified Fast Authentication</h3>
+            <h3 className="value-heading">Secure Mobile OTP Access</h3>
             <p className="value-text">
-              Log in securely with an Indian mobile number via instant SMS OTP. Review past orders, track pickup preparation, and enjoy one-tap repeat visits.
+              Log in securely with your Indian mobile number via instant SMS OTP. Review past orders, manage your profile, and receive live pickup notifications.
             </p>
-            <div className="value-footer-note">Passcode-free mobile access</div>
+            <div className="value-footer-note">Password-free mobile verification</div>
           </div>
         </div>
       </div>

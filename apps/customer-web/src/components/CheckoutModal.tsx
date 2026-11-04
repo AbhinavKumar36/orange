@@ -274,10 +274,10 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps): ReactEle
           {/* Header */}
           <div className="modal-header">
             <div className="modal-title-group">
-              <span className="brand-logo-mark" aria-hidden="true">🍊</span>
+              <span className="brand-logo-mark" aria-hidden="true">🌿</span>
               <div>
                 <h2 className="modal-title">
-                  {confirmedOrder ? 'Order Confirmed!' : 'Boutique Counter Checkout'}
+                  {confirmedOrder ? 'Order Confirmed!' : 'Mangala Enterprises — Counter Checkout'}
                 </h2>
                 <div className="modal-subtitle">
                   {confirmedOrder ? 'Kitchen stock reserved' : 'Prepared fresh for in-store collection'}
