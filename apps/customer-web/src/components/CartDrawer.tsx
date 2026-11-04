@@ -31,6 +31,10 @@ export function CartDrawer({ isOpen, onClose }: CartDrawerProps): ReactElement |
 
   if (!isOpen) return null;
 
+  // Approximate 5% GST on subtotal
+  const estimatedTax = Math.round(subtotal * 0.05);
+  const estimatedTotal = subtotal + estimatedTax;
+
   return (
     <>
       <div
@@ -41,45 +45,39 @@ export function CartDrawer({ isOpen, onClose }: CartDrawerProps): ReactElement |
         aria-label="Shopping Bag"
       >
         <div className="drawer-panel" onClick={(e) => e.stopPropagation()}>
+          {/* Header */}
           <div className="drawer-header">
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <span className="brand-logo-mark" style={{ width: '1.5rem', height: '1.5rem' }}>
-                🍊
-              </span>
-              <h2 className="drawer-title">Shopping Bag ({items.length})</h2>
+            <div className="drawer-brand-badge">
+              <span className="brand-logo-mark" aria-hidden="true">🍊</span>
+              <div>
+                <h2 className="drawer-title">Shopping Bag</h2>
+                <span className="drawer-count-subtitle">
+                  {items.length} {items.length === 1 ? 'creation' : 'creations'} selected
+                </span>
+              </div>
             </div>
             <button
               type="button"
-              className="icon-btn"
+              className="drawer-close-btn"
               onClick={onClose}
               aria-label="Close Shopping Bag"
-              style={{ width: '2rem', height: '2rem' }}
             >
               ✕
             </button>
           </div>
 
-          <div className="drawer-body" style={{ display: 'flex', flexDirection: 'column', height: 'calc(100% - 65px)', padding: '1rem' }}>
+          {/* Drawer Body */}
+          <div className="drawer-body">
             {items.length === 0 ? (
-              <div
-                style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  margin: 'auto',
-                  textAlign: 'center',
-                  padding: '2rem',
-                }}
-              >
-                <div className="state-icon-circle" style={{ width: '4rem', height: '4rem', marginBottom: '1rem' }}>
+              <div className="empty-cart-state">
+                <div className="empty-cart-icon-circle">
                   <svg
-                    width="28"
-                    height="28"
+                    width="32"
+                    height="32"
                     viewBox="0 0 24 24"
                     fill="none"
                     stroke="currentColor"
-                    strokeWidth="2"
+                    strokeWidth="1.5"
                     strokeLinecap="round"
                     strokeLinejoin="round"
                   >
@@ -88,173 +86,130 @@ export function CartDrawer({ isOpen, onClose }: CartDrawerProps): ReactElement |
                     <path d="M16 10a4 4 0 0 1-8 0" />
                   </svg>
                 </div>
-                <h3 className="state-title" style={{ marginBottom: '0.5rem' }}>
-                  Your Bag is Empty
-                </h3>
-                <p className="state-copy" style={{ fontSize: '0.875rem', marginBottom: '1.5rem', color: '#666' }}>
-                  Explore our artisanal cakes, cold-pressed juices, and confections to add treats.
+                <h3 className="empty-cart-title">Your Bag is Empty</h3>
+                <p className="empty-cart-copy">
+                  Explore our artisanal cakes, cold-pressed citrus, and single-origin chocolates to curate your selection.
                 </p>
                 <button
                   type="button"
                   className="btn-primary"
                   onClick={onClose}
-                  style={{ width: '100%' }}
+                  style={{ width: '100%', marginTop: '0.5rem' }}
                 >
-                  Explore Boutique Menu
+                  Browse Menu Catalog
                 </button>
               </div>
             ) : (
               <>
-                <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                {/* List of Cart Items */}
+                <div className="cart-items-scroll">
                   {items.map(({ product, quantity }) => (
-                    <div
-                      key={product.id}
-                      style={{
-                        display: 'flex',
-                        gap: '0.75rem',
-                        padding: '0.75rem',
-                        borderRadius: '10px',
-                        border: '1px solid #EFEAE5',
-                        background: '#FAFAF8',
-                        alignItems: 'center',
-                      }}
-                    >
-                      {/* Thumbnail or Illustration */}
-                      <div
-                        style={{
-                          width: '60px',
-                          height: '60px',
-                          borderRadius: '8px',
-                          overflow: 'hidden',
-                          flexShrink: 0,
-                          background: '#FFF5F0',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                        }}
-                      >
+                    <div key={product.id} className="cart-item-card">
+                      {/* Thumbnail */}
+                      <div className="cart-item-thumbnail">
                         {product.imageUrl ? (
                           <img
                             src={product.imageUrl}
                             alt={product.name}
-                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                            className="cart-thumb-img"
                           />
                         ) : (
-                          <ProductIllustration categorySlug={product.categorySlug} name={product.name} />
+                          <ProductIllustration
+                            categorySlug={product.categorySlug}
+                            name={product.name}
+                            className="cart-thumb-illustration"
+                          />
                         )}
                       </div>
 
-                      {/* Details */}
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <h4
-                          style={{
-                            margin: '0 0 0.25rem 0',
-                            fontSize: '0.9rem',
-                            fontWeight: 600,
-                            color: '#1B1817',
-                            whiteSpace: 'nowrap',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                          }}
-                        >
-                          {product.name}
-                        </h4>
-                        <div style={{ fontSize: '0.8rem', color: '#777', marginBottom: '0.35rem' }}>
-                          {formatPaiseToRupees(product.basePrice)} each
-                        </div>
-
-                        {/* Quantity Controls */}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                          <button
-                            type="button"
-                            onClick={() => updateQuantity(product.id, quantity - 1)}
-                            style={{
-                              width: '24px',
-                              height: '24px',
-                              borderRadius: '4px',
-                              border: '1px solid #CCC',
-                              background: '#FFF',
-                              cursor: 'pointer',
-                              fontWeight: 'bold',
-                            }}
-                            aria-label={`Decrease quantity of ${product.name}`}
-                          >
-                            -
-                          </button>
-                          <span style={{ fontSize: '0.85rem', fontWeight: 600, minWidth: '18px', textAlign: 'center' }}>
-                            {quantity}
+                      {/* Info & Stepper */}
+                      <div className="cart-item-details">
+                        <div className="cart-item-header">
+                          <h4 className="cart-item-name">{product.name}</h4>
+                          <span className="cart-item-unit-price">
+                            {formatPaiseToRupees(product.basePrice)} each
                           </span>
-                          <button
-                            type="button"
-                            onClick={() => updateQuantity(product.id, quantity + 1)}
-                            style={{
-                              width: '24px',
-                              height: '24px',
-                              borderRadius: '4px',
-                              border: '1px solid #CCC',
-                              background: '#FFF',
-                              cursor: 'pointer',
-                              fontWeight: 'bold',
-                            }}
-                            aria-label={`Increase quantity of ${product.name}`}
-                          >
-                            +
-                          </button>
                         </div>
-                      </div>
 
-                      {/* Item Total & Remove */}
-                      <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                        <div style={{ fontSize: '0.95rem', fontWeight: 700, color: '#D9531E' }}>
-                          {formatPaiseToRupees(product.basePrice * quantity)}
+                        <div className="cart-item-footer">
+                          {/* Stepper */}
+                          <div className="cart-stepper">
+                            <button
+                              type="button"
+                              className="cart-stepper-btn"
+                              onClick={() => updateQuantity(product.id, quantity - 1)}
+                              aria-label={`Decrease quantity of ${product.name}`}
+                            >
+                              –
+                            </button>
+                            <span className="cart-stepper-val">{quantity}</span>
+                            <button
+                              type="button"
+                              className="cart-stepper-btn"
+                              onClick={() => updateQuantity(product.id, quantity + 1)}
+                              aria-label={`Increase quantity of ${product.name}`}
+                            >
+                              +
+                            </button>
+                          </div>
+
+                          {/* Line total & remove */}
+                          <div className="cart-item-price-col">
+                            <div className="cart-item-line-total">
+                              {formatPaiseToRupees(product.basePrice * quantity)}
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => removeFromCart(product.id)}
+                              className="cart-item-remove-btn"
+                              aria-label={`Remove ${product.name} from bag`}
+                            >
+                              Remove
+                            </button>
+                          </div>
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => removeFromCart(product.id)}
-                          style={{
-                            background: 'none',
-                            border: 'none',
-                            color: '#999',
-                            fontSize: '0.75rem',
-                            cursor: 'pointer',
-                            padding: '0.25rem',
-                            marginTop: '0.35rem',
-                          }}
-                          aria-label={`Remove ${product.name} from bag`}
-                        >
-                          Remove
-                        </button>
                       </div>
                     </div>
                   ))}
                 </div>
 
-                {/* Subtotal & Checkout Actions */}
-                <div
-                  style={{
-                    borderTop: '1px solid #EFEAE5',
-                    paddingTop: '1rem',
-                    marginTop: '0.75rem',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '0.75rem',
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: '0.9rem', color: '#555' }}>Bag Subtotal</span>
-                    <strong style={{ fontSize: '1.1rem', color: '#1B1817' }}>{formatPaiseToRupees(subtotal)}</strong>
+                {/* Pickup Info Banner */}
+                <div className="cart-pickup-banner">
+                  <span className="banner-icon">🛍️</span>
+                  <div className="banner-text">
+                    <strong>In-Store Counter Pickup:</strong> Delicacies are prepared fresh at optimal serving temperature.
                   </div>
-                  <div style={{ fontSize: '0.75rem', color: '#888' }}>
-                    Taxes calculated at counter pickup checkout.
+                </div>
+
+                {/* Summary & Checkout Footer */}
+                <div className="cart-summary-footer">
+                  <div className="summary-breakdown">
+                    <div className="summary-row">
+                      <span className="summary-lbl">Subtotal</span>
+                      <span className="summary-val">{formatPaiseToRupees(subtotal)}</span>
+                    </div>
+                    <div className="summary-row">
+                      <span className="summary-lbl">Est. GST (5%)</span>
+                      <span className="summary-val">{formatPaiseToRupees(estimatedTax)}</span>
+                    </div>
+                    <div className="summary-row">
+                      <span className="summary-lbl">Boutique Packaging</span>
+                      <span className="summary-val green-text">Free</span>
+                    </div>
+                    <div className="summary-divider" />
+                    <div className="summary-row total-row">
+                      <span className="summary-total-lbl">Estimated Total</span>
+                      <span className="summary-total-val">{formatPaiseToRupees(estimatedTotal)}</span>
+                    </div>
                   </div>
 
                   <button
                     type="button"
-                    className="btn-primary"
+                    className="btn-primary cart-checkout-btn"
                     onClick={() => setIsCheckoutOpen(true)}
-                    style={{ width: '100%', padding: '0.85rem', fontSize: '0.95rem' }}
                   >
-                    Proceed to Boutique Checkout →
+                    <span>Proceed to Counter Checkout</span>
+                    <span className="btn-arrow" aria-hidden="true">→</span>
                   </button>
                 </div>
               </>

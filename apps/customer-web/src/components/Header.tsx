@@ -26,21 +26,38 @@ export function Header({ onCategorySelect }: HeaderProps): ReactElement {
     }
   };
 
+  const handleSearchFocus = () => {
+    const input = document.getElementById('catalog-search-input');
+    if (input) {
+      input.focus();
+      input.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    } else {
+      const menu = document.getElementById('menu');
+      if (menu) menu.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
   return (
     <>
+      {/* Announcement Bar */}
       <div className="announcement-bar">
-        Moody Orange • Counter Pickup Available • Cakes, Juices & Chocolates
+        <span className="announcement-dot" aria-hidden="true" />
+        <span>Moody Orange • Artisanal Patisserie & Cold-Pressed Nectars • Fresh In-Store Counter Pickup</span>
       </div>
 
       <header className="site-header">
         <div className="container header-inner">
+          {/* Brand Logo */}
           <Link href="/" className="brand-logo" aria-label="Moody Orange Home">
             <span className="brand-logo-mark" aria-hidden="true">
               🍊
             </span>
-            <span>Moody Orange</span>
+            <span className="brand-logo-text">
+              Moody Orange
+            </span>
           </Link>
 
+          {/* Primary Desktop Navigation */}
           <nav className="nav-links" aria-label="Primary Navigation">
             <Link
               href="/#menu"
@@ -50,63 +67,79 @@ export function Header({ onCategorySelect }: HeaderProps): ReactElement {
               Full Menu
             </Link>
             <Link
-              href="/#menu"
+              href="/collection/artisanal-cakes"
               className="nav-link"
               onClick={() => handleNavClick('artisanal-cakes')}
             >
-              Cakes
+              Artisanal Cakes
             </Link>
             <Link
-              href="/#menu"
+              href="/collection/cold-pressed-juices"
               className="nav-link"
               onClick={() => handleNavClick('cold-pressed-juices')}
             >
               Cold-Pressed Juices
             </Link>
             <Link
-              href="/#menu"
+              href="/collection/gourmet-chocolates"
               className="nav-link"
               onClick={() => handleNavClick('gourmet-chocolates')}
             >
-              Chocolates
+              Gourmet Chocolates
             </Link>
             <Link href="/#about" className="nav-link">
               Our Story
             </Link>
+            <Link href="/#service" className="nav-link">
+              Pickup & Policies
+            </Link>
           </nav>
 
+          {/* Header Action Controls */}
           <div className="header-actions">
+            {/* Quick Search Trigger */}
+            <button
+              type="button"
+              className="header-action-btn search-trigger-btn"
+              onClick={handleSearchFocus}
+              aria-label="Search delicacies"
+              title="Quick Search"
+            >
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <circle cx="11" cy="11" r="8" />
+                <path d="m21 21-4.3-4.3" />
+              </svg>
+              <span className="search-hint-text">Search</span>
+            </button>
+
+            {/* Authentication & User Session */}
             {isAuthenticated ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <div className="user-session-group">
                 <Link
                   href="/orders"
-                  className="nav-link"
-                  style={{
-                    fontSize: '0.85rem',
-                    fontWeight: 600,
-                    color: 'var(--color-brand-primary, #D9531E)',
-                    textDecoration: 'none',
-                    padding: '0.3rem 0.5rem',
-                    borderRadius: '6px',
-                    border: '1px solid rgba(217, 83, 30, 0.2)',
-                  }}
+                  className="orders-link-pill"
+                  aria-label="View My Orders"
                 >
-                  My Orders
+                  <span className="orders-icon">📋</span>
+                  <span>My Orders</span>
                 </Link>
-                <span style={{ fontSize: '0.85rem', color: '#555', fontWeight: 600 }}>
-                  👤 {session?.user.fullName || session?.user.phone}
+                <span className="user-profile-badge" title={session?.user.phone}>
+                  👤 {session?.user.fullName ? session.user.fullName.split(' ')[0] : session?.user.phone}
                 </span>
                 <button
                   type="button"
                   onClick={logout}
-                  style={{
-                    background: 'none',
-                    border: '1px solid #DDD',
-                    borderRadius: '6px',
-                    padding: '0.3rem 0.6rem',
-                    fontSize: '0.75rem',
-                    cursor: 'pointer',
-                  }}
+                  className="btn-signout"
                   aria-label="Sign out"
                 >
                   Sign Out
@@ -116,24 +149,18 @@ export function Header({ onCategorySelect }: HeaderProps): ReactElement {
               <button
                 type="button"
                 onClick={() => setIsAuthModalOpen(true)}
-                style={{
-                  background: 'none',
-                  border: '1px solid var(--color-brand-primary, #D9531E)',
-                  color: 'var(--color-brand-primary, #D9531E)',
-                  borderRadius: '8px',
-                  padding: '0.4rem 0.8rem',
-                  fontSize: '0.85rem',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                }}
+                className="btn-signin"
+                aria-label="Sign in to your account"
               >
-                Sign In
+                <span aria-hidden="true">👤</span>
+                <span>Sign In</span>
               </button>
             )}
 
+            {/* Shopping Bag CTA */}
             <button
               type="button"
-              className="icon-btn"
+              className="cart-trigger-btn"
               onClick={() => setIsCartOpen(true)}
               aria-label={`View Shopping Bag (${totalQuantity} items)`}
             >
@@ -152,86 +179,107 @@ export function Header({ onCategorySelect }: HeaderProps): ReactElement {
                 <path d="M3 6h18" />
                 <path d="M16 10a4 4 0 0 1-8 0" />
               </svg>
-              <span className="cart-badge" aria-hidden="true">
+              <span className={`cart-badge ${totalQuantity > 0 ? 'has-items' : ''}`} aria-hidden="true">
                 {totalQuantity}
               </span>
             </button>
 
-            {/* Mobile menu toggle button */}
+            {/* Mobile Menu Hamburger Toggle */}
             <button
               type="button"
-              className="icon-btn"
-              style={{ display: 'flex' }}
+              className="mobile-menu-toggle"
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
               aria-label={isMobileMenuOpen ? 'Close Menu' : 'Open Menu'}
               aria-expanded={isMobileMenuOpen}
             >
-              <span style={{ fontSize: '1.25rem' }}>{isMobileMenuOpen ? '✕' : '☰'}</span>
+              <span className="hamburger-icon">{isMobileMenuOpen ? '✕' : '☰'}</span>
             </button>
           </div>
         </div>
 
-        {/* Mobile dropdown navigation */}
+        {/* Mobile Slide-down Navigation Panel */}
         {isMobileMenuOpen && (
-          <div
-            style={{
-              backgroundColor: '#FFFDF9',
-              borderBottom: '1px solid var(--color-card-border)',
-              padding: '1rem 1.25rem',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '1rem',
-            }}
-          >
+          <div className="mobile-nav-panel" role="dialog" aria-label="Mobile Navigation">
             <Link
               href="/#menu"
-              className="nav-link"
-              style={{ fontSize: '1rem', fontWeight: 600 }}
+              className="mobile-nav-link"
               onClick={() => handleNavClick('')}
             >
-              Full Menu
+              <span>Full Menu Catalog</span>
+              <span className="nav-arrow">→</span>
             </Link>
             <Link
-              href="/#menu"
-              className="nav-link"
-              style={{ fontSize: '1rem', fontWeight: 600 }}
+              href="/collection/artisanal-cakes"
+              className="mobile-nav-link"
               onClick={() => handleNavClick('artisanal-cakes')}
             >
-              Artisanal Cakes
+              <span>Artisanal Cakes</span>
+              <span className="nav-arrow">→</span>
             </Link>
             <Link
-              href="/#menu"
-              className="nav-link"
-              style={{ fontSize: '1rem', fontWeight: 600 }}
+              href="/collection/cold-pressed-juices"
+              className="mobile-nav-link"
               onClick={() => handleNavClick('cold-pressed-juices')}
             >
-              Cold-Pressed Juices
+              <span>Cold-Pressed Juices</span>
+              <span className="nav-arrow">→</span>
             </Link>
             <Link
-              href="/#menu"
-              className="nav-link"
-              style={{ fontSize: '1rem', fontWeight: 600 }}
+              href="/collection/gourmet-chocolates"
+              className="mobile-nav-link"
               onClick={() => handleNavClick('gourmet-chocolates')}
             >
-              Gourmet Chocolates
+              <span>Gourmet Chocolates</span>
+              <span className="nav-arrow">→</span>
             </Link>
             <Link
               href="/#about"
-              className="nav-link"
-              style={{ fontSize: '1rem', fontWeight: 600 }}
+              className="mobile-nav-link"
               onClick={() => setIsMobileMenuOpen(false)}
             >
-              Our Story
+              <span>Our Story & Philosophy</span>
+              <span className="nav-arrow">→</span>
             </Link>
-            {isAuthenticated && (
-              <Link
-                href="/orders"
-                className="nav-link"
-                style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--color-brand-primary, #D9531E)' }}
-                onClick={() => setIsMobileMenuOpen(false)}
+            <Link
+              href="/#service"
+              className="mobile-nav-link"
+              onClick={() => setIsMobileMenuOpen(false)}
+            >
+              <span>Counter Pickup & Guarantees</span>
+              <span className="nav-arrow">→</span>
+            </Link>
+
+            {isAuthenticated ? (
+              <div className="mobile-user-row">
+                <Link
+                  href="/orders"
+                  className="mobile-orders-btn"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                >
+                  📋 My Orders
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => {
+                    logout();
+                    setIsMobileMenuOpen(false);
+                  }}
+                  className="mobile-signout-btn"
+                >
+                  Sign Out
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  setIsAuthModalOpen(true);
+                  setIsMobileMenuOpen(false);
+                }}
+                className="mobile-signin-btn"
               >
-                My Orders
-              </Link>
+                👤 Sign In / Account
+              </button>
             )}
           </div>
         )}
@@ -242,4 +290,3 @@ export function Header({ onCategorySelect }: HeaderProps): ReactElement {
     </>
   );
 }
-

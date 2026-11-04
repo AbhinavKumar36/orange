@@ -13,9 +13,12 @@
   },
   "dependencies": {
     "@orange/api-contracts": "*",
+    "@types/three": "^0.187.0",
+    "lucide-react": "^1.68.0",
     "next": "^15.1.7",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "three": "^0.187.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.20.0",

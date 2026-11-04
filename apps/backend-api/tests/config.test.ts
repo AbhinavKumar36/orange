@@ -6,12 +6,18 @@ import {
 } from '../src/config/env.js';
 
 describe('Environment Configuration Validation', () => {
-  it('should use default values in development and not generate fake credentials', () => {
-    const config = validateConfig({});
+  it('should require explicit SUPABASE_URL and not default to localhost:54321', () => {
+    expect(() => {
+      validateConfig({});
+    }).toThrowError(ConfigValidationError);
+
+    const config = validateConfig({
+      SUPABASE_URL: 'https://hosted-project.supabase.co',
+    });
     expect(config.PORT).toBe(4000);
     expect(config.HOST).toBe('0.0.0.0');
     expect(config.NODE_ENV).toBe('development');
-    expect(config.SUPABASE_URL).toBe('http://localhost:54321');
+    expect(config.SUPABASE_URL).toBe('https://hosted-project.supabase.co');
     expect(config.SUPABASE_SERVICE_ROLE_KEY).toBeUndefined();
     expect(config.ALLOW_MOCK_SERVICES).toBe(false);
   });
@@ -19,12 +25,14 @@ describe('Environment Configuration Validation', () => {
   it('should require ALLOW_MOCK_SERVICES=true when placeholder key is provided in development', () => {
     expect(() => {
       validateConfig({
+        SUPABASE_URL: 'https://hosted-project.supabase.co',
         SUPABASE_SERVICE_ROLE_KEY: 'example_service_role_key',
         ALLOW_MOCK_SERVICES: 'false',
       });
     }).toThrowError(ConfigValidationError);
 
     const validMock = validateConfig({
+      SUPABASE_URL: 'https://hosted-project.supabase.co',
       SUPABASE_SERVICE_ROLE_KEY: 'example_service_role_key',
       ALLOW_MOCK_SERVICES: 'true',
     });
@@ -100,6 +108,7 @@ describe('Environment Configuration Validation', () => {
 
   it('should sanitize credentials when getSanitizedConfig is called', () => {
     const config = validateConfig({
+      SUPABASE_URL: 'https://hosted-project.supabase.co',
       SUPABASE_SERVICE_ROLE_KEY: 'real_secret_token_12345',
       RAZORPAY_KEY_SECRET: 'secret_key_abcdef',
       RAZORPAY_WEBHOOK_SECRET: 'webhook_secret_xyz',

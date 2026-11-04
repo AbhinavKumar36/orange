@@ -148,141 +148,92 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps): ReactEle
   return (
     <>
       <div
-        className="drawer-backdrop"
+        className="modal-backdrop"
         onClick={handleCloseAll}
         role="dialog"
         aria-modal="true"
         aria-label="Checkout"
       >
         <div
-          className="drawer-panel"
-          style={{ maxWidth: '540px', margin: 'auto', borderRadius: '16px', maxHeight: '90vh', overflowY: 'auto' }}
+          className="modal-card checkout-modal-card"
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="drawer-header">
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <span className="brand-logo-mark" style={{ width: '1.5rem', height: '1.5rem' }}>
-                🍊
-              </span>
-              <h2 className="drawer-title">
-                {confirmedOrder ? 'Order Confirmed!' : 'Boutique Pickup Checkout'}
-              </h2>
+          {/* Header */}
+          <div className="modal-header">
+            <div className="modal-title-group">
+              <span className="brand-logo-mark" aria-hidden="true">🍊</span>
+              <div>
+                <h2 className="modal-title">
+                  {confirmedOrder ? 'Order Confirmed!' : 'Boutique Counter Checkout'}
+                </h2>
+                <div className="modal-subtitle">
+                  {confirmedOrder ? 'Kitchen stock reserved' : 'Prepared fresh for in-store collection'}
+                </div>
+              </div>
             </div>
             <button
               type="button"
-              className="icon-btn"
+              className="modal-close-btn"
               onClick={handleCloseAll}
               aria-label="Close"
-              style={{ width: '2rem', height: '2rem' }}
             >
               ✕
             </button>
           </div>
 
-          <div className="drawer-body" style={{ padding: '1.5rem' }}>
+          <div className="modal-body">
             {error && (
-              <div
-                style={{
-                  backgroundColor: '#FFF0F0',
-                  color: '#D32F2F',
-                  padding: '0.75rem 1rem',
-                  borderRadius: '8px',
-                  fontSize: '0.875rem',
-                  marginBottom: '1rem',
-                  border: '1px solid #FFCDD2',
-                }}
-              >
-                {error}
+              <div className="checkout-alert-error" role="alert">
+                <span>⚠️</span>
+                <span>{error}</span>
               </div>
             )}
 
-            {/* ORDER CONFIRMATION SCREEN */}
+            {/* CONFIRMED ORDER RECEIPT */}
             {confirmedOrder ? (
-              <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                <div
-                  style={{
-                    width: '64px',
-                    height: '64px',
-                    borderRadius: '50%',
-                    backgroundColor: '#E8F5E9',
-                    color: '#2E7D32',
-                    fontSize: '2rem',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    margin: '0 auto',
-                  }}
-                >
+              <div className="confirmed-order-view">
+                <div className="confirmed-icon-circle">
                   ✓
                 </div>
 
-                <h3 style={{ margin: 0, fontSize: '1.25rem', color: '#1B1817' }}>
+                <h3 className="confirmed-title">
                   Thank You, {customerName}!
                 </h3>
 
-                <p style={{ margin: 0, fontSize: '0.9rem', color: '#666' }}>
-                  Your boutique order has been received and stock has been reserved.
+                <p className="confirmed-subtitle">
+                  Your boutique order has been confirmed and kitchen inventory is locked.
                 </p>
 
-                <div
-                  style={{
-                    background: '#FAFAF7',
-                    border: '1px solid #E5E0DB',
-                    borderRadius: '12px',
-                    padding: '1.25rem',
-                    textAlign: 'left',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '0.75rem',
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ fontSize: '0.85rem', color: '#777' }}>Order Reference</span>
-                    <strong style={{ fontSize: '0.95rem', color: '#D9531E' }}>{confirmedOrder.orderNumber}</strong>
+                <div className="receipt-card">
+                  <div className="receipt-row">
+                    <span className="receipt-label">Order Reference</span>
+                    <strong className="receipt-order-num">{confirmedOrder.orderNumber}</strong>
                   </div>
 
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ fontSize: '0.85rem', color: '#777' }}>Order Status</span>
-                    <span
-                      style={{
-                        fontSize: '0.75rem',
-                        fontWeight: 700,
-                        textTransform: 'uppercase',
-                        padding: '0.2rem 0.6rem',
-                        borderRadius: '6px',
-                        background: confirmedOrder.orderStatus === 'confirmed' ? '#E8F5E9' : '#FFF3E0',
-                        color: confirmedOrder.orderStatus === 'confirmed' ? '#2E7D32' : '#E65100',
-                      }}
-                    >
+                  <div className="receipt-row">
+                    <span className="receipt-label">Order Status</span>
+                    <span className="badge-stock badge-in-stock">
                       {confirmedOrder.orderStatus}
                     </span>
                   </div>
 
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ fontSize: '0.85rem', color: '#777' }}>Payment</span>
-                    <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>
-                      {paymentMethod === 'cash_at_pickup' ? 'Cash at Boutique Counter' : 'Online Payment (Draft)'}
+                  <div className="receipt-row">
+                    <span className="receipt-label">Payment Mode</span>
+                    <span className="receipt-value">
+                      {paymentMethod === 'cash_at_pickup' ? 'Cash/UPI at Counter' : 'Online Payment (Draft)'}
                     </span>
                   </div>
 
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ fontSize: '0.85rem', color: '#777' }}>Total to Pay</span>
-                    <strong style={{ fontSize: '1.1rem', color: '#1B1817' }}>
+                  <div className="receipt-row">
+                    <span className="receipt-label">Total to Pay</span>
+                    <strong className="receipt-total">
                       {formatPaiseToRupees(confirmedOrder.totalAmount)}
                     </strong>
                   </div>
 
-                  <div
-                    style={{
-                      borderTop: '1px dashed #DDD',
-                      paddingTop: '0.75rem',
-                      fontSize: '0.8rem',
-                      color: '#555',
-                      lineHeight: '1.4',
-                    }}
-                  >
+                  <div className="receipt-pickup-note">
                     📍 <strong>Boutique Counter Collection:</strong> Please show order reference{' '}
-                    <strong>{confirmedOrder.orderNumber}</strong> at the shop counter.
+                    <strong>{confirmedOrder.orderNumber}</strong> to the counter team upon arrival.
                   </div>
                 </div>
 
@@ -290,203 +241,160 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps): ReactEle
                   type="button"
                   className="btn-primary"
                   onClick={handleCloseAll}
-                  style={{ width: '100%', padding: '0.75rem', marginTop: '0.5rem' }}
+                  style={{ width: '100%', marginTop: '1rem' }}
                 >
-                  Continue Browsing
+                  Return to Storefront
                 </button>
               </div>
             ) : (
-              /* CHECKOUT FORM */
-              <form onSubmit={handleSubmitOrder} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+              /* PROGRESSIVE CHECKOUT FORM */
+              <form onSubmit={handleSubmitOrder} className="checkout-form">
                 {/* 1. Fulfillment Selection */}
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.5rem' }}>
-                    1. Counter Pickup Option
-                  </label>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                <div className="checkout-field-section">
+                  <div className="step-label">
+                    <span className="step-num">1</span>
+                    <span className="step-title">Counter Pickup Window</span>
+                  </div>
+
+                  <div className="fulfillment-grid">
                     <button
                       type="button"
                       onClick={() => setFulfillment('immediate')}
-                      style={{
-                        padding: '0.75rem',
-                        borderRadius: '8px',
-                        border: fulfillment === 'immediate' ? '2px solid #D9531E' : '1px solid #DDD',
-                        background: fulfillment === 'immediate' ? '#FFF5F0' : '#FFF',
-                        cursor: 'pointer',
-                        textAlign: 'left',
-                      }}
+                      className={`fulfillment-option-card ${fulfillment === 'immediate' ? 'active' : ''}`}
                     >
-                      <strong style={{ display: 'block', fontSize: '0.85rem' }}>⚡ Immediate Pickup</strong>
-                      <span style={{ fontSize: '0.75rem', color: '#666' }}>Ready in ~15-20 mins</span>
+                      <div className="option-title-row">
+                        <span className="option-icon">⚡</span>
+                        <strong>Immediate Pickup</strong>
+                      </div>
+                      <span className="option-caption">Ready in ~15-20 mins</span>
                     </button>
 
                     <button
                       type="button"
                       onClick={() => setFulfillment('scheduled')}
-                      style={{
-                        padding: '0.75rem',
-                        borderRadius: '8px',
-                        border: fulfillment === 'scheduled' ? '2px solid #D9531E' : '1px solid #DDD',
-                        background: fulfillment === 'scheduled' ? '#FFF5F0' : '#FFF',
-                        cursor: 'pointer',
-                        textAlign: 'left',
-                      }}
+                      className={`fulfillment-option-card ${fulfillment === 'scheduled' ? 'active' : ''}`}
                     >
-                      <strong style={{ display: 'block', fontSize: '0.85rem' }}>📅 Scheduled Slot</strong>
-                      <span style={{ fontSize: '0.75rem', color: '#666' }}>Select pickup time</span>
+                      <div className="option-title-row">
+                        <span className="option-icon">📅</span>
+                        <strong>Scheduled Slot</strong>
+                      </div>
+                      <span className="option-caption">Select pickup date & time</span>
                     </button>
                   </div>
 
                   {fulfillment === 'scheduled' && (
                     <div style={{ marginTop: '0.75rem' }}>
+                      <label className="input-field-label">Preferred Pickup Date & Time</label>
                       <input
                         type="datetime-local"
                         value={scheduledTime}
                         onChange={(e) => setScheduledTime(e.target.value)}
                         required
-                        style={{
-                          width: '100%',
-                          padding: '0.65rem',
-                          border: '1px solid #DDD',
-                          borderRadius: '8px',
-                          fontSize: '0.9rem',
-                          boxSizing: 'border-box',
-                        }}
+                        className="modal-text-input"
                       />
                     </div>
                   )}
                 </div>
 
                 {/* 2. Customer Contact */}
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.5rem' }}>
-                    2. Pickup Contact Information
-                  </label>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-                    <input
-                      type="text"
-                      placeholder="Your Full Name"
-                      value={customerName}
-                      onChange={(e) => setCustomerName(e.target.value)}
-                      required
-                      style={{
-                        padding: '0.65rem',
-                        border: '1px solid #DDD',
-                        borderRadius: '8px',
-                        fontSize: '0.9rem',
-                      }}
-                    />
-                    <input
-                      type="tel"
-                      placeholder="Mobile Phone"
-                      value={customerPhone}
-                      onChange={(e) => setCustomerPhone(e.target.value)}
-                      required
-                      style={{
-                        padding: '0.65rem',
-                        border: '1px solid #DDD',
-                        borderRadius: '8px',
-                        fontSize: '0.9rem',
-                      }}
-                    />
+                <div className="checkout-field-section">
+                  <div className="step-label">
+                    <span className="step-num">2</span>
+                    <span className="step-title">Customer Information</span>
+                  </div>
+
+                  <div className="form-double-col">
+                    <div>
+                      <label className="input-field-label">Full Name for Counter</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Maya Sharma"
+                        value={customerName}
+                        onChange={(e) => setCustomerName(e.target.value)}
+                        required
+                        className="modal-text-input"
+                      />
+                    </div>
+                    <div>
+                      <label className="input-field-label">Mobile Number</label>
+                      <input
+                        type="tel"
+                        placeholder="+91 98765 43210"
+                        value={customerPhone}
+                        onChange={(e) => setCustomerPhone(e.target.value)}
+                        required
+                        className="modal-text-input"
+                      />
+                    </div>
                   </div>
                 </div>
 
                 {/* 3. Payment Method */}
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.5rem' }}>
-                    3. Payment Method
-                  </label>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                <div className="checkout-field-section">
+                  <div className="step-label">
+                    <span className="step-num">3</span>
+                    <span className="step-title">Payment Settlement</span>
+                  </div>
+
+                  <div className="fulfillment-grid">
                     <button
                       type="button"
                       onClick={() => setPaymentMethod('cash_at_pickup')}
-                      style={{
-                        padding: '0.75rem',
-                        borderRadius: '8px',
-                        border: paymentMethod === 'cash_at_pickup' ? '2px solid #D9531E' : '1px solid #DDD',
-                        background: paymentMethod === 'cash_at_pickup' ? '#FFF5F0' : '#FFF',
-                        cursor: 'pointer',
-                        textAlign: 'left',
-                      }}
+                      className={`fulfillment-option-card ${paymentMethod === 'cash_at_pickup' ? 'active' : ''}`}
                     >
-                      <strong style={{ display: 'block', fontSize: '0.85rem' }}>💵 Cash at Pickup</strong>
-                      <span style={{ fontSize: '0.75rem', color: '#666' }}>Pay at boutique counter</span>
+                      <div className="option-title-row">
+                        <span className="option-icon">💵</span>
+                        <strong>Pay at Counter</strong>
+                      </div>
+                      <span className="option-caption">Cash, UPI, or Card upon collection</span>
                     </button>
 
                     <button
                       type="button"
                       onClick={() => setPaymentMethod('online_razorpay')}
-                      style={{
-                        padding: '0.75rem',
-                        borderRadius: '8px',
-                        border: paymentMethod === 'online_razorpay' ? '2px solid #D9531E' : '1px solid #DDD',
-                        background: paymentMethod === 'online_razorpay' ? '#FFF5F0' : '#FFF',
-                        cursor: 'pointer',
-                        textAlign: 'left',
-                      }}
+                      className={`fulfillment-option-card ${paymentMethod === 'online_razorpay' ? 'active' : ''}`}
                     >
-                      <strong style={{ display: 'block', fontSize: '0.85rem' }}>💳 Online Draft</strong>
-                      <span style={{ fontSize: '0.75rem', color: '#666' }}>Reserve with 10m hold</span>
+                      <div className="option-title-row">
+                        <span className="option-icon">💳</span>
+                        <strong>Online Draft</strong>
+                      </div>
+                      <span className="option-caption">Reserve with 10-min payment hold</span>
                     </button>
                   </div>
                 </div>
 
                 {/* 4. Special Notes */}
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', color: '#666', marginBottom: '0.25rem' }}>
-                    Special Instructions (Optional)
+                <div className="checkout-field-section">
+                  <label className="input-field-label">
+                    Special Kitchen Instructions (Optional)
                   </label>
                   <input
                     type="text"
-                    placeholder="e.g. Please pack extra serviettes"
+                    placeholder="e.g. Pack cold juice with ice pack; extra napkins"
                     value={specialNotes}
                     onChange={(e) => setSpecialNotes(e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '0.65rem',
-                      border: '1px solid #DDD',
-                      borderRadius: '8px',
-                      fontSize: '0.85rem',
-                      boxSizing: 'border-box',
-                    }}
+                    className="modal-text-input"
                   />
                 </div>
 
                 {/* 5. Authoritative Server Total Breakdown */}
-                <div
-                  style={{
-                    backgroundColor: '#FAFAF7',
-                    border: '1px solid #E5E0DB',
-                    borderRadius: '8px',
-                    padding: '0.85rem',
-                    fontSize: '0.85rem',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '0.4rem',
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', color: '#666' }}>
+                <div className="checkout-breakdown-card">
+                  <div className="breakdown-line">
                     <span>Items Subtotal</span>
-                    <span>{validation ? formatPaiseToRupees(validation.subtotalAmount) : 'Calculating...'}</span>
+                    <span>{validation ? formatPaiseToRupees(validation.subtotalAmount) : 'Validating...'}</span>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', color: '#666' }}>
+                  <div className="breakdown-line">
                     <span>GST (5%)</span>
-                    <span>{validation ? formatPaiseToRupees(validation.taxAmount) : 'Calculating...'}</span>
+                    <span>{validation ? formatPaiseToRupees(validation.taxAmount) : 'Validating...'}</span>
                   </div>
-                  <div
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      fontWeight: 700,
-                      fontSize: '1rem',
-                      borderTop: '1px solid #E0DCD7',
-                      paddingTop: '0.5rem',
-                      color: '#1B1817',
-                    }}
-                  >
+                  <div className="breakdown-line">
+                    <span>Boutique In-Store Packaging</span>
+                    <span className="green-text">Free</span>
+                  </div>
+                  <div className="breakdown-divider" />
+                  <div className="breakdown-line total-line">
                     <span>Total Amount</span>
-                    <span style={{ color: '#D9531E' }}>
+                    <span className="total-price">
                       {validation ? formatPaiseToRupees(validation.totalAmount) : '...'}
                     </span>
                   </div>
@@ -495,10 +403,9 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps): ReactEle
                 <button
                   type="submit"
                   disabled={Boolean(isSubmitting || isValidating || (validation && !validation.isValid))}
-                  className="btn-primary"
-                  style={{ width: '100%', padding: '0.85rem', fontSize: '1rem', fontWeight: 700 }}
+                  className="btn-primary checkout-submit-btn"
                 >
-                  {isSubmitting ? 'Placing Order...' : 'Place Order & Reserve Items'}
+                  {isSubmitting ? 'Reserving Kitchen Stock...' : 'Confirm Order & Reserve Delicacies →'}
                 </button>
               </form>
             )}

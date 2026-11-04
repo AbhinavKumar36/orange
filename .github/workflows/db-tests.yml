@@ -32,8 +32,10 @@ jobs:
         run: npm ci
 
       - name: Validate Hosted Test Database Secret
+        env:
+          TEST_DB_URL: ${{ secrets.TEST_SUPABASE_DB_URL }}
         run: |
-          if [ -z "${{ secrets.TEST_SUPABASE_DB_URL }}" ]; then
+          if [ -z "$TEST_DB_URL" ]; then
             echo "::error::TEST_SUPABASE_DB_URL repository secret is missing."
             echo "================================================================================"
             echo "BLOCKED: Remote database tests require a dedicated hosted staging/test Supabase"

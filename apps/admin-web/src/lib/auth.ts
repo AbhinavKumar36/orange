@@ -6,14 +6,23 @@ import { fetchAdminMe, AdminApiError } from './api';
 
 const STORAGE_KEY = 'moody_orange_admin_session';
 
+const PLACEHOLDER_KEY_PATTERN = /(example|mock|placeholder|dummy)/i;
+
 function getValidatedAuthEnv(): { url: string; anonKey: string } {
+  const url = (process.env.NEXT_PUBLIC_SUPABASE_URL || '').trim();
+  const anonKey = (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '').trim();
   const isProd = process.env.NODE_ENV === 'production';
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || (isProd ? '' : 'https://pdosvzdkuulstvzqfnkl.supabase.co');
-  const anonKey =
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-    (isProd
-      ? ''
-      : 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkb3N2emRrdXVsc3R2enFmbmtsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM1MjgzODIsImV4cCI6MjEwOTEwNDM4Mn0.MPVNcaabsiMtH7S3WiKncr_yRQxKiIxxv9cXWsbDXXQ');
+
+  if (typeof window !== 'undefined') {
+    if (!url) {
+      console.error('[Config] NEXT_PUBLIC_SUPABASE_URL is missing. Please configure it in your environment.');
+    } else if (isProd && (!url.startsWith('https://') || url.includes('localhost') || url.includes('127.0.0.1'))) {
+      console.error('[Security] Production requires a valid HTTPS NEXT_PUBLIC_SUPABASE_URL without localhost');
+    }
+    if (!anonKey || PLACEHOLDER_KEY_PATTERN.test(anonKey)) {
+      console.error('[Config] NEXT_PUBLIC_SUPABASE_ANON_KEY is missing or invalid.');
+    }
+  }
 
   return { url, anonKey };
 }

@@ -1,28 +1,47 @@
 'use client';
 
-import type { ReactElement } from 'react';
+import { useState, type ReactElement } from 'react';
 import Link from 'next/link';
 import { type Product, formatPaiseToRupees } from '@orange/api-contracts';
 import { ProductIllustration } from './ProductIllustration';
+import { addToCart } from '../lib/cart';
 
 interface ProductCardProps {
   product: Product;
+  onOpenCart?: () => void;
 }
 
 export function ProductCard({
   product,
+  onOpenCart,
 }: ProductCardProps): ReactElement {
+  const [justAdded, setJustAdded] = useState(false);
   const formattedPrice = formatPaiseToRupees(product.basePrice);
+
+  function handleQuickAdd(e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!product.isInStock) return;
+
+    addToCart(product, 1);
+    setJustAdded(true);
+    setTimeout(() => setJustAdded(false), 2000);
+
+    if (onOpenCart) {
+      onOpenCart();
+    }
+  }
 
   return (
     <article
       className={`product-card ${!product.isInStock ? 'sold-out' : ''}`}
       aria-labelledby={`product-title-${product.id}`}
     >
+      {/* Media Wrapper */}
       <div className="card-media-wrapper">
         <div className="card-badge-top-left">
           {product.isVeg && (
-            <div className="badge-veg" title="Vegetarian / Eggless" aria-label="Vegetarian">
+            <div className="badge-veg" title="100% Vegetarian / Eggless" aria-label="Vegetarian">
               <span className="badge-veg-dot" />
             </div>
           )}
@@ -38,27 +57,38 @@ export function ProductCard({
           </span>
         </div>
 
-        {product.imageUrl ? (
-          <img
-            src={product.imageUrl}
-            alt={product.name}
-            className="card-image"
-            loading="lazy"
-            onError={(e) => {
-              // Hide broken image to fallback to illustration
-              (e.target as HTMLElement).style.display = 'none';
-            }}
-          />
-        ) : (
-          <ProductIllustration
-            categorySlug={product.categorySlug}
-            name={product.name}
-          />
-        )}
+        <Link
+          href={`/product/${encodeURIComponent(product.slug)}`}
+          className="card-media-link"
+          tabIndex={-1}
+          aria-hidden="true"
+        >
+          {product.imageUrl ? (
+            <img
+              src={product.imageUrl}
+              alt={product.name}
+              className="card-image"
+              loading="lazy"
+              onError={(e) => {
+                (e.target as HTMLElement).style.display = 'none';
+              }}
+            />
+          ) : (
+            <ProductIllustration
+              categorySlug={product.categorySlug}
+              name={product.name}
+              className="card-illustration"
+            />
+          )}
+        </Link>
       </div>
 
+      {/* Card Body */}
       <div className="card-body">
-        <div className="category-tag">{product.categoryName}</div>
+        <div className="card-meta-top">
+          <span className="category-tag">{product.categoryName}</span>
+          <span className="card-prep-time">⏱️ {product.prepTimeMinutes}m</span>
+        </div>
 
         <h3 id={`product-title-${product.id}`} className="product-title">
           <Link href={`/product/${encodeURIComponent(product.slug)}`}>
@@ -68,34 +98,50 @@ export function ProductCard({
 
         <p className="product-description">{product.description || 'Artisanal delicacy.'}</p>
 
-        <div className="card-meta-row">
-          <span>⏱️ Est. prep: {product.prepTimeMinutes}m</span>
-          {product.allergens && product.allergens.length > 0 && (
-            <span>• Contains {product.allergens.slice(0, 2).join(', ')}</span>
-          )}
-        </div>
+        {product.allergens && product.allergens.length > 0 && (
+          <div className="card-allergen-row">
+            <span className="allergen-label">Contains:</span>
+            <span className="allergen-text">{product.allergens.slice(0, 2).join(', ')}</span>
+          </div>
+        )}
 
         <div className="card-footer">
-          <div className="product-price">{formattedPrice}</div>
+          <div className="product-price-box">
+            <span className="product-price">{formattedPrice}</span>
+            <span className="product-tax-sub">Incl. {product.taxRatePct}% GST</span>
+          </div>
 
-          {product.isInStock ? (
-            <Link
-              href={`/product/${encodeURIComponent(product.slug)}`}
-              className="btn-card-action btn-view-details"
-              aria-label={`View details for ${product.name}`}
-            >
-              View Details
-            </Link>
-          ) : (
-            <button
-              type="button"
-              disabled
-              className="btn-card-action btn-sold-out-disabled"
-              aria-disabled="true"
-            >
-              Sold Out
-            </button>
-          )}
+          <div className="card-actions-group">
+            {product.isInStock ? (
+              <>
+                <button
+                  type="button"
+                  onClick={handleQuickAdd}
+                  className={`btn-card-quick-add ${justAdded ? 'added' : ''}`}
+                  aria-label={`Add ${product.name} to shopping bag`}
+                  title="Quick Add to Bag"
+                >
+                  {justAdded ? '✓ Added' : '+ Add'}
+                </button>
+                <Link
+                  href={`/product/${encodeURIComponent(product.slug)}`}
+                  className="btn-card-details"
+                  aria-label={`View details for ${product.name}`}
+                >
+                  Details
+                </Link>
+              </>
+            ) : (
+              <button
+                type="button"
+                disabled
+                className="btn-card-action btn-sold-out-disabled"
+                aria-disabled="true"
+              >
+                Sold Out
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </article>

@@ -10,6 +10,7 @@ describe('Health Endpoints', () => {
     const config = validateConfig({
       NODE_ENV: 'test',
       PORT: '4000',
+      SUPABASE_URL: 'https://test-project.supabase.co',
     });
     app = await buildApp({ config });
     await app.ready();

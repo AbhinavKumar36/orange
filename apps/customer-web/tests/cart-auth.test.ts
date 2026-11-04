@@ -67,6 +67,7 @@ const sessionStoragePolyfill = {
 
 describe('Phase 5 Web: Cart & Customer Authentication', () => {
   beforeEach(() => {
+    clearCustomerSession();
     localStorage.clear();
     sessionStorage.clear();
     (globalThis as any).document.cookie = '';
@@ -229,6 +230,66 @@ describe('Phase 5 Web: Cart & Customer Authentication', () => {
         const restored = getStoredCustomerSession();
         expect(restored).not.toBeNull();
         expect(restored?.accessToken).toBe('valid_supabase_signed_jwt_token');
+      } finally {
+        globalThis.fetch = originalFetch;
+      }
+    });
+
+    it('strictly rejects development OTP fallback in production environment', async () => {
+      const originalFetch = globalThis.fetch;
+      const origNodeEnv = process.env.NODE_ENV;
+      const origDevLogin = process.env.NEXT_PUBLIC_ENABLE_DEV_LOGIN;
+
+      try {
+        (process.env as any).NODE_ENV = 'production';
+        process.env.NEXT_PUBLIC_ENABLE_DEV_LOGIN = 'true';
+
+        globalThis.fetch = vi.fn().mockResolvedValue({
+          ok: false,
+          status: 400,
+          json: async () => ({ msg: 'Invalid verification code' }),
+        }) as any;
+
+        const res = await verifyPhoneOtp('+919876543210', '123456');
+        expect(res.success).toBe(false);
+        expect(res.session).toBeUndefined();
+        expect(res.error).toContain('Invalid verification code');
+        expect(getStoredCustomerSession()).toBeNull();
+
+        // Verify that NO password grant or substitute auth endpoint was called
+        const calledUrls = (globalThis.fetch as any).mock.calls.map((c: any[]) => String(c[0]));
+        expect(calledUrls.some((u: string) => u.includes('grant_type=password'))).toBe(false);
+      } finally {
+        (process.env as any).NODE_ENV = origNodeEnv;
+        process.env.NEXT_PUBLIC_ENABLE_DEV_LOGIN = origDevLogin;
+        globalThis.fetch = originalFetch;
+      }
+    });
+
+    it('never calls password grant endpoint on OTP failure in any environment', async () => {
+      const originalFetch = globalThis.fetch;
+      const fetchCalls: Array<{ url: string; options?: any }> = [];
+
+      try {
+        globalThis.fetch = vi.fn().mockImplementation((url, options) => {
+          fetchCalls.push({ url: String(url), options });
+          return Promise.resolve({
+            ok: false,
+            status: 400,
+            json: async () => ({ msg: 'Token expired' }),
+          });
+        }) as any;
+
+        await verifyPhoneOtp('+919876543210', '999999');
+
+        for (const call of fetchCalls) {
+          expect(call.url).not.toContain('grant_type=password');
+          if (call.options?.body) {
+            const bodyStr = String(call.options.body);
+            expect(bodyStr).not.toContain('phone_customer@moodyorange.com');
+            expect(bodyStr).not.toContain('password123');
+          }
+        }
       } finally {
         globalThis.fetch = originalFetch;
       }

@@ -9,6 +9,7 @@ describe('Consistent Error Handling', () => {
   beforeAll(async () => {
     const config = validateConfig({
       NODE_ENV: 'test',
+      SUPABASE_URL: 'https://test-project.supabase.co',
     });
     app = await buildApp({ config });
 

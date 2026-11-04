@@ -18,7 +18,11 @@ export const ConfigSchema = z
       .union([z.boolean(), z.string()])
       .default(false)
       .transform((val) => val === true || val === 'true' || val === '1'),
-    SUPABASE_URL: z.string().url().default('http://localhost:54321'),
+    SUPABASE_URL: z
+      .string({
+        required_error: 'SUPABASE_URL is required. Explicit Supabase project configuration is required.',
+      })
+      .url('SUPABASE_URL must be a valid URL string'),
     // Privileged key for authoritative DB access. Optional in dev/test, required in production.
     SUPABASE_SERVICE_ROLE_KEY: z.string().min(1).optional(),
     // Public anon key. Can be used in dev for public catalog reading if service role key is absent.
@@ -33,6 +37,13 @@ export const ConfigSchema = z
   .superRefine((data, ctx) => {
     if (data.NODE_ENV === 'production') {
       // 1. SUPABASE_URL must use https and not localhost in production
+      if (!data.SUPABASE_URL.startsWith('https://')) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'SUPABASE_URL must use HTTPS in production',
+          path: ['SUPABASE_URL'],
+        });
+      }
       if (data.SUPABASE_URL.includes('localhost') || data.SUPABASE_URL.includes('127.0.0.1')) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,

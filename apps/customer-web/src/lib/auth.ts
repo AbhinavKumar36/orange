@@ -5,20 +5,18 @@ import { useState, useEffect } from 'react';
 const PLACEHOLDER_KEY_PATTERN = /(example|mock|placeholder|dummy)/i;
 
 function getValidatedAuthEnv(): { url: string; anonKey: string } {
+  const url = (process.env.NEXT_PUBLIC_SUPABASE_URL || '').trim();
+  const anonKey = (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '').trim();
   const isProd = process.env.NODE_ENV === 'production';
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || (isProd ? '' : 'https://pdosvzdkuulstvzqfnkl.supabase.co');
-  const anonKey =
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-    (isProd
-      ? ''
-      : 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkb3N2emRrdXVsc3R2enFmbmtsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM1MjgzODIsImV4cCI6MjEwOTEwNDM4Mn0.MPVNcaabsiMtH7S3WiKncr_yRQxKiIxxv9cXWsbDXXQ');
 
-  if (isProd && typeof window !== 'undefined') {
-    if (!url || url.includes('localhost') || url.includes('127.0.0.1')) {
-      console.error('[Security] Production requires a valid HTTPS NEXT_PUBLIC_SUPABASE_URL');
+  if (typeof window !== 'undefined') {
+    if (!url) {
+      console.error('[Config] NEXT_PUBLIC_SUPABASE_URL is missing. Please configure it in your environment.');
+    } else if (isProd && (!url.startsWith('https://') || url.includes('localhost') || url.includes('127.0.0.1'))) {
+      console.error('[Security] Production requires a valid HTTPS NEXT_PUBLIC_SUPABASE_URL without localhost');
     }
     if (!anonKey || PLACEHOLDER_KEY_PATTERN.test(anonKey)) {
-      console.error('[Security] Production requires a valid NEXT_PUBLIC_SUPABASE_ANON_KEY');
+      console.error('[Config] NEXT_PUBLIC_SUPABASE_ANON_KEY is missing or invalid.');
     }
   }
 
@@ -26,6 +24,17 @@ function getValidatedAuthEnv(): { url: string; anonKey: string } {
 }
 
 const { url: SUPABASE_URL, anonKey: SUPABASE_ANON_KEY } = getValidatedAuthEnv();
+
+/**
+ * Returns true only when development OTP testing is explicitly enabled.
+ * Strictly disabled in production builds.
+ */
+export function isDevOtpEnabled(): boolean {
+  return (
+    process.env.NODE_ENV === 'development' &&
+    process.env.NEXT_PUBLIC_ENABLE_DEV_LOGIN === 'true'
+  );
+}
 
 const STORAGE_KEY = 'moody_orange_customer_session';
 
@@ -154,6 +163,7 @@ export async function requestPhoneOtp(phone: string): Promise<{ success: boolean
     return { success: false, error: norm.error || 'Please enter a valid 10-digit mobile number.' };
   }
   const formatted = norm.e164;
+  const devModeActive = isDevOtpEnabled();
 
   try {
     const res = await fetch(`${SUPABASE_URL}/auth/v1/otp`, {
@@ -173,17 +183,16 @@ export async function requestPhoneOtp(phone: string): Promise<{ success: boolean
         rawMsg.toLowerCase().includes('phone provider') ||
         (data as unknown as { error_code?: string })?.error_code === 'phone_provider_disabled';
 
-      if (isProviderDisabled && LOCAL_DEV_TEST_OTPS[formatted]) {
-        // When hosted Supabase has not enabled an external SMS provider, allow documented test numbers to proceed to OTP entry
+      // In development test mode ONLY: allow canonical test numbers to proceed to OTP entry if SMS provider is unconfigured
+      if (devModeActive && isProviderDisabled && LOCAL_DEV_TEST_OTPS[formatted]) {
         return { success: true };
       }
 
       let msg = rawMsg || `Failed to send SMS verification code (status ${res.status}).`;
-      if (
-        process.env.NODE_ENV === 'development' &&
-        isProviderDisabled
-      ) {
-        msg = 'SMS provider not configured on local development environment.';
+      if (isProviderDisabled) {
+        msg = devModeActive
+          ? 'SMS provider not configured on local development environment.'
+          : 'SMS authentication service is currently unavailable. Please contact support.';
       }
       return {
         success: false,
@@ -207,6 +216,7 @@ export async function verifyPhoneOtp(
   }
   const formatted = norm.e164;
   const cleanToken = token.trim();
+  const devModeActive = isDevOtpEnabled();
 
   try {
     const res = await fetch(`${SUPABASE_URL}/auth/v1/verify`, {
@@ -223,37 +233,20 @@ export async function verifyPhoneOtp(
     });
 
     if (!res.ok) {
-      // Fallback for canonical test numbers when hosted Supabase phone provider is disabled
-      if (LOCAL_DEV_TEST_OTPS[formatted] && cleanToken === LOCAL_DEV_TEST_OTPS[formatted]) {
-        try {
-          const tokenRes = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              apikey: SUPABASE_ANON_KEY,
-            },
-            body: JSON.stringify({
-              email: 'phone_customer@moodyorange.com',
-              password: 'password123',
-            }),
-          });
-          if (tokenRes.ok) {
-            const tokenData = await tokenRes.json();
-            const session: CustomerSession = {
-              accessToken: tokenData.access_token,
-              user: {
-                id: tokenData.user.id,
-                phone: formatted,
-                fullName: tokenData.user.user_metadata?.full_name || 'Demo Customer',
-              },
-              expiresAt: tokenData.expires_in ? Date.now() + tokenData.expires_in * 1000 : Date.now() + 3600 * 1000,
-            };
-            saveCustomerSession(session);
-            return { success: true, session };
-          }
-        } catch {
-          // Fall through to error reporting below
-        }
+      // In development test mode ONLY: allow canonical dev test numbers to establish a dev session
+      // Password grant fallback is strictly removed; test credentials cannot be used in production builds
+      if (devModeActive && LOCAL_DEV_TEST_OTPS[formatted] && cleanToken === LOCAL_DEV_TEST_OTPS[formatted]) {
+        const session: CustomerSession = {
+          accessToken: `dev_customer_token:${formatted}:${Date.now()}`,
+          user: {
+            id: `dev-customer-${formatted.replace(/\D/g, '').slice(-4)}`,
+            phone: formatted,
+            fullName: 'Demo Customer',
+          },
+          expiresAt: Date.now() + 3600 * 1000,
+        };
+        saveCustomerSession(session);
+        return { success: true, session };
       }
 
       const errData = (await res.json().catch(() => null)) as SupabaseAuthError | null;

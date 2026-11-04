@@ -14,7 +14,7 @@ export function SearchBar({
   resultCount,
 }: SearchBarProps): ReactElement {
   return (
-    <div className="search-bar-wrapper">
+    <div id="menu-search" className="search-bar-wrapper">
       <div className="search-input-box">
         <span className="search-icon-left" aria-hidden="true">
           <svg
@@ -33,9 +33,10 @@ export function SearchBar({
         </span>
 
         <input
+          id="catalog-search-input"
           type="search"
           className="search-input"
-          placeholder="Search cakes, juices, chocolates..."
+          placeholder="Search by delicacy, flavor, or ingredient..."
           value={query}
           onChange={(e) => onChange(e.target.value)}
           aria-label="Search menu catalog"
@@ -55,10 +56,10 @@ export function SearchBar({
 
       {typeof resultCount === 'number' && (
         <div className="catalog-counter">
-          Showing <strong>{resultCount}</strong> {resultCount === 1 ? 'item' : 'items'}
+          <span>Catalog Results:</span>
+          <strong>{resultCount}</strong> {resultCount === 1 ? 'creation' : 'creations'}
         </div>
       )}
     </div>
   );
 }
-

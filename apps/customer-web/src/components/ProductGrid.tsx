@@ -11,6 +11,7 @@ interface ProductGridProps {
   onRetry: () => void;
   onResetFilters: () => void;
   hasActiveFilters: boolean;
+  onOpenCart?: () => void;
 }
 
 export function ProductGrid({
@@ -20,6 +21,7 @@ export function ProductGrid({
   onRetry,
   onResetFilters,
   hasActiveFilters,
+  onOpenCart,
 }: ProductGridProps): ReactElement {
   // 1. Loading Skeleton
   if (isLoading) {
@@ -108,7 +110,7 @@ export function ProductGrid({
         <h3 className="state-title">No Matching Treats Found</h3>
         <p className="state-copy">
           We could not find any items matching your current filters. Try searching for another
-          dessert or browse our full menu.
+          delicacy or clear active filters.
         </p>
         <button type="button" className="btn-secondary" onClick={onResetFilters}>
           Clear Filters & Show All
@@ -117,7 +119,7 @@ export function ProductGrid({
     );
   }
 
-  // 4. Empty Catalog State (Database has no products)
+  // 4. Empty Catalog State
   if (products.length === 0) {
     return (
       <div className="state-box">
@@ -142,9 +144,9 @@ export function ProductGrid({
         <ProductCard
           key={product.id}
           product={product}
+          onOpenCart={onOpenCart}
         />
       ))}
     </div>
   );
 }
-
