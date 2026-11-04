@@ -146,6 +146,16 @@ export default function AdminDashboardPage(): ReactElement {
   });
   const [writeOffError, setWriteOffError] = useState<string | null>(null);
 
+  // Stock Adjustment & Out of Stock Modal State
+  const [adjustModalItem, setAdjustModalItem] = useState<AdminInventoryItem | null>(null);
+  const [adjustMode, setAdjustMode] = useState<'restock' | 'out_of_stock' | 'custom'>('restock');
+  const [adjustDelta, setAdjustDelta] = useState<number>(10);
+  const [adjustReason, setAdjustReason] = useState<string>('Counter restock shipment received');
+  const [adjustError, setAdjustError] = useState<string | null>(null);
+  const [isAdjusting, setIsAdjusting] = useState<boolean>(false);
+  const [inventoryFilter, setInventoryFilter] = useState<'all' | 'out_of_stock' | 'low_stock' | 'in_stock'>('all');
+  const [autoRefreshQueue, setAutoRefreshQueue] = useState<boolean>(true);
+
   const [orderFilter, setOrderFilter] = useState('all');
   const [orderPaymentFilter, setOrderPaymentFilter] = useState('all');
   const [orderFulfillmentFilter, setOrderFulfillmentFilter] = useState('all');
@@ -222,6 +232,15 @@ export default function AdminDashboardPage(): ReactElement {
       loadData();
     }
   }, [isAuthenticated, loadData]);
+
+  // Real-time Order Queue auto-refresh
+  useEffect(() => {
+    if (!isAuthenticated || activeTab !== 'queue' || !autoRefreshQueue) return;
+    const interval = setInterval(() => {
+      loadData();
+    }, 12000);
+    return () => clearInterval(interval);
+  }, [isAuthenticated, activeTab, autoRefreshQueue, loadData]);
 
   // Keep product form category selection synchronized with loaded categories
   useEffect(() => {
@@ -718,16 +737,28 @@ export default function AdminDashboardPage(): ReactElement {
                   />
                 </div>
 
-                {/* Refresh Action */}
-                <button
-                  type="button"
-                  className="btn-secondary"
-                  disabled={isOrdersLoading}
-                  onClick={loadData}
-                  style={{ fontSize: '0.85rem', padding: '0.45rem 0.85rem', whiteSpace: 'nowrap' }}
-                >
-                  {isOrdersLoading ? 'Refreshing...' : '↻ Refresh Queue'}
-                </button>
+                {/* Refresh Action & Auto-refresh */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    disabled={isOrdersLoading}
+                    onClick={loadData}
+                    style={{ fontSize: '0.85rem', padding: '0.45rem 0.85rem', whiteSpace: 'nowrap' }}
+                  >
+                    {isOrdersLoading ? 'Refreshing...' : '↻ Refresh Queue'}
+                  </button>
+
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.8rem', color: 'var(--color-text-muted)', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                    <input
+                      type="checkbox"
+                      checked={autoRefreshQueue}
+                      onChange={(e) => setAutoRefreshQueue(e.target.checked)}
+                      style={{ accentColor: 'var(--color-brand-primary)' }}
+                    />
+                    <span>Live Updates</span>
+                  </label>
+                </div>
               </div>
             </div>
 
@@ -1270,7 +1301,7 @@ export default function AdminDashboardPage(): ReactElement {
         {/* ========================================================================= */}
         {activeTab === 'inventory' && (
           <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.2rem', flexWrap: 'wrap', gap: '0.8rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.8rem' }}>
               <input
                 type="text"
                 placeholder="Search inventory by product name..."
@@ -1295,6 +1326,53 @@ export default function AdminDashboardPage(): ReactElement {
               )}
             </div>
 
+            {/* Inventory Status Quick Filter Tabs */}
+            <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                className={`tab-btn ${inventoryFilter === 'all' ? 'active' : ''}`}
+                style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem' }}
+                onClick={() => setInventoryFilter('all')}
+              >
+                All Items ({inventory.length})
+              </button>
+              <button
+                type="button"
+                className={`tab-btn ${inventoryFilter === 'out_of_stock' ? 'active' : ''}`}
+                style={{
+                  padding: '0.4rem 0.8rem',
+                  fontSize: '0.8rem',
+                  color: inventory.filter((i) => i.availableStock <= 0).length > 0 ? '#DC3545' : 'inherit',
+                  borderColor: inventoryFilter === 'out_of_stock' ? '#DC3545' : undefined,
+                  fontWeight: inventory.filter((i) => i.availableStock <= 0).length > 0 ? 700 : 500,
+                }}
+                onClick={() => setInventoryFilter('out_of_stock')}
+              >
+                🔴 Out of Stock ({inventory.filter((i) => i.availableStock <= 0).length})
+              </button>
+              <button
+                type="button"
+                className={`tab-btn ${inventoryFilter === 'low_stock' ? 'active' : ''}`}
+                style={{
+                  padding: '0.4rem 0.8rem',
+                  fontSize: '0.8rem',
+                  color: inventory.filter((i) => i.availableStock > 0 && i.isLowStock).length > 0 ? '#B7791F' : 'inherit',
+                  borderColor: inventoryFilter === 'low_stock' ? '#B7791F' : undefined,
+                }}
+                onClick={() => setInventoryFilter('low_stock')}
+              >
+                🟡 Low Stock ({inventory.filter((i) => i.availableStock > 0 && i.isLowStock).length})
+              </button>
+              <button
+                type="button"
+                className={`tab-btn ${inventoryFilter === 'in_stock' ? 'active' : ''}`}
+                style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem' }}
+                onClick={() => setInventoryFilter('in_stock')}
+              >
+                🟢 Optimal ({inventory.filter((i) => i.availableStock > i.lowStockThreshold).length})
+              </button>
+            </div>
+
             <div style={{ background: '#FFF', borderRadius: '10px', border: '1px solid var(--color-border)', overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.85rem' }}>
                 <thead>
@@ -1304,12 +1382,19 @@ export default function AdminDashboardPage(): ReactElement {
                     <th style={{ padding: '0.75rem 1rem' }}>Reserved (Active Orders)</th>
                     <th style={{ padding: '0.75rem 1rem' }}>Available</th>
                     <th style={{ padding: '0.75rem 1rem' }}>Threshold</th>
-                    <th style={{ padding: '0.75rem 1rem' }}>Status</th>
-                    {isManager && <th style={{ padding: '0.75rem 1rem' }}>Restock</th>}
+                    <th style={{ padding: '0.75rem 1rem' }}>Stock Status</th>
+                    {isManager && <th style={{ padding: '0.75rem 1rem' }}>Actions</th>}
                   </tr>
                 </thead>
                 <tbody>
-                  {inventory.map((inv) => (
+                  {inventory
+                    .filter((inv) => {
+                      if (inventoryFilter === 'out_of_stock') return inv.availableStock <= 0;
+                      if (inventoryFilter === 'low_stock') return inv.availableStock > 0 && inv.isLowStock;
+                      if (inventoryFilter === 'in_stock') return inv.availableStock > inv.lowStockThreshold;
+                      return true;
+                    })
+                    .map((inv) => (
                     <tr key={inv.productId} style={{ borderBottom: '1px solid var(--color-border-light)' }}>
                       <td style={{ padding: '0.75rem 1rem' }}>
                         <strong>{inv.productName}</strong>
@@ -1319,39 +1404,89 @@ export default function AdminDashboardPage(): ReactElement {
                       <td style={{ padding: '0.75rem 1rem', color: inv.reservedStock > 0 ? '#B7791F' : 'inherit' }}>
                         {inv.reservedStock}
                       </td>
-                      <td style={{ padding: '0.75rem 1rem', fontWeight: 700, color: inv.isLowStock ? '#DC3545' : 'inherit' }}>
+                      <td style={{ padding: '0.75rem 1rem', fontWeight: 700, color: inv.availableStock <= 0 ? '#DC3545' : inv.isLowStock ? '#B7791F' : 'inherit' }}>
                         {inv.availableStock}
                       </td>
                       <td style={{ padding: '0.75rem 1rem' }}>{inv.lowStockThreshold}</td>
                       <td style={{ padding: '0.75rem 1rem' }}>
-                        {inv.isLowStock ? (
-                          <span className="badge badge-cancelled">Low Stock</span>
+                        {inv.availableStock <= 0 ? (
+                          <span
+                            className="badge"
+                            style={{
+                              background: '#FEE2E2',
+                              color: '#B91C1C',
+                              border: '1px solid #F87171',
+                              fontWeight: 700,
+                              padding: '0.25rem 0.55rem',
+                            }}
+                          >
+                            🔴 Out of Stock
+                          </span>
+                        ) : inv.isLowStock ? (
+                          <span
+                            className="badge"
+                            style={{
+                              background: '#FEF3C7',
+                              color: '#92400E',
+                              border: '1px solid #FBBF24',
+                              fontWeight: 700,
+                              padding: '0.25rem 0.55rem',
+                            }}
+                          >
+                            🟡 Low Stock ({inv.availableStock})
+                          </span>
                         ) : (
-                          <span className="badge badge-confirmed">Optimal</span>
+                          <span className="badge badge-confirmed">
+                            🟢 Optimal ({inv.availableStock})
+                          </span>
                         )}
                       </td>
                       {isManager && (
                         <td style={{ padding: '0.75rem 1rem' }}>
-                          <button
-                            type="button"
-                            className="btn-secondary"
-                            style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem' }}
-                            onClick={async () => {
-                              if (!token) return;
-                              const qtyStr = prompt(`Enter restock units to ADD for ${inv.productName}:`, '10');
-                              if (!qtyStr) return;
-                              const delta = parseInt(qtyStr, 10);
-                              if (isNaN(delta) || delta === 0) return;
-                              await adjustAdminInventory(token, {
-                                productId: inv.productId,
-                                physicalStockDelta: delta,
-                                reason: 'Counter restock shipment received',
-                              });
-                              loadData();
-                            }}
-                          >
-                            + Restock
-                          </button>
+                          <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                            <button
+                              type="button"
+                              className={inv.availableStock <= 0 ? 'btn-primary' : 'btn-secondary'}
+                              style={{
+                                padding: '0.25rem 0.6rem',
+                                fontSize: '0.78rem',
+                                background: inv.availableStock <= 0 ? '#198754' : undefined,
+                              }}
+                              onClick={() => {
+                                setAdjustModalItem(inv);
+                                setAdjustMode('restock');
+                                setAdjustDelta(10);
+                                setAdjustReason('Counter restock shipment received');
+                                setAdjustError(null);
+                              }}
+                              title="Restock units or adjust inventory"
+                            >
+                              {inv.availableStock <= 0 ? '+ Restock Now' : '📦 Adjust / Restock'}
+                            </button>
+
+                            {inv.availableStock > 0 && (
+                              <button
+                                type="button"
+                                className="btn-secondary"
+                                style={{
+                                  padding: '0.25rem 0.55rem',
+                                  fontSize: '0.75rem',
+                                  color: '#DC3545',
+                                  borderColor: '#FCA5A5',
+                                }}
+                                onClick={() => {
+                                  setAdjustModalItem(inv);
+                                  setAdjustMode('out_of_stock');
+                                  setAdjustDelta(-inv.availableStock);
+                                  setAdjustReason('Vitrine counter display depleted / marked out of stock');
+                                  setAdjustError(null);
+                                }}
+                                title="Instantly reduce available stock to 0"
+                              >
+                                Mark Out of Stock
+                              </button>
+                            )}
+                          </div>
                         </td>
                       )}
                     </tr>
@@ -1426,6 +1561,202 @@ export default function AdminDashboardPage(): ReactElement {
                 onClick={handleHandoverSubmit}
               >
                 Confirm & Complete Handover
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Stock Adjustment & Out of Stock Modal */}
+      {adjustModalItem && (
+        <div className="modal-backdrop">
+          <div className="modal-card" style={{ maxWidth: '480px' }}>
+            <div className="modal-header">
+              <h3 style={{ fontSize: '1.15rem', fontWeight: 700, color: 'var(--color-brand-primary)' }}>
+                {adjustMode === 'out_of_stock' ? 'Mark Out of Stock' : 'Stock Adjustment & Restock'}
+              </h3>
+              <button type="button" onClick={() => setAdjustModalItem(null)}>✕</button>
+            </div>
+
+            <div className="modal-body">
+              {adjustError && (
+                <div style={{ padding: '0.75rem', background: '#FEECEB', color: '#DC3545', borderRadius: '6px', fontSize: '0.85rem', marginBottom: '1rem' }}>
+                  {adjustError}
+                </div>
+              )}
+
+              <div style={{ background: 'var(--color-bg-cream)', padding: '0.85rem', borderRadius: '8px', marginBottom: '1.25rem' }}>
+                <strong style={{ fontSize: '1rem' }}>{adjustModalItem.productName}</strong>
+                <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>{adjustModalItem.categoryName}</div>
+                <div style={{ display: 'flex', gap: '1rem', marginTop: '0.6rem', fontSize: '0.82rem' }}>
+                  <span>Physical: <strong>{adjustModalItem.physicalStock}</strong></span>
+                  <span>Reserved: <strong>{adjustModalItem.reservedStock}</strong></span>
+                  <span style={{ color: adjustModalItem.availableStock <= 0 ? '#DC3545' : 'inherit' }}>
+                    Available: <strong>{adjustModalItem.availableStock}</strong>
+                  </span>
+                </div>
+              </div>
+
+              {/* Action Mode Selector */}
+              <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.25rem' }}>
+                <button
+                  type="button"
+                  className={`btn-secondary ${adjustMode === 'restock' ? 'active' : ''}`}
+                  style={{
+                    flex: 1,
+                    fontSize: '0.8rem',
+                    background: adjustMode === 'restock' ? '#EBF8EE' : undefined,
+                    borderColor: adjustMode === 'restock' ? '#198754' : undefined,
+                    color: adjustMode === 'restock' ? '#198754' : undefined,
+                  }}
+                  onClick={() => {
+                    setAdjustMode('restock');
+                    setAdjustDelta(10);
+                    setAdjustReason('Counter restock shipment received');
+                  }}
+                >
+                  📥 Restock (+)
+                </button>
+                <button
+                  type="button"
+                  className={`btn-secondary ${adjustMode === 'out_of_stock' ? 'active' : ''}`}
+                  style={{
+                    flex: 1,
+                    fontSize: '0.8rem',
+                    background: adjustMode === 'out_of_stock' ? '#FEECEB' : undefined,
+                    borderColor: adjustMode === 'out_of_stock' ? '#DC3545' : undefined,
+                    color: adjustMode === 'out_of_stock' ? '#DC3545' : undefined,
+                  }}
+                  onClick={() => {
+                    setAdjustMode('out_of_stock');
+                    setAdjustDelta(-adjustModalItem.availableStock);
+                    setAdjustReason('Vitrine counter display depleted / marked out of stock');
+                  }}
+                >
+                  ⚡ Set Out of Stock
+                </button>
+                <button
+                  type="button"
+                  className={`btn-secondary ${adjustMode === 'custom' ? 'active' : ''}`}
+                  style={{ flex: 1, fontSize: '0.8rem' }}
+                  onClick={() => {
+                    setAdjustMode('custom');
+                    setAdjustDelta(0);
+                    setAdjustReason('Counter physical inventory count correction');
+                  }}
+                >
+                  ✏️ Custom (+/-)
+                </button>
+              </div>
+
+              {/* Quantity delta input & quick chips */}
+              {adjustMode === 'restock' && (
+                <div style={{ marginBottom: '1rem' }}>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '0.4rem' }}>
+                    Restock Quantity to ADD (Units)
+                  </label>
+                  <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                    {[5, 10, 25, 50].map((num) => (
+                      <button
+                        key={num}
+                        type="button"
+                        className="btn-secondary"
+                        style={{
+                          padding: '0.3rem 0.6rem',
+                          fontSize: '0.8rem',
+                          background: adjustDelta === num ? '#EBF8EE' : undefined,
+                          borderColor: adjustDelta === num ? '#198754' : undefined,
+                        }}
+                        onClick={() => setAdjustDelta(num)}
+                      >
+                        +{num}
+                      </button>
+                    ))}
+                  </div>
+                  <input
+                    type="number"
+                    min="1"
+                    value={adjustDelta}
+                    onChange={(e) => setAdjustDelta(parseInt(e.target.value, 10) || 0)}
+                    style={{ width: '100%' }}
+                  />
+                </div>
+              )}
+
+              {adjustMode === 'out_of_stock' && (
+                <div style={{ padding: '0.75rem', background: '#FEECEB', borderRadius: '8px', marginBottom: '1rem', fontSize: '0.85rem', color: '#B91C1C' }}>
+                  <strong>Marking Out of Stock:</strong> This will reduce physical stock by {adjustModalItem.availableStock} units so available stock becomes <strong>0</strong>. Customers will see &ldquo;Out of Stock&rdquo; immediately.
+                </div>
+              )}
+
+              {adjustMode === 'custom' && (
+                <div style={{ marginBottom: '1rem' }}>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '0.4rem' }}>
+                    Adjustment Delta (+ to add, - to subtract)
+                  </label>
+                  <input
+                    type="number"
+                    value={adjustDelta}
+                    onChange={(e) => setAdjustDelta(parseInt(e.target.value, 10) || 0)}
+                    style={{ width: '100%' }}
+                  />
+                </div>
+              )}
+
+              {/* Reason input */}
+              <div style={{ marginBottom: '1.25rem' }}>
+                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '0.4rem' }}>
+                  Adjustment Reason (Required for Audit Log)
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Counter restock shipment received"
+                  value={adjustReason}
+                  onChange={(e) => setAdjustReason(e.target.value)}
+                  style={{ width: '100%' }}
+                  required
+                />
+              </div>
+
+              {/* Calculated preview */}
+              <div style={{ padding: '0.65rem 0.85rem', background: '#F8F9FA', borderRadius: '6px', fontSize: '0.82rem', border: '1px solid var(--color-border)' }}>
+                <span>Stock Preview: </span>
+                Physical: {adjustModalItem.physicalStock} → <strong>{Math.max(adjustModalItem.reservedStock, adjustModalItem.physicalStock + adjustDelta)}</strong> |
+                Available: {adjustModalItem.availableStock} → <strong style={{ color: (adjustModalItem.availableStock + adjustDelta) <= 0 ? '#DC3545' : '#198754' }}>
+                  {Math.max(0, adjustModalItem.availableStock + adjustDelta)}
+                </strong>
+              </div>
+            </div>
+
+            <div className="modal-footer">
+              <button type="button" className="btn-secondary" onClick={() => setAdjustModalItem(null)}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn-primary"
+                disabled={isAdjusting || !adjustReason.trim() || adjustDelta === 0}
+                onClick={async () => {
+                  if (!token || !adjustModalItem) return;
+                  setIsAdjusting(true);
+                  setAdjustError(null);
+                  try {
+                    await adjustAdminInventory(token, {
+                      productId: adjustModalItem.productId,
+                      physicalStockDelta: adjustDelta,
+                      reason: adjustReason.trim(),
+                    });
+                    setStatusMessage(`Inventory adjusted for ${adjustModalItem.productName}.`);
+                    setAdjustModalItem(null);
+                    loadData();
+                  } catch (e: unknown) {
+                    setAdjustError(e instanceof Error ? e.message : 'Inventory adjustment failed');
+                  } finally {
+                    setIsAdjusting(false);
+                  }
+                }}
+              >
+                {isAdjusting ? 'Updating Stock...' : 'Confirm Stock Adjustment'}
               </button>
             </div>
           </div>

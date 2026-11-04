@@ -4239,3 +4239,166 @@ html.dark .alert-error {
   color: var(--color-text-main);
 }
 
+/* ==========================================================================
+   Order Tracking & Stepper Styles
+   ========================================================================== */
+.order-tracking-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-card-border);
+  border-radius: var(--radius-lg);
+  padding: 1.5rem;
+  box-shadow: var(--shadow-sm);
+  transition: border-color var(--transition-fast), transform var(--transition-fast);
+}
+
+.order-tracking-card:hover {
+  border-color: rgba(215, 163, 74, 0.4);
+}
+
+.order-stepper-container {
+  margin: 1.5rem 0 1rem 0;
+  padding: 1.25rem 0.75rem;
+  background: var(--color-surface-elevated);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-card-border);
+}
+
+.stepper-progress-bar {
+  display: flex;
+  justify-content: space-between;
+  position: relative;
+  max-width: 100%;
+}
+
+.stepper-progress-bar::before {
+  content: '';
+  position: absolute;
+  top: 15px;
+  left: 24px;
+  right: 24px;
+  height: 3px;
+  background: var(--color-card-border);
+  z-index: 1;
+}
+
+.stepper-progress-fill {
+  position: absolute;
+  top: 15px;
+  left: 24px;
+  height: 3px;
+  background: linear-gradient(90deg, #10B981, var(--color-gold));
+  z-index: 2;
+  transition: width 0.4s ease;
+}
+
+.stepper-step-node {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+  text-align: center;
+}
+
+.stepper-node-circle {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--color-surface);
+  border: 2px solid var(--color-card-border);
+  color: var(--color-text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85rem;
+  font-weight: 700;
+  transition: all 0.3s ease;
+}
+
+.stepper-step-node.completed .stepper-node-circle {
+  background: #10B981;
+  border-color: #10B981;
+  color: #FFFFFF;
+}
+
+.stepper-step-node.active .stepper-node-circle {
+  background: var(--color-gold);
+  border-color: var(--color-gold);
+  color: #040D12;
+  box-shadow: 0 0 12px rgba(215, 163, 74, 0.5);
+  animation: pulseNode 2s infinite;
+}
+
+@keyframes pulseNode {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.08); }
+  100% { transform: scale(1); }
+}
+
+.stepper-step-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  margin-top: 0.5rem;
+  color: var(--color-text-muted);
+}
+
+.stepper-step-node.completed .stepper-step-label {
+  color: #10B981;
+}
+
+.stepper-step-node.active .stepper-step-label {
+  color: var(--color-gold);
+}
+
+.stepper-step-desc {
+  font-size: 0.68rem;
+  color: var(--color-text-muted);
+  margin-top: 0.15rem;
+  max-width: 110px;
+}
+
+.counter-handover-callout {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.85rem;
+  padding: 1rem 1.25rem;
+  border-radius: var(--radius-md);
+  background: rgba(215, 163, 74, 0.1);
+  border: 1.5px solid var(--color-gold);
+  margin-top: 1rem;
+}
+
+.handover-callout-icon {
+  font-size: 1.5rem;
+  line-height: 1;
+}
+
+.handover-callout-title {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--color-gold);
+  margin-bottom: 0.2rem;
+}
+
+.handover-callout-copy {
+  font-size: 0.82rem;
+  color: var(--color-text-body);
+  line-height: 1.4;
+}
+
+.out-of-stock-alert-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.85rem 1.15rem;
+  background: rgba(239, 68, 68, 0.12);
+  border: 1.5px solid #EF4444;
+  border-radius: var(--radius-md);
+  color: #F87171;
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+}
+
+

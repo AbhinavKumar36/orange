@@ -314,7 +314,7 @@ export function ProductShowcase({ products, onOpenCart }: ProductShowcaseProps):
                     disabled
                     className="btn-primary btn-sold-out-disabled showcase-add-btn"
                   >
-                    Currently Sold Out
+                    Currently Out of Stock at Counter
                   </button>
                 )}
 

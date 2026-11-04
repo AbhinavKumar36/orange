@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, type ReactElement } from 'react';
+import Link from 'next/link';
 import { formatPaiseToRupees, type ValidateCartResponse, type CheckoutResponse } from '@orange/api-contracts';
 import { useCart } from '../lib/cart';
 import { useCustomerAuth } from '../lib/auth';
@@ -338,13 +339,17 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps): ReactEle
 
                   <div className="receipt-row">
                     <span className="receipt-label">Payment Mode</span>
-                    <span className="receipt-value">
-                      {paymentMethod === 'cash_at_pickup' ? 'Cash/UPI at Counter' : 'Online Payment (Draft)'}
+                    <span className="receipt-value" style={{ fontWeight: 600, color: confirmedOrder.paymentStatus === 'captured' || (confirmedOrder.paymentStatus as string) === 'paid' ? '#10B981' : 'inherit' }}>
+                      {paymentMethod === 'cash_at_pickup'
+                        ? 'Cash/UPI at Counter'
+                        : confirmedOrder.paymentStatus === 'captured' || (confirmedOrder.paymentStatus as string) === 'paid'
+                        ? 'Online Payment (Paid ✓)'
+                        : 'Online Payment (Awaiting Capture)'}
                     </span>
                   </div>
 
                   <div className="receipt-row">
-                    <span className="receipt-label">Total to Pay</span>
+                    <span className="receipt-label">Total Amount</span>
                     <strong className="receipt-total">
                       {formatPaiseToRupees(confirmedOrder.totalAmount)}
                     </strong>
@@ -352,18 +357,29 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps): ReactEle
 
                   <div className="receipt-pickup-note">
                     📍 <strong>Boutique Counter Collection:</strong> Please show order reference{' '}
-                    <strong>{confirmedOrder.orderNumber}</strong> to the counter team upon arrival.
+                    <strong>#{confirmedOrder.orderNumber}</strong> to the counter team upon arrival.
                   </div>
                 </div>
 
-                <button
-                  type="button"
-                  className="btn-primary"
-                  onClick={handleCloseAll}
-                  style={{ width: '100%', marginTop: '1rem' }}
-                >
-                  Return to Storefront
-                </button>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '1.25rem' }}>
+                  <Link
+                    href="/orders"
+                    className="btn-primary"
+                    onClick={handleCloseAll}
+                    style={{ textAlign: 'center', textDecoration: 'none', padding: '0.8rem 1.25rem' }}
+                  >
+                    Track Order Live →
+                  </Link>
+
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    onClick={handleCloseAll}
+                    style={{ width: '100%' }}
+                  >
+                    Continue Browsing Storefront
+                  </button>
+                </div>
               </div>
             ) : pendingOnlineOrder ? (
               <div className="pending-payment-view">
@@ -440,6 +456,23 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps): ReactEle
             ) : (
               /* PROGRESSIVE CHECKOUT FORM */
               <form onSubmit={handleSubmitOrder} className="checkout-form">
+                {validation && (!validation.isValid || validation.hasOutOfStockItems) && (
+                  <div className="out-of-stock-alert-banner" role="alert">
+                    <span style={{ fontSize: '1.25rem' }}>⚠️</span>
+                    <div>
+                      <div style={{ fontWeight: 700 }}>Item(s) Out of Stock</div>
+                      <div style={{ fontSize: '0.82rem', marginTop: '0.2rem', opacity: 0.95 }}>
+                        {validation.items.some((i) => !i.isInStock)
+                          ? `The following items are out of stock: ${validation.items
+                              .filter((i) => !i.isInStock)
+                              .map((i) => i.productName)
+                              .join(', ')}. Please adjust your bag.`
+                          : 'One or more items in your shopping bag are no longer available in our display counter. Please return to your bag and remove them to continue.'}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* 1. Fulfillment Selection */}
                 <div className="checkout-field-section">
                   <div className="step-label">

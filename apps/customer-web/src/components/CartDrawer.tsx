@@ -14,6 +14,7 @@ interface CartDrawerProps {
 export function CartDrawer({ isOpen, onClose }: CartDrawerProps): ReactElement | null {
   const { items, subtotal, updateQuantity, removeFromCart } = useCart();
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
+  const hasOutOfStockItems = items.some((it) => !it.product.isInStock);
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -125,7 +126,22 @@ export function CartDrawer({ isOpen, onClose }: CartDrawerProps): ReactElement |
                       {/* Info & Stepper */}
                       <div className="cart-item-details">
                         <div className="cart-item-header">
-                          <h4 className="cart-item-name">{product.name}</h4>
+                          <div>
+                            <h4 className="cart-item-name">{product.name}</h4>
+                            {!product.isInStock && (
+                              <span
+                                className="badge-stock badge-sold-out"
+                                style={{
+                                  fontSize: '0.7rem',
+                                  padding: '0.15rem 0.45rem',
+                                  marginTop: '0.25rem',
+                                  display: 'inline-block',
+                                }}
+                              >
+                                Out of Stock
+                              </span>
+                            )}
+                          </div>
                           <span className="cart-item-unit-price">
                             {formatPaiseToRupees(product.basePrice)} each
                           </span>
@@ -203,12 +219,30 @@ export function CartDrawer({ isOpen, onClose }: CartDrawerProps): ReactElement |
                     </div>
                   </div>
 
+                  {hasOutOfStockItems && (
+                    <div
+                      style={{
+                        padding: '0.65rem 0.85rem',
+                        background: 'rgba(239, 68, 68, 0.12)',
+                        border: '1px solid #EF4444',
+                        borderRadius: '6px',
+                        fontSize: '0.78rem',
+                        color: '#F87171',
+                        marginBottom: '0.75rem',
+                      }}
+                    >
+                      ⚠️ Some items in your bag are currently out of stock. Please remove them to proceed.
+                    </div>
+                  )}
+
                   <button
                     type="button"
                     className="btn-primary cart-checkout-btn"
+                    disabled={hasOutOfStockItems}
+                    style={hasOutOfStockItems ? { opacity: 0.6, cursor: 'not-allowed' } : undefined}
                     onClick={() => setIsCheckoutOpen(true)}
                   >
-                    <span>Proceed to Counter Checkout</span>
+                    <span>{hasOutOfStockItems ? 'Remove Out of Stock Items' : 'Proceed to Counter Checkout'}</span>
                     <span className="btn-arrow" aria-hidden="true">→</span>
                   </button>
                 </div>

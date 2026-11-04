@@ -91,6 +91,9 @@ export function Header({ onCategorySelect }: HeaderProps): ReactElement {
             <Link href="/#about" className="nav-link">
               Our Story
             </Link>
+            <Link href="/orders" className="nav-link">
+              Track Order
+            </Link>
             <Link href="/#service" className="nav-link">
               Pickup & Policies
             </Link>
@@ -176,15 +179,27 @@ export function Header({ onCategorySelect }: HeaderProps): ReactElement {
                 </button>
               </div>
             ) : (
-              <button
-                type="button"
-                onClick={() => setIsAuthModalOpen(true)}
-                className="btn-signin"
-                aria-label="Sign in to your account"
-              >
-                <span aria-hidden="true">👤</span>
-                <span>Sign In</span>
-              </button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Link
+                  href="/orders"
+                  className="orders-link-pill"
+                  aria-label="Track Order"
+                  title="Track your order status"
+                >
+                  <span className="orders-icon">📍</span>
+                  <span>Track</span>
+                </Link>
+
+                <button
+                  type="button"
+                  onClick={() => setIsAuthModalOpen(true)}
+                  className="btn-signin"
+                  aria-label="Sign in to your account"
+                >
+                  <span aria-hidden="true">👤</span>
+                  <span>Sign In</span>
+                </button>
+              </div>
             )}
 
             {/* Shopping Bag CTA */}

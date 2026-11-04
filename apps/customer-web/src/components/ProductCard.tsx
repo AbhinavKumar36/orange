@@ -59,7 +59,7 @@ export function ProductCard({
               product.isInStock ? 'badge-in-stock' : 'badge-sold-out'
             }`}
           >
-            {product.isInStock ? 'In Stock' : 'Sold Out'}
+            {product.isInStock ? 'In Stock' : 'Out of Stock'}
           </span>
         </div>
 
@@ -144,7 +144,7 @@ export function ProductCard({
                 className="btn-card-action btn-sold-out-disabled"
                 aria-disabled="true"
               >
-                Sold Out
+                Out of Stock
               </button>
             )}
           </div>

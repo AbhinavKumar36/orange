@@ -275,7 +275,7 @@ export default function ProductDetailPage(): ReactElement {
                         product.isInStock ? 'badge-in-stock' : 'badge-sold-out'
                       }`}
                     >
-                      {product.isInStock ? 'In Stock' : 'Sold Out'}
+                      {product.isInStock ? 'In Stock' : 'Out of Stock'}
                     </span>
                   </div>
                 </div>
@@ -296,9 +296,9 @@ export default function ProductDetailPage(): ReactElement {
 
                 {/* Counter Pickup Lead Time Advisory */}
                 <div className="pickup-lead-banner">
-                  <div className="pickup-banner-icon">⏱️</div>
+                  <div className="pickup-banner-icon">🛍️</div>
                   <div className="pickup-banner-text">
-                    <strong>Fresh Preparation:</strong> Estimated kitchen lead time is ~{product.prepTimeMinutes} minutes upon counter order.
+                    <strong>In-Store Display Confection:</strong> Pre-crafted batch displayed in boutique vitrine. Zero wait time counter collection.
                   </div>
                 </div>
 
@@ -331,8 +331,8 @@ export default function ProductDetailPage(): ReactElement {
                     </span>
                   </div>
                   <div className="spec-row">
-                    <span className="spec-label">Prep Lead Time</span>
-                    <span className="spec-value">~{product.prepTimeMinutes} minutes</span>
+                    <span className="spec-label">Counter Handover</span>
+                    <span className="spec-value">Immediate (Ready-to-Collect Vitrine Stock)</span>
                   </div>
                   <div className="spec-row">
                     <span className="spec-label">Allergens Declared</span>
@@ -405,7 +405,7 @@ export default function ProductDetailPage(): ReactElement {
                         className="btn-primary btn-sold-out-disabled"
                         style={{ flexGrow: 1 }}
                       >
-                        Currently Sold Out in Kitchen
+                        Currently Out of Stock at Display Counter
                       </button>
                     </div>
                   )}
