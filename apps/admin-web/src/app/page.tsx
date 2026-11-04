@@ -7,6 +7,7 @@ import {
   type AdminCategoryItem,
   type AdminInventoryItem,
   type Order,
+  type OrderPaymentsResponse,
   formatPaiseToRupees,
 } from '@orange/api-contracts';
 import { useAdminAuth } from '../lib/auth';
@@ -26,6 +27,8 @@ import {
   fetchAdminInventory,
   writeOffAdminInventory,
   adjustAdminInventory,
+  refundAdminOrder,
+  fetchAdminOrderPayments,
 } from '../lib/api';
 
 type AdminTab = 'queue' | 'overview' | 'products' | 'categories' | 'inventory';
@@ -89,6 +92,17 @@ export default function AdminDashboardPage(): ReactElement {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [isActionLoading, setIsActionLoading] = useState(false);
+
+  // Refund and Payment Inspection states
+  const [refundOrder, setRefundOrder] = useState<Order | null>(null);
+  const [refundAmountPaise, setRefundAmountPaise] = useState<number>(0);
+  const [refundReason, setRefundReason] = useState<string>('');
+  const [refundError, setRefundError] = useState<string | null>(null);
+  const [isRefunding, setIsRefunding] = useState(false);
+
+  const [inspectPaymentsOrder, setInspectPaymentsOrder] = useState<Order | null>(null);
+  const [inspectPaymentsData, setInspectPaymentsData] = useState<OrderPaymentsResponse | null>(null);
+  const [isInspectLoading, setIsInspectLoading] = useState(false);
 
   // Staff Supabase Auth credentials for login screen
   const [loginEmail, setLoginEmail] = useState('');
@@ -363,6 +377,56 @@ export default function AdminDashboardPage(): ReactElement {
     }
   };
 
+  const handleOpenRefund = (order: Order) => {
+    setRefundOrder(order);
+    setRefundAmountPaise(order.totalAmount);
+    setRefundReason('');
+    setRefundError(null);
+  };
+
+  const handleExecuteRefund = async () => {
+    if (!token || !refundOrder) return;
+    if (!refundReason.trim()) {
+      setRefundError('Please provide a reason for the refund.');
+      return;
+    }
+    if (refundAmountPaise <= 0 || refundAmountPaise > refundOrder.totalAmount) {
+      setRefundError('Invalid refund amount.');
+      return;
+    }
+
+    setIsRefunding(true);
+    setRefundError(null);
+    try {
+      await refundAdminOrder(token, refundOrder.id, {
+        amount: refundAmountPaise,
+        reason: refundReason.trim(),
+      });
+      setStatusMessage(`Refund of ${formatPaiseToRupees(refundAmountPaise)} successfully issued for Order #${refundOrder.orderNumber}.`);
+      setRefundOrder(null);
+      loadData();
+    } catch (e: unknown) {
+      setRefundError(e instanceof Error ? e.message : 'Failed to issue refund.');
+    } finally {
+      setIsRefunding(false);
+    }
+  };
+
+  const handleInspectPayments = async (order: Order) => {
+    if (!token) return;
+    setInspectPaymentsOrder(order);
+    setInspectPaymentsData(null);
+    setIsInspectLoading(true);
+    try {
+      const data = await fetchAdminOrderPayments(token, order.id);
+      setInspectPaymentsData(data);
+    } catch (e: unknown) {
+      alert(`Error fetching payments: ${e instanceof Error ? e.message : 'Unknown error'}`);
+    } finally {
+      setIsInspectLoading(false);
+    }
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
       {/* Header */}
@@ -570,15 +634,50 @@ export default function AdminDashboardPage(): ReactElement {
 
                     <div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '0.75rem 0 1rem 0' }}>
-                        <span style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>
-                          Total ({ord.paymentMethod === 'cash_at_pickup' ? 'Cash at Counter' : 'Online'})
-                        </span>
+                        <div>
+                          <span style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>
+                            {ord.paymentMethod === 'cash_at_pickup' ? 'Cash at Counter' : 'Online Payment'}
+                          </span>
+                          <span
+                            className={`badge badge-${ord.paymentStatus}`}
+                            style={{ marginLeft: '0.5rem', fontSize: '0.75rem' }}
+                          >
+                            {ord.paymentStatus.replace(/_/g, ' ')}
+                          </span>
+                        </div>
                         <strong style={{ fontSize: '1.1rem', color: 'var(--color-brand-primary)' }}>
                           {formatPaiseToRupees(ord.totalAmount)}
                         </strong>
                       </div>
 
                       <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                        <button
+                          type="button"
+                          className="btn-secondary"
+                          style={{ fontSize: '0.8rem', padding: '0.35rem 0.6rem' }}
+                          onClick={() => handleInspectPayments(ord)}
+                        >
+                          💳 Payments
+                        </button>
+
+                        {isManager &&
+                          ord.paymentMethod === 'online_razorpay' &&
+                          ['captured', 'partially_refunded'].includes(ord.paymentStatus) && (
+                            <button
+                              type="button"
+                              className="btn-secondary"
+                              style={{
+                                fontSize: '0.8rem',
+                                padding: '0.35rem 0.6rem',
+                                color: '#b91c1c',
+                                borderColor: '#fca5a5',
+                              }}
+                              onClick={() => handleOpenRefund(ord)}
+                            >
+                              ↩️ Refund
+                            </button>
+                          )}
+
                         {ord.orderStatus === 'confirmed' && (
                           <button
                             type="button"
@@ -1376,6 +1475,184 @@ export default function AdminDashboardPage(): ReactElement {
                 }}
               >
                 Create Category
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Issue Refund Modal */}
+      {refundOrder && (
+        <div className="modal-backdrop">
+          <div className="modal-card" style={{ maxWidth: '440px' }}>
+            <div className="modal-header">
+              <h3 style={{ fontSize: '1.1rem', fontWeight: 700 }}>
+                Issue Refund — Order #{refundOrder.orderNumber}
+              </h3>
+              <button type="button" onClick={() => setRefundOrder(null)}>✕</button>
+            </div>
+            <div className="modal-body">
+              {refundError && (
+                <div style={{ background: '#fee2e2', color: '#b91c1c', padding: '0.6rem 0.8rem', borderRadius: '6px', fontSize: '0.85rem', marginBottom: '0.8rem' }}>
+                  ⚠️ {refundError}
+                </div>
+              )}
+
+              <div style={{ background: '#f8fafc', padding: '0.8rem', borderRadius: '8px', marginBottom: '1rem', border: '1px solid #e2e8f0' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginBottom: '0.3rem' }}>
+                  <span>Customer:</span>
+                  <strong>{refundOrder.customerName}</strong>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginBottom: '0.3rem' }}>
+                  <span>Payment Method:</span>
+                  <strong style={{ textTransform: 'capitalize' }}>{refundOrder.paymentMethod.replace(/_/g, ' ')}</strong>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                  <span>Order Total:</span>
+                  <strong style={{ color: 'var(--color-brand-primary)' }}>{formatPaiseToRupees(refundOrder.totalAmount)}</strong>
+                </div>
+              </div>
+
+              <div style={{ marginBottom: '0.8rem' }}>
+                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '0.2rem' }}>
+                  Refund Amount (₹)
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="1"
+                  max={refundOrder.totalAmount / 100}
+                  value={refundAmountPaise / 100}
+                  onChange={(e) => {
+                    const rupees = parseFloat(e.target.value) || 0;
+                    setRefundAmountPaise(Math.round(rupees * 100));
+                  }}
+                  style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid #cbd5e1' }}
+                />
+                <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.2rem' }}>
+                  Default is full refund of remaining balance: {formatPaiseToRupees(refundOrder.totalAmount)}
+                </div>
+              </div>
+
+              <div style={{ marginBottom: '0.8rem' }}>
+                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '0.2rem' }}>
+                  Reason for Refund *
+                </label>
+                <textarea
+                  rows={2}
+                  placeholder="e.g. Item unavailable; Customer requested cancellation"
+                  value={refundReason}
+                  onChange={(e) => setRefundReason(e.target.value)}
+                  style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid #cbd5e1' }}
+                />
+              </div>
+            </div>
+
+            <div className="modal-footer">
+              <button type="button" className="btn-secondary" onClick={() => setRefundOrder(null)} disabled={isRefunding}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn-danger"
+                disabled={isRefunding || !refundReason.trim()}
+                onClick={handleExecuteRefund}
+              >
+                {isRefunding ? 'Processing Gateway Refund...' : 'Confirm & Issue Refund'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* View Payments Modal */}
+      {inspectPaymentsOrder && (
+        <div className="modal-backdrop">
+          <div className="modal-card" style={{ maxWidth: '560px' }}>
+            <div className="modal-header">
+              <h3 style={{ fontSize: '1.1rem', fontWeight: 700 }}>
+                Payment Details — Order #{inspectPaymentsOrder.orderNumber}
+              </h3>
+              <button type="button" onClick={() => setInspectPaymentsOrder(null)}>✕</button>
+            </div>
+            <div className="modal-body">
+              {isInspectLoading ? (
+                <div style={{ textAlign: 'center', padding: '2rem', color: '#64748b' }}>
+                  Loading payment attempts & gateway records...
+                </div>
+              ) : inspectPaymentsData ? (
+                <div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem', marginBottom: '1rem', textAlign: 'center' }}>
+                    <div style={{ background: '#f1f5f9', padding: '0.6rem', borderRadius: '6px' }}>
+                      <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Total Captured</div>
+                      <strong style={{ fontSize: '1rem', color: '#16a34a' }}>
+                        {formatPaiseToRupees(inspectPaymentsData.totalCaptured)}
+                      </strong>
+                    </div>
+                    <div style={{ background: '#f1f5f9', padding: '0.6rem', borderRadius: '6px' }}>
+                      <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Total Refunded</div>
+                      <strong style={{ fontSize: '1rem', color: '#dc2626' }}>
+                        {formatPaiseToRupees(inspectPaymentsData.totalRefunded)}
+                      </strong>
+                    </div>
+                    <div style={{ background: '#f1f5f9', padding: '0.6rem', borderRadius: '6px' }}>
+                      <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Remaining Balance</div>
+                      <strong style={{ fontSize: '1rem', color: '#0284c7' }}>
+                        {formatPaiseToRupees(inspectPaymentsData.remainingRefundable)}
+                      </strong>
+                    </div>
+                  </div>
+
+                  <h4 style={{ fontSize: '0.9rem', fontWeight: 700, marginBottom: '0.4rem' }}>
+                    Payment Attempts ({inspectPaymentsData.payments.length})
+                  </h4>
+                  {inspectPaymentsData.payments.length === 0 ? (
+                    <p style={{ fontSize: '0.85rem', color: '#64748b', marginBottom: '1rem' }}>No payment attempts recorded.</p>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginBottom: '1rem' }}>
+                      {inspectPaymentsData.payments.map((p) => (
+                        <div key={p.id} style={{ background: '#f8fafc', padding: '0.6rem', borderRadius: '6px', border: '1px solid #e2e8f0', fontSize: '0.8rem' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.2rem' }}>
+                            <strong>{p.providerPaymentId || p.providerOrderId || p.provider}</strong>
+                            <span className={`badge badge-${p.status}`}>{p.status}</span>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b' }}>
+                            <span>Amount: {formatPaiseToRupees(p.amount)}</span>
+                            <span>{new Date(p.createdAt).toLocaleString()}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <h4 style={{ fontSize: '0.9rem', fontWeight: 700, marginBottom: '0.4rem' }}>
+                    Refund Records ({inspectPaymentsData.refunds.length})
+                  </h4>
+                  {inspectPaymentsData.refunds.length === 0 ? (
+                    <p style={{ fontSize: '0.85rem', color: '#64748b' }}>No refunds issued for this order.</p>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                      {inspectPaymentsData.refunds.map((r) => (
+                        <div key={r.id} style={{ background: '#fef2f2', padding: '0.6rem', borderRadius: '6px', border: '1px solid #fecaca', fontSize: '0.8rem' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.2rem' }}>
+                            <strong>{r.providerRefundId || r.id}</strong>
+                            <span className={`badge badge-${r.status}`}>{r.status}</span>
+                          </div>
+                          <div style={{ color: '#475569', marginBottom: '0.2rem' }}>Reason: {r.reason}</div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b' }}>
+                            <span>Amount: {formatPaiseToRupees(r.amount)}</span>
+                            <span>{new Date(r.createdAt).toLocaleString()}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ) : null}
+            </div>
+
+            <div className="modal-footer">
+              <button type="button" className="btn-secondary" onClick={() => setInspectPaymentsOrder(null)}>
+                Close
               </button>
             </div>
           </div>

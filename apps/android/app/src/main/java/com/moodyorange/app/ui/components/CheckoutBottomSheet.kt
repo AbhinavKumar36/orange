@@ -43,6 +43,7 @@ import androidx.compose.ui.unit.sp
 import com.moodyorange.app.ui.theme.BorderMuted
 import com.moodyorange.app.ui.theme.CardBackground
 import com.moodyorange.app.ui.theme.CreamBackground
+import com.moodyorange.app.ui.theme.EditorialSerif
 import com.moodyorange.app.ui.theme.InStockBg
 import com.moodyorange.app.ui.theme.InStockGreen
 import com.moodyorange.app.ui.theme.OrangeLight
@@ -95,8 +96,9 @@ fun CheckoutBottomSheet(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Counter Pickup Checkout",
-                    fontSize = 20.sp,
+                    text = "Counter Pickup",
+                    fontFamily = EditorialSerif,
+                    fontSize = 22.sp,
                     fontWeight = FontWeight.Bold,
                     color = TextPrimary
                 )
@@ -109,7 +111,7 @@ fun CheckoutBottomSheet(
                     Text(
                         text = "Moody Orange Boutique",
                         fontSize = 11.sp,
-                        fontWeight = FontWeight.SemiBold,
+                        fontWeight = FontWeight.Bold,
                         color = OrangePrimary
                     )
                 }
@@ -129,15 +131,15 @@ fun CheckoutBottomSheet(
                 Box(
                     modifier = Modifier
                         .weight(1f)
-                        .clip(RoundedCornerShape(12.dp))
+                        .clip(RoundedCornerShape(14.dp))
                         .border(
                             1.5.dp,
                             if (!isScheduled) OrangePrimary else BorderMuted,
-                            RoundedCornerShape(12.dp)
+                            RoundedCornerShape(14.dp)
                         )
                         .background(if (!isScheduled) OrangeLight else CreamBackground)
                         .clickable { isScheduled = false }
-                        .padding(12.dp)
+                        .padding(14.dp)
                 ) {
                     Column {
                         Text(
@@ -146,6 +148,7 @@ fun CheckoutBottomSheet(
                             fontWeight = FontWeight.Bold,
                             color = if (!isScheduled) OrangePrimary else TextPrimary
                         )
+                        Spacer(modifier = Modifier.height(2.dp))
                         Text(
                             text = "Ready in ~15-20m",
                             fontSize = 11.sp,
@@ -157,15 +160,15 @@ fun CheckoutBottomSheet(
                 Box(
                     modifier = Modifier
                         .weight(1f)
-                        .clip(RoundedCornerShape(12.dp))
+                        .clip(RoundedCornerShape(14.dp))
                         .border(
                             1.5.dp,
                             if (isScheduled) OrangePrimary else BorderMuted,
-                            RoundedCornerShape(12.dp)
+                            RoundedCornerShape(14.dp)
                         )
                         .background(if (isScheduled) OrangeLight else CreamBackground)
                         .clickable { isScheduled = true }
-                        .padding(12.dp)
+                        .padding(14.dp)
                 ) {
                     Column {
                         Text(
@@ -174,6 +177,7 @@ fun CheckoutBottomSheet(
                             fontWeight = FontWeight.Bold,
                             color = if (isScheduled) OrangePrimary else TextPrimary
                         )
+                        Spacer(modifier = Modifier.height(2.dp))
                         Text(
                             text = "In 2 hours",
                             fontSize = 11.sp,
@@ -196,9 +200,9 @@ fun CheckoutBottomSheet(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
+                    .clip(RoundedCornerShape(14.dp))
                     .background(CreamBackground)
-                    .border(1.dp, BorderMuted, RoundedCornerShape(12.dp))
+                    .border(1.dp, BorderMuted, RoundedCornerShape(14.dp))
                     .padding(14.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -216,7 +220,7 @@ fun CheckoutBottomSheet(
                     Text(
                         text = session?.fullName ?: "Boutique Guest",
                         fontSize = 14.sp,
-                        fontWeight = FontWeight.SemiBold,
+                        fontWeight = FontWeight.Bold,
                         color = TextPrimary
                     )
                     Text(
@@ -241,15 +245,15 @@ fun CheckoutBottomSheet(
                 Box(
                     modifier = Modifier
                         .weight(1f)
-                        .clip(RoundedCornerShape(12.dp))
+                        .clip(RoundedCornerShape(14.dp))
                         .border(
                             1.5.dp,
                             if (paymentMethod == "cash_at_pickup") OrangePrimary else BorderMuted,
-                            RoundedCornerShape(12.dp)
+                            RoundedCornerShape(14.dp)
                         )
                         .background(if (paymentMethod == "cash_at_pickup") OrangeLight else CreamBackground)
                         .clickable { paymentMethod = "cash_at_pickup" }
-                        .padding(12.dp)
+                        .padding(14.dp)
                 ) {
                     Column {
                         Text(
@@ -258,8 +262,9 @@ fun CheckoutBottomSheet(
                             fontWeight = FontWeight.Bold,
                             color = if (paymentMethod == "cash_at_pickup") OrangePrimary else TextPrimary
                         )
+                        Spacer(modifier = Modifier.height(2.dp))
                         Text(
-                            text = "Cash / Card at pickup",
+                            text = "Cash / Card at counter",
                             fontSize = 11.sp,
                             color = TextSecondary
                         )
@@ -269,15 +274,15 @@ fun CheckoutBottomSheet(
                 Box(
                     modifier = Modifier
                         .weight(1f)
-                        .clip(RoundedCornerShape(12.dp))
+                        .clip(RoundedCornerShape(14.dp))
                         .border(
                             1.5.dp,
                             if (paymentMethod == "online_razorpay") OrangePrimary else BorderMuted,
-                            RoundedCornerShape(12.dp)
+                            RoundedCornerShape(14.dp)
                         )
                         .background(if (paymentMethod == "online_razorpay") OrangeLight else CreamBackground)
                         .clickable { paymentMethod = "online_razorpay" }
-                        .padding(12.dp)
+                        .padding(14.dp)
                 ) {
                     Column {
                         Text(
@@ -286,6 +291,7 @@ fun CheckoutBottomSheet(
                             fontWeight = FontWeight.Bold,
                             color = if (paymentMethod == "online_razorpay") OrangePrimary else TextPrimary
                         )
+                        Spacer(modifier = Modifier.height(2.dp))
                         Text(
                             text = "10-min reservation",
                             fontSize = 11.sp,
@@ -315,7 +321,7 @@ fun CheckoutBottomSheet(
                     focusedContainerColor = CreamBackground,
                     unfocusedContainerColor = CreamBackground
                 ),
-                shape = RoundedCornerShape(12.dp),
+                shape = RoundedCornerShape(14.dp),
                 modifier = Modifier.fillMaxWidth(),
                 maxLines = 3
             )
@@ -328,13 +334,13 @@ fun CheckoutBottomSheet(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(14.dp))
+                        .clip(RoundedCornerShape(16.dp))
                         .background(CreamBackground)
-                        .border(1.dp, BorderMuted, RoundedCornerShape(14.dp))
+                        .border(1.dp, BorderMuted, RoundedCornerShape(16.dp))
                         .padding(16.dp)
                 ) {
                     Text(
-                        text = "Store Calculated Total",
+                        text = "Store-Calculated Total",
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold,
                         color = TextPrimary
@@ -413,11 +419,58 @@ fun CheckoutBottomSheet(
                 }
             }
 
+            if (checkoutState is CheckoutUiState.AwaitingPayment) {
+                val state = checkoutState as CheckoutUiState.AwaitingPayment
+                Spacer(modifier = Modifier.height(14.dp))
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(Color(0xFFFFF7ED))
+                        .padding(14.dp)
+                ) {
+                    Column {
+                        Text(
+                            text = "Payment Required: Order #${state.order.orderNumber}",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 14.sp,
+                            color = OrangePrimary
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Payable Amount: ${CurrencyFormatter.formatPaiseToInr(state.paymentInit.amount)}",
+                            fontSize = 13.sp,
+                            color = TextSecondary
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Button(
+                            onClick = {
+                                // Complete payment and verify with backend signature check
+                                shopViewModel.verifyOnlinePayment(
+                                    order = state.order,
+                                    razorpayOrderId = state.paymentInit.razorpayOrderId,
+                                    razorpayPaymentId = "pay_mock_${System.currentTimeMillis()}",
+                                    razorpaySignature = "mock_sig_${state.paymentInit.razorpayOrderId}"
+                                )
+                            },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = OrangePrimary,
+                                contentColor = Color.White
+                            ),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.fillMaxWidth().height(42.dp)
+                        ) {
+                            Text("Pay Now with Razorpay →", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                        }
+                    }
+                }
+            }
+
             Spacer(modifier = Modifier.height(24.dp))
 
             // Action Button
-            val isSubmitting = checkoutState is CheckoutUiState.Submitting || checkoutState is CheckoutUiState.Validating
-            val canSubmit = valRes?.isValid == true && !isSubmitting
+            val isSubmitting = checkoutState is CheckoutUiState.Submitting || checkoutState is CheckoutUiState.Validating || checkoutState is CheckoutUiState.VerifyingPayment
+            val canSubmit = valRes?.isValid == true && !isSubmitting && checkoutState !is CheckoutUiState.AwaitingPayment
 
             Button(
                 onClick = {
@@ -437,7 +490,7 @@ fun CheckoutBottomSheet(
                     containerColor = OrangePrimary,
                     contentColor = Color.White
                 ),
-                shape = RoundedCornerShape(12.dp),
+                shape = RoundedCornerShape(14.dp),
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(50.dp)
@@ -453,4 +506,3 @@ fun CheckoutBottomSheet(
         }
     }
 }
-

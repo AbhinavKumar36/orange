@@ -40,6 +40,7 @@ import com.moodyorange.app.data.model.CartItem
 import com.moodyorange.app.ui.theme.BorderMuted
 import com.moodyorange.app.ui.theme.CardBackground
 import com.moodyorange.app.ui.theme.CreamBackground
+import com.moodyorange.app.ui.theme.EditorialSerif
 import com.moodyorange.app.ui.theme.OrangeLight
 import com.moodyorange.app.ui.theme.OrangePrimary
 import com.moodyorange.app.ui.theme.OutOfStockRed
@@ -83,7 +84,8 @@ fun CartBottomSheet(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         text = "Shopping Bag",
-                        fontSize = 20.sp,
+                        fontFamily = EditorialSerif,
+                        fontSize = 22.sp,
                         fontWeight = FontWeight.Bold,
                         color = TextPrimary
                     )
@@ -92,12 +94,12 @@ fun CartBottomSheet(
                         modifier = Modifier
                             .clip(CircleShape)
                             .background(OrangeLight)
-                            .padding(horizontal = 8.dp, vertical = 2.dp)
+                            .padding(horizontal = 8.dp, vertical = 3.dp)
                     ) {
                         Text(
                             text = "$totalItems items",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
                             color = OrangePrimary
                         )
                     }
@@ -132,8 +134,9 @@ fun CartBottomSheet(
                     }
                     Spacer(modifier = Modifier.height(14.dp))
                     Text(
-                        text = "Your bag is empty",
-                        fontSize = 16.sp,
+                        text = "Your Bag is Empty",
+                        fontFamily = EditorialSerif,
+                        fontSize = 18.sp,
                         fontWeight = FontWeight.Bold,
                         color = TextPrimary
                     )
@@ -153,7 +156,7 @@ fun CartBottomSheet(
                         ),
                         shape = RoundedCornerShape(12.dp)
                     ) {
-                        Text("Explore Boutique", fontWeight = FontWeight.SemiBold)
+                        Text("Explore Boutique Menu", fontWeight = FontWeight.Bold)
                     }
                 }
             } else {
@@ -181,9 +184,9 @@ fun CartBottomSheet(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(16.dp))
+                        .clip(RoundedCornerShape(18.dp))
                         .background(CreamBackground)
-                        .border(1.dp, BorderMuted, RoundedCornerShape(16.dp))
+                        .border(1.dp, BorderMuted, RoundedCornerShape(18.dp))
                         .padding(16.dp)
                 ) {
                     Row(
@@ -206,7 +209,7 @@ fun CartBottomSheet(
 
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "Taxes and preparation times calculated at checkout.",
+                        text = "Counter pickup in 15 mins. Tax and packaging calculated at checkout.",
                         fontSize = 11.sp,
                         color = TextMuted
                     )
@@ -226,10 +229,10 @@ fun CartBottomSheet(
                             containerColor = OrangePrimary,
                             contentColor = Color.White
                         ),
-                        shape = RoundedCornerShape(12.dp),
+                        shape = RoundedCornerShape(14.dp),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(48.dp)
+                            .height(50.dp)
                     ) {
                         Text(
                             text = if (session == null) "Sign In to Checkout" else "Proceed to Counter Pickup",
@@ -256,23 +259,23 @@ fun CartItemRow(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(14.dp))
             .background(CardBackground)
-            .border(1.dp, BorderMuted, RoundedCornerShape(12.dp))
+            .border(1.dp, BorderMuted, RoundedCornerShape(14.dp))
             .padding(12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Thumbnail Image or Placeholder
+        // Thumbnail Image or Vector Placeholder
         Box(
             modifier = Modifier
-                .size(56.dp)
+                .size(60.dp)
                 .clip(RoundedCornerShape(10.dp))
         ) {
             ProductImage(
                 imageUrl = item.product.imageUrl,
                 categorySlug = item.product.categorySlug,
                 contentDescription = item.product.name,
-                modifier = Modifier.size(56.dp)
+                modifier = Modifier.size(60.dp)
             )
         }
 
@@ -291,7 +294,8 @@ fun CartItemRow(
             Text(
                 text = CurrencyFormatter.formatPaiseToInr(item.product.basePrice),
                 fontSize = 13.sp,
-                color = TextSecondary
+                fontWeight = FontWeight.Bold,
+                color = OrangePrimary
             )
         }
 

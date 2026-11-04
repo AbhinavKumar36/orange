@@ -7,6 +7,8 @@ import com.moodyorange.app.data.model.Category
 import com.moodyorange.app.data.model.CheckoutRequest
 import com.moodyorange.app.data.model.CheckoutResponse
 import com.moodyorange.app.data.model.CustomerProfile
+import com.moodyorange.app.data.model.InitiatePaymentResponse
+import com.moodyorange.app.data.model.VerifyPaymentResponse
 import com.moodyorange.app.data.model.Order
 import com.moodyorange.app.data.model.OrderItem
 import com.moodyorange.app.data.model.Product
@@ -177,6 +179,35 @@ class MoodyOrangeApiClient(
 
         executeWithFallback("/orders/checkout", "POST", payload, headers) { body ->
             parseCheckoutResponse(body)
+        }
+    }
+
+    suspend fun initiatePayment(orderId: String, token: String): Result<InitiatePaymentResponse> = withContext(Dispatchers.IO) {
+        val payload = JSONObject().apply {
+            put("orderId", orderId)
+        }.toString()
+        val headers = mapOf("Authorization" to "Bearer $token")
+        executeWithFallback("/payments/initiate", "POST", payload, headers) { body ->
+            parseInitiatePaymentResponse(body)
+        }
+    }
+
+    suspend fun verifyPayment(
+        orderId: String,
+        razorpayOrderId: String,
+        razorpayPaymentId: String,
+        razorpaySignature: String,
+        token: String
+    ): Result<VerifyPaymentResponse> = withContext(Dispatchers.IO) {
+        val payload = JSONObject().apply {
+            put("orderId", orderId)
+            put("razorpayOrderId", razorpayOrderId)
+            put("razorpayPaymentId", razorpayPaymentId)
+            put("razorpaySignature", razorpaySignature)
+        }.toString()
+        val headers = mapOf("Authorization" to "Bearer $token")
+        executeWithFallback("/payments/verify", "POST", payload, headers) { body ->
+            parseVerifyPaymentResponse(body)
         }
     }
 
@@ -395,6 +426,31 @@ class MoodyOrangeApiClient(
             currency = root.optString("currency", "INR"),
             expiresAt = if (root.isNull("expiresAt")) null else root.getString("expiresAt"),
             estimatedPickupAt = if (root.isNull("estimatedPickupAt")) null else root.getString("estimatedPickupAt")
+        )
+    }
+
+    fun parseInitiatePaymentResponse(jsonString: String): InitiatePaymentResponse {
+        val root = JSONObject(jsonString)
+        return InitiatePaymentResponse(
+            orderId = root.getString("orderId"),
+            razorpayOrderId = root.getString("razorpayOrderId"),
+            amount = root.getLong("amount"),
+            currency = root.optString("currency", "INR"),
+            keyId = root.getString("keyId"),
+            customerName = root.optString("customerName", "Customer"),
+            customerPhone = root.optString("customerPhone", "")
+        )
+    }
+
+    fun parseVerifyPaymentResponse(jsonString: String): VerifyPaymentResponse {
+        val root = JSONObject(jsonString)
+        return VerifyPaymentResponse(
+            success = root.getBoolean("success"),
+            orderId = root.getString("orderId"),
+            orderNumber = root.getString("orderNumber"),
+            orderStatus = root.getString("orderStatus"),
+            paymentStatus = root.getString("paymentStatus"),
+            paymentId = root.getString("paymentId")
         )
     }
 

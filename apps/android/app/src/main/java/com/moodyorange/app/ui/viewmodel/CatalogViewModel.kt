@@ -29,6 +29,13 @@ sealed interface ProductDetailUiState {
     data class Error(val message: String) : ProductDetailUiState
 }
 
+enum class SortOption(val label: String) {
+    FEATURED("Featured"),
+    PRICE_ASC("Price: Low to High"),
+    PRICE_DESC("Price: High to Low"),
+    PREP_ASC("Prep Time")
+}
+
 class CatalogViewModel(
     private val repository: CatalogRepository = CatalogRepositoryImpl(),
     private val coroutineScope: CoroutineScope? = null
@@ -48,6 +55,15 @@ class CatalogViewModel(
 
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
+
+    private val _sortOption = MutableStateFlow(SortOption.FEATURED)
+    val sortOption: StateFlow<SortOption> = _sortOption.asStateFlow()
+
+    private val _isVegOnly = MutableStateFlow(false)
+    val isVegOnly: StateFlow<Boolean> = _isVegOnly.asStateFlow()
+
+    private val _isInStockOnly = MutableStateFlow(false)
+    val isInStockOnly: StateFlow<Boolean> = _isInStockOnly.asStateFlow()
 
     private val _productDetailState = MutableStateFlow<ProductDetailUiState>(ProductDetailUiState.Idle)
     val productDetailState: StateFlow<ProductDetailUiState> = _productDetailState.asStateFlow()
@@ -96,6 +112,27 @@ class CatalogViewModel(
             delay(300)
             loadProducts()
         }
+    }
+
+    fun setSortOption(option: SortOption) {
+        _sortOption.value = option
+    }
+
+    fun toggleVegOnly() {
+        _isVegOnly.value = !_isVegOnly.value
+    }
+
+    fun toggleInStockOnly() {
+        _isInStockOnly.value = !_isInStockOnly.value
+    }
+
+    fun resetFilters() {
+        _selectedCategory.value = null
+        _searchQuery.value = ""
+        _sortOption.value = SortOption.FEATURED
+        _isVegOnly.value = false
+        _isInStockOnly.value = false
+        loadProducts()
     }
 
     fun loadProducts() {
@@ -155,4 +192,3 @@ class CatalogViewModel(
         _productDetailState.value = ProductDetailUiState.Idle
     }
 }
-

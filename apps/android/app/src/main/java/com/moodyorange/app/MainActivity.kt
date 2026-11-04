@@ -5,7 +5,10 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -14,21 +17,25 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import com.moodyorange.app.ui.components.AccountDialog
 import com.moodyorange.app.ui.components.AuthDialog
+import com.moodyorange.app.ui.components.BottomNavBar
 import com.moodyorange.app.ui.components.CartBottomSheet
 import com.moodyorange.app.ui.components.CheckoutBottomSheet
+import com.moodyorange.app.ui.components.NavTab
 import com.moodyorange.app.ui.components.OrderConfirmationDialog
+import com.moodyorange.app.ui.screens.AccountScreen
 import com.moodyorange.app.ui.screens.HomeScreen
+import com.moodyorange.app.ui.screens.OrdersScreen
 import com.moodyorange.app.ui.screens.ProductDetailScreen
-import com.moodyorange.app.ui.theme.CreamBackground
+import com.moodyorange.app.ui.screens.ShopScreen
+import com.moodyorange.app.ui.theme.DarkBackground
 import com.moodyorange.app.ui.theme.MoodyOrangeTheme
 import com.moodyorange.app.ui.viewmodel.CatalogViewModel
 import com.moodyorange.app.ui.viewmodel.CheckoutUiState
 import com.moodyorange.app.ui.viewmodel.ShopViewModel
 
 sealed class AppDestination {
-    object Home : AppDestination()
+    object Main : AppDestination()
     data class ProductDetail(val productIdOrSlug: String) : AppDestination()
 }
 
@@ -43,7 +50,7 @@ class MainActivity : ComponentActivity() {
             MoodyOrangeTheme {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
-                    color = CreamBackground
+                    color = DarkBackground
                 ) {
                     MoodyOrangeApp(
                         catalogViewModel = catalogViewModel,
@@ -60,8 +67,8 @@ fun MoodyOrangeApp(
     catalogViewModel: CatalogViewModel,
     shopViewModel: ShopViewModel
 ) {
-    var currentDestination by remember { mutableStateOf<AppDestination>(AppDestination.Home) }
-    var isAccountDialogOpen by remember { mutableStateOf(false) }
+    var currentDestination by remember { mutableStateOf<AppDestination>(AppDestination.Main) }
+    var selectedTab by remember { mutableStateOf(NavTab.HOME) }
 
     val cartItems by shopViewModel.cartItems.collectAsState()
     val session by shopViewModel.sessionState.collectAsState()
@@ -69,49 +76,124 @@ fun MoodyOrangeApp(
     val isAuthOpen by shopViewModel.isAuthOpen.collectAsState()
     val isCheckoutOpen by shopViewModel.isCheckoutOpen.collectAsState()
     val checkoutState by shopViewModel.checkoutState.collectAsState()
-    val orders by shopViewModel.orders.collectAsState()
-    val isOrdersLoading by shopViewModel.isOrdersLoading.collectAsState()
 
     val totalItemCount = cartItems.sumOf { it.quantity }
 
     when (val dest = currentDestination) {
-        is AppDestination.Home -> {
-            HomeScreen(
-                viewModel = catalogViewModel,
-                cartItemCount = totalItemCount,
-                onCartClick = { shopViewModel.openCart() },
-                isLoggedIn = session != null,
-                customerName = session?.fullName,
-                onProfileClick = {
-                    if (session != null) {
-                        shopViewModel.loadOrders()
-                        isAccountDialogOpen = true
-                    } else {
-                        shopViewModel.openAuth()
-                    }
-                },
-                onProductClick = { product ->
-                    currentDestination = AppDestination.ProductDetail(product.id)
-                }
-            )
-        }
         is AppDestination.ProductDetail -> {
             BackHandler {
                 catalogViewModel.clearProductDetail()
-                currentDestination = AppDestination.Home
+                currentDestination = AppDestination.Main
             }
             ProductDetailScreen(
                 productIdOrSlug = dest.productIdOrSlug,
                 viewModel = catalogViewModel,
                 onBackClick = {
                     catalogViewModel.clearProductDetail()
-                    currentDestination = AppDestination.Home
+                    currentDestination = AppDestination.Main
                 },
-                onAddToCart = { product ->
-                    shopViewModel.addToCart(product)
+                onAddToCart = { product, quantity ->
+                    shopViewModel.addToCart(product, quantity)
                     shopViewModel.openCart()
+                },
+                onProductClick = { rel ->
+                    catalogViewModel.clearProductDetail()
+                    currentDestination = AppDestination.ProductDetail(rel.id)
                 }
             )
+        }
+
+        is AppDestination.Main -> {
+            Scaffold(
+                bottomBar = {
+                    BottomNavBar(
+                        selectedTab = selectedTab,
+                        onTabSelected = { selectedTab = it }
+                    )
+                }
+            ) { innerPadding ->
+                Box(modifier = Modifier.padding(innerPadding)) {
+                    when (selectedTab) {
+                        NavTab.HOME -> {
+                            HomeScreen(
+                                viewModel = catalogViewModel,
+                                cartItemCount = totalItemCount,
+                                onCartClick = { shopViewModel.openCart() },
+                                isLoggedIn = session != null,
+                                customerName = session?.fullName,
+                                onProfileClick = {
+                                    if (session != null) {
+                                        selectedTab = NavTab.ACCOUNT
+                                    } else {
+                                        shopViewModel.openAuth()
+                                    }
+                                },
+                                onProductClick = { product ->
+                                    currentDestination = AppDestination.ProductDetail(product.id)
+                                },
+                                onQuickAdd = { product ->
+                                    shopViewModel.addToCart(product)
+                                },
+                                onNavigateToShop = { category ->
+                                    if (category != null) {
+                                        catalogViewModel.selectCategory(category)
+                                    }
+                                    selectedTab = NavTab.SHOP
+                                }
+                            )
+                        }
+
+                        NavTab.SHOP -> {
+                            ShopScreen(
+                                viewModel = catalogViewModel,
+                                cartItemCount = totalItemCount,
+                                onCartClick = { shopViewModel.openCart() },
+                                isLoggedIn = session != null,
+                                customerName = session?.fullName,
+                                onProfileClick = {
+                                    if (session != null) {
+                                        selectedTab = NavTab.ACCOUNT
+                                    } else {
+                                        shopViewModel.openAuth()
+                                    }
+                                },
+                                onProductClick = { product ->
+                                    currentDestination = AppDestination.ProductDetail(product.id)
+                                },
+                                onQuickAdd = { product ->
+                                    shopViewModel.addToCart(product)
+                                }
+                            )
+                        }
+
+                        NavTab.ORDERS -> {
+                            OrdersScreen(
+                                shopViewModel = shopViewModel,
+                                cartItemCount = totalItemCount,
+                                onCartClick = { shopViewModel.openCart() },
+                                onProfileClick = {
+                                    if (session != null) {
+                                        selectedTab = NavTab.ACCOUNT
+                                    } else {
+                                        shopViewModel.openAuth()
+                                    }
+                                },
+                                onNavigateToShop = {
+                                    selectedTab = NavTab.SHOP
+                                }
+                            )
+                        }
+
+                        NavTab.ACCOUNT -> {
+                            AccountScreen(
+                                shopViewModel = shopViewModel,
+                                cartItemCount = totalItemCount,
+                                onCartClick = { shopViewModel.openCart() }
+                            )
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -134,17 +216,6 @@ fun MoodyOrangeApp(
         CheckoutBottomSheet(
             shopViewModel = shopViewModel,
             onDismiss = { shopViewModel.closeCheckout() }
-        )
-    }
-
-    if (isAccountDialogOpen && session != null) {
-        AccountDialog(
-            session = session!!,
-            orders = orders,
-            isLoadingOrders = isOrdersLoading,
-            onRefreshOrders = { shopViewModel.loadOrders() },
-            onLogout = { shopViewModel.logout() },
-            onDismiss = { isAccountDialogOpen = false }
         )
     }
 

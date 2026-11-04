@@ -4,8 +4,18 @@ import { useState, useEffect, useRef, type ReactElement } from 'react';
 import { formatPaiseToRupees, type ValidateCartResponse, type CheckoutResponse } from '@orange/api-contracts';
 import { useCart } from '../lib/cart';
 import { useCustomerAuth } from '../lib/auth';
-import { validateCartApi, checkoutOrderApi } from '../lib/api';
+import { validateCartApi, checkoutOrderApi, initiatePaymentApi, verifyPaymentApi } from '../lib/api';
+import { loadRazorpayScript } from '../lib/razorpay';
 import { AuthModal } from './AuthModal';
+
+declare global {
+  interface Window {
+    Razorpay?: new (options: Record<string, unknown>) => {
+      open: () => void;
+      on: (event: string, callback: (resp: { error?: { description?: string; code?: string; step?: string } }) => void) => void;
+    };
+  }
+}
 
 interface CheckoutModalProps {
   isOpen: boolean;
@@ -29,6 +39,10 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps): ReactEle
   const [error, setError] = useState<string | null>(null);
 
   const [confirmedOrder, setConfirmedOrder] = useState<CheckoutResponse | null>(null);
+  const [pendingOnlineOrder, setPendingOnlineOrder] = useState<CheckoutResponse | null>(null);
+  const [paymentStep, setPaymentStep] = useState<
+    'idle' | 'initiating' | 'gateway_open' | 'verifying' | 'failed'
+  >('idle');
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const idempotencyKeyRef = useRef<string | null>(null);
 
@@ -75,6 +89,98 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps): ReactEle
         }}
       />
     );
+  }
+
+  async function launchRazorpayCheckout(targetOrder: CheckoutResponse) {
+    if (!session) {
+      setIsAuthModalOpen(true);
+      return;
+    }
+    setIsSubmitting(true);
+    setError(null);
+    setPaymentStep('initiating');
+
+    try {
+      const isLoaded = await loadRazorpayScript();
+      if (!isLoaded || !window.Razorpay) {
+        throw new Error('Unable to load payment gateway SDK. Please verify internet connection.');
+      }
+
+      const initData = await initiatePaymentApi(targetOrder.orderId, session.accessToken);
+      setPaymentStep('gateway_open');
+
+      const rzp = new window.Razorpay({
+        key: initData.keyId,
+        amount: initData.amount,
+        currency: initData.currency,
+        name: 'Moody Orange',
+        description: `Boutique Order #${targetOrder.orderNumber}`,
+        order_id: initData.razorpayOrderId,
+        prefill: {
+          name: initData.customerName,
+          contact: initData.customerPhone,
+        },
+        theme: {
+          color: '#f97316',
+        },
+        handler: async function (response: {
+          razorpay_order_id: string;
+          razorpay_payment_id: string;
+          razorpay_signature: string;
+        }) {
+          setPaymentStep('verifying');
+          try {
+            const verifyRes = await verifyPaymentApi(
+              {
+                orderId: targetOrder.orderId,
+                razorpayOrderId: response.razorpay_order_id,
+                razorpayPaymentId: response.razorpay_payment_id,
+                razorpaySignature: response.razorpay_signature,
+              },
+              session.accessToken
+            );
+
+            setConfirmedOrder({
+              ...targetOrder,
+              orderStatus: verifyRes.orderStatus,
+              paymentStatus: verifyRes.paymentStatus,
+            });
+            setPendingOnlineOrder(null);
+            setPaymentStep('idle');
+            clearCart();
+            setIsSubmitting(false);
+          } catch (vErr: unknown) {
+            const msg = vErr instanceof Error ? vErr.message : 'Server signature verification failed.';
+            setError('Payment verification failed on server: ' + msg);
+            setPaymentStep('failed');
+            setIsSubmitting(false);
+          }
+        },
+        modal: {
+          ondismiss: function () {
+            setError(
+              'Payment window was closed. Your boutique reservation is held. You can retry payment below.'
+            );
+            setPaymentStep('failed');
+            setIsSubmitting(false);
+          },
+        },
+      });
+
+      rzp.on('payment.failed', function (resp: { error?: { description?: string } }) {
+        const failReason = resp?.error?.description || 'Payment was declined by payment gateway.';
+        setError('Payment Failed: ' + failReason);
+        setPaymentStep('failed');
+        setIsSubmitting(false);
+      });
+
+      rzp.open();
+    } catch (err: unknown) {
+      setIsSubmitting(false);
+      setPaymentStep('failed');
+      const msg = err instanceof Error ? err.message : 'Failed to launch payment checkout.';
+      setError(msg);
+    }
   }
 
   async function handleSubmitOrder(e: React.FormEvent) {
@@ -129,10 +235,15 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps): ReactEle
         idempotencyKey
       );
 
-      setConfirmedOrder(orderResult);
-      idempotencyKeyRef.current = null;
-      clearCart();
-      setIsSubmitting(false);
+      if (paymentMethod === 'online_razorpay') {
+        setPendingOnlineOrder(orderResult);
+        await launchRazorpayCheckout(orderResult);
+      } else {
+        setConfirmedOrder(orderResult);
+        idempotencyKeyRef.current = null;
+        clearCart();
+        setIsSubmitting(false);
+      }
     } catch (err: unknown) {
       setIsSubmitting(false);
       const message = err instanceof Error ? err.message : 'Failed to complete checkout. Please try again.';
@@ -142,6 +253,8 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps): ReactEle
 
   function handleCloseAll() {
     setConfirmedOrder(null);
+    setPendingOnlineOrder(null);
+    setPaymentStep('idle');
     onClose();
   }
 
@@ -245,6 +358,78 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps): ReactEle
                 >
                   Return to Storefront
                 </button>
+              </div>
+            ) : pendingOnlineOrder ? (
+              <div className="pending-payment-view">
+                <div
+                  style={{
+                    fontSize: '2.5rem',
+                    textAlign: 'center',
+                    marginBottom: '0.75rem',
+                  }}
+                >
+                  ⏳
+                </div>
+                <h3 className="confirmed-title" style={{ textAlign: 'center' }}>
+                  Online Payment Pending
+                </h3>
+                <p className="confirmed-subtitle" style={{ textAlign: 'center' }}>
+                  Your items are reserved under order #{pendingOnlineOrder.orderNumber}.
+                  Please complete payment before the reservation TTL expires.
+                </p>
+
+                <div className="receipt-card">
+                  <div className="receipt-row">
+                    <span className="receipt-label">Order Reference</span>
+                    <strong className="receipt-order-num">{pendingOnlineOrder.orderNumber}</strong>
+                  </div>
+                  <div className="receipt-row">
+                    <span className="receipt-label">Amount Payable</span>
+                    <strong className="receipt-total">
+                      {formatPaiseToRupees(pendingOnlineOrder.totalAmount)}
+                    </strong>
+                  </div>
+                  <div className="receipt-row">
+                    <span className="receipt-label">Status</span>
+                    <span className="badge-stock badge-low-stock">
+                      {paymentStep === 'verifying' ? 'Verifying payment...' : 'Awaiting Payment'}
+                    </span>
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '0.75rem',
+                    marginTop: '1.25rem',
+                  }}
+                >
+                  <button
+                    type="button"
+                    className="btn-primary"
+                    disabled={isSubmitting || paymentStep === 'verifying'}
+                    onClick={() => launchRazorpayCheckout(pendingOnlineOrder)}
+                  >
+                    {paymentStep === 'verifying'
+                      ? 'Verifying Payment with Server...'
+                      : paymentStep === 'initiating'
+                      ? 'Opening Gateway...'
+                      : `Retry Online Payment (${formatPaiseToRupees(pendingOnlineOrder.totalAmount)}) →`}
+                  </button>
+
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    disabled={isSubmitting}
+                    onClick={() => {
+                      setPendingOnlineOrder(null);
+                      setPaymentStep('idle');
+                    }}
+                  >
+                    Modify Cart or Details
+                  </button>
+                </div>
               </div>
             ) : (
               /* PROGRESSIVE CHECKOUT FORM */

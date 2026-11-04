@@ -2,27 +2,43 @@ package com.moodyorange.app.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-val OrangePrimary = Color(0xFFE85D04)
-val OrangeSecondary = Color(0xFFF48C06)
-val OrangeLight = Color(0xFFFFF3EB)
-val OrangeDark = Color(0xFFDC2F02)
+// Obsidian & Midnight Charcoal (Dark Luxury Surfaces)
+val DarkBackground = Color(0xFF090807)
+val DarkSurface = Color(0xFF141210)
+val DarkSurfaceVariant = Color(0xFF1C1916)
+val DarkBorder = Color(0x33FFFFFF) // Subtle 20% white hairline
+val DarkBorderSubtle = Color(0x1AFFFFFF) // 10% white hairline
+val DarkTextPrimary = Color(0xFFFDFBF7)
+val DarkTextSecondary = Color(0xFFB8AEA4)
+val DarkTextMuted = Color(0xFF7D746C)
 
-val CreamBackground = Color(0xFFFDFBF7)
+// Warm Cream & Ivory (Editorial Daytime Surfaces)
+val CreamBackground = Color(0xFFFFFDF9)
+val CreamSurface = Color(0xFFFAF6F0)
+val CreamSurfaceVariant = Color(0xFFF3ECE1)
+val CreamBorder = Color(0xFFE8DFD0)
 val CardBackground = Color(0xFFFFFFFF)
-val SurfaceVariant = Color(0xFFF8F5EE)
 
-val TextPrimary = Color(0xFF1E1B18)
-val TextSecondary = Color(0xFF756A63)
-val TextMuted = Color(0xFF9E928A)
+// Primary Brand Accents (Moody Orange & Amber Glow)
+val OrangePrimary = Color(0xFFFF5500) // Signature Moody Orange
+val OrangeSecondary = Color(0xFFFF7A00) // Warm Amber Orange
+val OrangeLight = Color(0xFFFFF0E6) // Soft Orange Glow Pill
+val OrangeDark = Color(0xFFD43D00) // Deep Amber
+val OrangeGlow = Color(0x40FF5500) // 25% Orange Glow for radial/glows
+val AmberGold = Color(0xFFFF9E00) // High-end Citrus Amber
+val GourmetGold = Color(0xFFD4AF37) // Metallic Gold Accent
+val GoldGlow = Color(0x33D4AF37)
 
-val BorderMuted = Color(0xFFEAE4DC)
+// Text Hierarchy
+val TextPrimary = Color(0xFF141210) // Near-black charcoal
+val TextSecondary = Color(0xFF5E554D) // Refined warm grey
+val TextMuted = Color(0xFF968D84) // Editorial caption muted
+val BorderMuted = Color(0xFFE8DFD0) // Card hairline border
 
-val VegGreen = Color(0xFF2D6A4F)
-val VegGreenBg = Color(0xFFE8F5E9)
-
-val InStockGreen = Color(0xFF2E7D32)
-val InStockBg = Color(0xFFE8F5E9)
-
-val OutOfStockRed = Color(0xFFB71C1C)
-val OutOfStockBg = Color(0xFFFFEBEE)
-
+// Dietary, Availability & Status Accents
+val VegGreen = Color(0xFF1B6B38)
+val VegGreenBg = Color(0xFFEAF5EC)
+val InStockGreen = Color(0xFF238636)
+val InStockBg = Color(0xFFEAF5EC)
+val OutOfStockRed = Color(0xFFD32F2F)
+val OutOfStockBg = Color(0xFFFDE8E8)

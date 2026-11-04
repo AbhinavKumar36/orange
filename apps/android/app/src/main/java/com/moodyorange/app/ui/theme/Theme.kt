@@ -15,7 +15,7 @@ private val LightColorScheme = lightColorScheme(
     onBackground = TextPrimary,
     surface = CardBackground,
     onSurface = TextPrimary,
-    surfaceVariant = SurfaceVariant,
+    surfaceVariant = CreamSurfaceVariant,
     onSurfaceVariant = TextSecondary,
     outline = BorderMuted
 )
@@ -26,7 +26,7 @@ fun MoodyOrangeTheme(
 ) {
     MaterialTheme(
         colorScheme = LightColorScheme,
+        typography = MoodyTypography,
         content = content
     )
 }
-

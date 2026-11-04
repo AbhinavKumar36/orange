@@ -346,6 +346,128 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /payments/initiate:
+    post:
+      summary: Initiate online payment for an order
+      description: Creates Razorpay order from trusted database records and returns Razorpay order details.
+      operationId: initiatePayment
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InitiatePaymentRequest'
+      responses:
+        '200':
+          description: Payment initiated successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InitiatePaymentResponse'
+        '400':
+          description: Invalid request or order not payable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden (Order belongs to another customer).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Order not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Payment already in progress or captured.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /payments/verify:
+    post:
+      summary: Verify online payment signature
+      description: Verifies Razorpay HMAC SHA256 signature and transitions order to confirmed.
+      operationId: verifyPayment
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VerifyPaymentRequest'
+      responses:
+        '200':
+          description: Payment verified successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VerifyPaymentResponse'
+        '400':
+          description: Invalid signature or verification failure.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Order not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /webhooks/razorpay:
+    post:
+      summary: Razorpay webhook event receiver
+      description: Receives asynchronous payment and refund events from Razorpay.
+      operationId: handleRazorpayWebhook
+      security: []
+      parameters:
+        - name: X-Razorpay-Signature
+          in: header
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Webhook processed successfully.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  received:
+                    type: boolean
+        '400':
+          description: Invalid webhook signature.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /admin/me:
     get:
       summary: Get current authenticated staff profile
@@ -953,6 +1075,96 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '403':
           description: Forbidden (Requires manager or admin role).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /admin/orders/{id}/refund:
+    post:
+      summary: Issue full or partial refund
+      description: Issues a refund via Razorpay for an online order. Requires manager or admin role.
+      operationId: refundAdminOrder
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminRefundRequest'
+      responses:
+        '200':
+          description: Refund processed successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminRefundResponse'
+        '400':
+          description: Invalid refund amount or non-refundable order.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden (Requires manager or admin role).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Order not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /admin/orders/{id}/payments:
+    get:
+      summary: Get payment and refund history for an order
+      description: Returns payment attempts, gateway references, and refund records.
+      operationId: getAdminOrderPayments
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Payment and refund history.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderPaymentsResponse'
+        '401':
+          description: Unauthorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Order not found.
           content:
             application/json:
               schema:
@@ -1996,4 +2208,249 @@ components:
         - productId
         - physicalStockDelta
         - reason
+      additionalProperties: false
+    RefundStatus:
+      type: string
+      enum:
+        - refund_pending
+        - refund_processing
+        - refunded
+        - refund_failed
+    InitiatePaymentRequest:
+      type: object
+      properties:
+        orderId:
+          type: string
+          format: uuid
+      required:
+        - orderId
+      additionalProperties: false
+    InitiatePaymentResponse:
+      type: object
+      properties:
+        orderId:
+          type: string
+          format: uuid
+        razorpayOrderId:
+          type: string
+          minLength: 1
+        amount:
+          type: integer
+          minimum: 0
+        currency:
+          type: string
+          enum:
+            - INR
+        keyId:
+          type: string
+          minLength: 1
+        customerName:
+          type: string
+        customerPhone:
+          type: string
+      required:
+        - orderId
+        - razorpayOrderId
+        - amount
+        - currency
+        - keyId
+        - customerName
+        - customerPhone
+      additionalProperties: false
+    VerifyPaymentRequest:
+      type: object
+      properties:
+        orderId:
+          type: string
+          format: uuid
+        razorpayOrderId:
+          type: string
+          minLength: 1
+        razorpayPaymentId:
+          type: string
+          minLength: 1
+        razorpaySignature:
+          type: string
+          minLength: 1
+      required:
+        - orderId
+        - razorpayOrderId
+        - razorpayPaymentId
+        - razorpaySignature
+      additionalProperties: false
+    VerifyPaymentResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        orderId:
+          type: string
+          format: uuid
+        orderNumber:
+          type: string
+        orderStatus:
+          $ref: '#/components/schemas/OrderStatus'
+        paymentStatus:
+          $ref: '#/components/schemas/PaymentStatus'
+        paymentId:
+          type: string
+      required:
+        - success
+        - orderId
+        - orderNumber
+        - orderStatus
+        - paymentStatus
+        - paymentId
+      additionalProperties: false
+    AdminRefundRequest:
+      type: object
+      properties:
+        amount:
+          type: integer
+          minimum: 0
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 300
+        idempotencyKey:
+          type: string
+          minLength: 1
+      required:
+        - reason
+      additionalProperties: false
+    AdminRefundResponse:
+      type: object
+      properties:
+        refundId:
+          type: string
+        orderId:
+          type: string
+          format: uuid
+        paymentId:
+          type: string
+          format: uuid
+        providerRefundId:
+          type: [string, "null"]
+        amount:
+          type: integer
+          minimum: 0
+        status:
+          $ref: '#/components/schemas/RefundStatus'
+        remainingRefundable:
+          type: integer
+          minimum: 0
+        orderStatus:
+          $ref: '#/components/schemas/OrderStatus'
+        paymentStatus:
+          $ref: '#/components/schemas/PaymentStatus'
+      required:
+        - refundId
+        - orderId
+        - paymentId
+        - amount
+        - status
+        - remainingRefundable
+        - orderStatus
+        - paymentStatus
+      additionalProperties: false
+    PaymentAttempt:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        orderId:
+          type: string
+          format: uuid
+        provider:
+          type: string
+        providerOrderId:
+          type: [string, "null"]
+        providerPaymentId:
+          type: [string, "null"]
+        amount:
+          type: integer
+          minimum: 0
+        currency:
+          type: string
+        status:
+          $ref: '#/components/schemas/PaymentStatus'
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - orderId
+        - provider
+        - amount
+        - currency
+        - status
+        - createdAt
+      additionalProperties: false
+    RefundRecord:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        paymentId:
+          type: string
+          format: uuid
+        orderId:
+          type: string
+          format: uuid
+        providerRefundId:
+          type: [string, "null"]
+        amount:
+          type: integer
+          minimum: 0
+        currency:
+          type: string
+        status:
+          $ref: '#/components/schemas/RefundStatus'
+        reason:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - paymentId
+        - orderId
+        - amount
+        - currency
+        - status
+        - reason
+        - createdAt
+      additionalProperties: false
+    OrderPaymentsResponse:
+      type: object
+      properties:
+        orderId:
+          type: string
+          format: uuid
+        payments:
+          type: array
+          items:
+            $ref: '#/components/schemas/PaymentAttempt'
+        refunds:
+          type: array
+          items:
+            $ref: '#/components/schemas/RefundRecord'
+        totalCaptured:
+          type: integer
+          minimum: 0
+        totalRefunded:
+          type: integer
+          minimum: 0
+        remainingRefundable:
+          type: integer
+          minimum: 0
+      required:
+        - orderId
+        - payments
+        - refunds
+        - totalCaptured
+        - totalRefunded
+        - remainingRefundable
       additionalProperties: false

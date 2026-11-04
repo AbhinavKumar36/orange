@@ -6,6 +6,9 @@ import {
   type CheckoutResponse,
   type Order,
   type CustomerProfile,
+  type InitiatePaymentResponse,
+  type VerifyPaymentRequest,
+  type VerifyPaymentResponse,
   CategoryListResponseSchema,
   ProductListResponseSchema,
   ProductDetailResponseSchema,
@@ -14,6 +17,8 @@ import {
   OrderListResponseSchema,
   OrderDetailResponseSchema,
   CustomerProfileResponseSchema,
+  InitiatePaymentResponseSchema,
+  VerifyPaymentResponseSchema,
 } from '@orange/api-contracts';
 
 const API_BASE_URL =
@@ -287,5 +292,59 @@ export async function updateProfileApi(fullName: string, token: string): Promise
   const data = await res.json();
   const parsed = CustomerProfileResponseSchema.parse(data);
   return parsed.profile;
+}
+
+export async function initiatePaymentApi(
+  orderId: string,
+  token: string
+): Promise<InitiatePaymentResponse> {
+  const res = await fetch(`${API_BASE_URL}/payments/initiate`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ orderId }),
+  });
+
+  const body = (await res.json().catch(() => null)) as ErrorPayload | null;
+
+  if (!res.ok) {
+    throw new ApiError(
+      res.status,
+      body?.error?.code || 'PAYMENT_INITIATE_FAILED',
+      body?.error?.message || 'Failed to initiate payment'
+    );
+  }
+
+  return InitiatePaymentResponseSchema.parse(body);
+}
+
+export async function verifyPaymentApi(
+  payload: VerifyPaymentRequest,
+  token: string
+): Promise<VerifyPaymentResponse> {
+  const res = await fetch(`${API_BASE_URL}/payments/verify`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const body = (await res.json().catch(() => null)) as ErrorPayload | null;
+
+  if (!res.ok) {
+    throw new ApiError(
+      res.status,
+      body?.error?.code || 'PAYMENT_VERIFY_FAILED',
+      body?.error?.message || 'Failed to verify payment'
+    );
+  }
+
+  return VerifyPaymentResponseSchema.parse(body);
 }
 

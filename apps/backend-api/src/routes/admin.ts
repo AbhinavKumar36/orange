@@ -11,6 +11,9 @@ import {
   AdminOrderCancelSchema,
   AdminInventoryWriteOffSchema,
   AdminInventoryAdjustSchema,
+  AdminRefundRequestSchema,
+  type AdminRefundResponse,
+  type OrderPaymentsResponse,
 } from '@orange/api-contracts';
 import { type AppConfig, loadConfig } from '../config/env.js';
 import { createStaffAuthPreHandler } from '../plugins/auth.js';
@@ -20,10 +23,56 @@ import {
   type MockProductEntry,
 } from './catalog.js';
 import { mockOrdersStore, mockStockStore } from './orders.js';
+import {
+  mockPaymentsStore,
+  mockRefundsStore,
+  type MockPaymentRecord,
+  type MockRefundRecord,
+} from '../services/paymentStore.js';
+import { createRazorpayRefund } from '../services/razorpay.js';
 
 // Concurrency mutex locks for atomic state transitions in mock memory
 const inProgressHandovers = new Set<string>();
 const inProgressStockOperations = new Set<string>();
+
+interface DbOrderRow {
+  id: string;
+  order_status?: AdminRefundResponse['orderStatus'];
+  orderStatus?: AdminRefundResponse['orderStatus'];
+  payment_method?: string;
+  paymentMethod?: string;
+  payment_status?: string;
+  paymentStatus?: string;
+  total?: number;
+  totalAmount?: number;
+  total_paise?: number;
+  providerOrderId?: string;
+  [key: string]: unknown;
+}
+
+interface DbPaymentRow {
+  id: string;
+  order_id: string;
+  provider: string;
+  provider_order_id?: string | null;
+  provider_payment_id?: string | null;
+  amount: number | string;
+  currency: string;
+  status: string;
+  created_at: string;
+}
+
+interface DbRefundRow {
+  id: string;
+  payment_id: string;
+  order_id: string;
+  provider_refund_id?: string | null;
+  amount: number | string;
+  currency: string;
+  status: string;
+  reason?: string | null;
+  created_at: string;
+}
 
 export interface AdminRoutesOptions {
   config?: AppConfig;
@@ -1581,6 +1630,449 @@ export const adminRoutes: FastifyPluginAsync<AdminRoutesOptions> = async (app, o
         reservedStock: resRow?.out_reserved_stock ?? 0,
         availableStock: resRow?.out_available_stock ?? 0,
       });
+    }
+  );
+
+  // 12. Order Refund Management (Manager & Admin only)
+  app.post(
+    '/api/v1/admin/orders/:id/refund',
+    { preHandler: [createStaffAuthPreHandler(config, ['manager', 'admin'])] },
+    async (request, reply) => {
+      const { id } = request.params as { id: string };
+      const staffUser = request.user!;
+
+      const parseResult = AdminRefundRequestSchema.safeParse(request.body);
+      if (!parseResult.success) {
+        return reply.status(400).send({
+          error: {
+            statusCode: 400,
+            code: 'VALIDATION_ERROR',
+            message: parseResult.error.issues.map((i) => i.message).join('; '),
+          },
+        });
+      }
+
+      const { reason, idempotencyKey: bodyIdempKey } = parseResult.data;
+      const idempotencyKey =
+        bodyIdempKey ||
+        (request.headers['x-idempotency-key'] as string) ||
+        `ref_${id}_${Date.now()}`;
+
+      // Check order
+      let order: DbOrderRow | null = null;
+      if (config.ALLOW_MOCK_SERVICES) {
+        order = (mockOrdersStore.get(id) as unknown as DbOrderRow) || null;
+      } else {
+        const rows = await supabaseRest<DbOrderRow[]>(`orders?id=eq.${encodeURIComponent(id)}&select=*`);
+        if (rows && rows.length > 0) order = rows[0];
+      }
+
+      if (!order) {
+        return reply.status(404).send({
+          error: {
+            statusCode: 404,
+            code: 'ORDER_NOT_FOUND',
+            message: `Order ${id} was not found.`,
+          },
+        });
+      }
+
+      const paymentMethod = order.paymentMethod || order.payment_method;
+      if (paymentMethod === 'cash_at_pickup') {
+        return reply.status(400).send({
+          error: {
+            statusCode: 400,
+            code: 'CASH_ORDER_REFUND_NOT_ALLOWED',
+            message: `Cannot issue online gateway refund for cash-at-pickup order ${id}. Cash refunds must be handled via store register.`,
+          },
+        });
+      }
+
+      const paymentStatus = String(order.paymentStatus || order.payment_status || '');
+      if (!['captured', 'partially_refunded', 'refund_pending'].includes(paymentStatus)) {
+        return reply.status(400).send({
+          error: {
+            statusCode: 400,
+            code: 'ORDER_NOT_REFUNDABLE',
+            message: `Order cannot be refunded in current payment status: ${paymentStatus}.`,
+          },
+        });
+      }
+
+      if (config.ALLOW_MOCK_SERVICES) {
+        // Find captured payment
+        let foundPayment: MockPaymentRecord | undefined;
+        for (const p of mockPaymentsStore.values()) {
+          if (p.orderId === id && p.status === 'captured') {
+            foundPayment = p;
+            break;
+          }
+        }
+
+        const payment: MockPaymentRecord = foundPayment ?? {
+          id: randomUUID(),
+          orderId: id,
+          provider: 'razorpay',
+          providerOrderId: order.providerOrderId || 'order_mock_dummy',
+          providerPaymentId: 'pay_mock_' + randomUUID().slice(0, 8),
+          amount: Number(order.totalAmount || order.total || 0),
+          currency: 'INR',
+          status: 'captured',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+
+        if (!foundPayment && payment.providerPaymentId) {
+          mockPaymentsStore.set(payment.providerPaymentId, payment);
+        }
+
+        // Calculate already refunded
+        let totalRefunded = 0;
+        for (const r of mockRefundsStore.values()) {
+          if (r.paymentId === payment.id && ['refund_pending', 'refund_processing', 'refunded'].includes(r.status)) {
+            totalRefunded += r.amount;
+          }
+        }
+
+        const remaining = Math.max(0, payment.amount - totalRefunded);
+        const refundAmount = parseResult.data.amount ?? remaining;
+
+        if (refundAmount <= 0) {
+          return reply.status(400).send({
+            error: {
+              statusCode: 400,
+              code: 'INVALID_REFUND_AMOUNT',
+              message: 'Refund amount must be greater than zero.',
+            },
+          });
+        }
+
+        if (refundAmount > remaining) {
+          return reply.status(400).send({
+            error: {
+              statusCode: 400,
+              code: 'REFUND_EXCEEDS_REMAINING_AMOUNT',
+              message: `Requested refund amount (${refundAmount}) exceeds remaining refundable amount (${remaining}).`,
+            },
+          });
+        }
+
+        // Check idempotency key replay
+        for (const r of mockRefundsStore.values()) {
+          if (r.idempotencyKey === idempotencyKey) {
+            if (r.orderId !== id || r.amount !== refundAmount) {
+              return reply.status(409).send({
+                error: {
+                  statusCode: 409,
+                  code: 'IDEMPOTENCY_CONFLICT',
+                  message: 'Refund idempotency key reused with mismatched parameters.',
+                },
+              });
+            }
+            return reply.send({
+              refundId: r.id,
+              orderId: id,
+              paymentId: payment.id,
+              providerRefundId: r.providerRefundId,
+              amount: r.amount,
+              status: r.status,
+              remainingRefundable: remaining,
+              orderStatus: order.orderStatus,
+              paymentStatus: order.paymentStatus,
+            });
+          }
+        }
+
+        const rzpRefund = await createRazorpayRefund({
+          paymentId: payment.providerPaymentId || 'pay_mock',
+          amount: refundAmount,
+          notes: { reason, orderId: id },
+          config,
+        });
+
+        const refundId = randomUUID();
+        const refundRecord: MockRefundRecord = {
+          id: refundId,
+          paymentId: payment.id,
+          orderId: id,
+          providerRefundId: rzpRefund.id,
+          amount: refundAmount,
+          currency: 'INR',
+          status: 'refunded',
+          idempotencyKey,
+          reason,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+        mockRefundsStore.set(refundId, refundRecord);
+
+        const newRemaining = remaining - refundAmount;
+        order.paymentStatus = newRemaining === 0 ? 'refunded' : 'partially_refunded';
+
+        const refundResponse: AdminRefundResponse = {
+          refundId,
+          orderId: id,
+          paymentId: payment.id,
+          providerRefundId: rzpRefund.id,
+          amount: refundAmount,
+          status: 'refunded',
+          remainingRefundable: newRemaining,
+          orderStatus: (order.orderStatus || order.order_status || 'confirmed') as AdminRefundResponse['orderStatus'],
+          paymentStatus: (order.paymentStatus || 'refunded') as AdminRefundResponse['paymentStatus'],
+        };
+        return reply.send(refundResponse);
+      }
+
+      // Live Supabase path
+      // 1. Fetch captured payment
+      const pRows = await supabaseRest<DbPaymentRow[]>(
+        `payments?order_id=eq.${encodeURIComponent(id)}&status=eq.captured&order=created_at.desc&limit=1`
+      );
+      if (!pRows || pRows.length === 0) {
+        return reply.status(400).send({
+          error: {
+            statusCode: 400,
+            code: 'NO_CAPTURED_PAYMENT',
+            message: `No captured payment found for order ${id}.`,
+          },
+        });
+      }
+      const payment = pRows[0];
+
+      // Calculate default amount if not supplied
+      let refundAmount = parseResult.data.amount;
+      if (!refundAmount) {
+        const existingRefunds = await supabaseRest<Array<{ amount: number | string }>>(
+          `refunds?payment_id=eq.${encodeURIComponent(payment.id)}&status=in.(refund_pending,refund_processing,refunded)&select=amount`
+        );
+        const totalRef = (existingRefunds || []).reduce(
+          (acc: number, r: { amount: number | string }) => acc + Number(r.amount),
+          0
+        );
+        refundAmount = Math.max(0, Number(payment.amount) - totalRef);
+      }
+
+      // 2. Call PostgreSQL RPC rpc_issue_refund
+      const { data: rpcData, error: rpcError } = await supabaseRpc<Array<{
+        out_refund_id: string;
+        out_status: string;
+        out_remaining_refundable: number;
+      }>>('rpc_issue_refund', {
+        p_order_id: id,
+        p_refund_amount: refundAmount,
+        p_staff_id: staffUser.id,
+        p_reason: reason,
+        p_idempotency_key: idempotencyKey,
+      });
+
+      if (rpcError) {
+        const isExceeds = rpcError.includes('REFUND_EXCEEDS_REMAINING_AMOUNT');
+        return reply.status(400).send({
+          error: {
+            statusCode: 400,
+            code: isExceeds ? 'REFUND_EXCEEDS_REMAINING_AMOUNT' : 'REFUND_FAILED',
+            message: rpcError,
+          },
+        });
+      }
+
+      const rpcResult = rpcData && rpcData.length > 0 ? rpcData[0] : null;
+      const refundId = rpcResult?.out_refund_id || randomUUID();
+      const remainingRefundable = Number(rpcResult?.out_remaining_refundable ?? 0);
+
+      // 3. Trigger Gateway Refund API
+      let providerRefundId: string | null = null;
+      try {
+        const rzpRefund = await createRazorpayRefund({
+          paymentId: payment.provider_payment_id || payment.id,
+          amount: refundAmount,
+          notes: { reason, orderId: id },
+          config,
+        });
+        providerRefundId = rzpRefund.id;
+
+        // Update refund record in DB with provider_refund_id and set status to refunded
+        await supabaseRest(`refunds?id=eq.${encodeURIComponent(refundId)}`, {
+          method: 'PATCH',
+          body: JSON.stringify({
+            provider_refund_id: providerRefundId,
+            status: 'refunded',
+            updated_at: new Date().toISOString(),
+          }),
+        });
+
+        // Update order status if fully refunded
+        if (remainingRefundable === 0) {
+          await supabaseRest(`orders?id=eq.${encodeURIComponent(id)}`, {
+            method: 'PATCH',
+            body: JSON.stringify({
+              payment_status: 'refunded',
+              updated_at: new Date().toISOString(),
+            }),
+          });
+        }
+      } catch (gwErr) {
+        app.log.error(gwErr, 'Razorpay refund API call failed');
+      }
+
+      // Audit log entry
+      try {
+        await supabaseRest('audit_logs', {
+          method: 'POST',
+          body: JSON.stringify({
+            actor_id: staffUser.id,
+            actor_role: staffUser.staffRole,
+            action: 'order.refund',
+            entity_type: 'order',
+            entity_id: id,
+            new_values: {
+              refundId,
+              amount: refundAmount,
+              reason,
+              providerRefundId,
+            },
+          }),
+        });
+      } catch (logErr) {
+        app.log.error(logErr, 'Failed to insert audit log');
+      }
+
+      const refundResponse: AdminRefundResponse = {
+        refundId,
+        orderId: id,
+        paymentId: payment.id,
+        providerRefundId,
+        amount: refundAmount,
+        status: (rpcResult?.out_status as AdminRefundResponse['status']) || 'refunded',
+        remainingRefundable,
+        orderStatus: (order.order_status || order.orderStatus || 'confirmed') as AdminRefundResponse['orderStatus'],
+        paymentStatus: remainingRefundable === 0 ? 'refunded' : 'partially_refunded',
+      };
+      return reply.send(refundResponse);
+    }
+  );
+
+  // 13. Order Payments & Refunds Inspection (All Staff)
+  app.get(
+    '/api/v1/admin/orders/:id/payments',
+    { preHandler: [createStaffAuthPreHandler(config)] },
+    async (request, reply) => {
+      const { id } = request.params as { id: string };
+
+      if (config.ALLOW_MOCK_SERVICES) {
+        const order = mockOrdersStore.get(id);
+        if (!order) {
+          return reply.status(404).send({
+            error: {
+              statusCode: 404,
+              code: 'ORDER_NOT_FOUND',
+              message: `Order ${id} not found.`,
+            },
+          });
+        }
+
+        const payments: OrderPaymentsResponse['payments'] = [];
+        for (const p of mockPaymentsStore.values()) {
+          if (p.orderId === id) {
+            payments.push({
+              id: p.id,
+              orderId: p.orderId,
+              provider: p.provider,
+              providerOrderId: p.providerOrderId || null,
+              providerPaymentId: p.providerPaymentId || null,
+              amount: p.amount,
+              currency: p.currency,
+              status: p.status,
+              createdAt: p.createdAt,
+            });
+          }
+        }
+
+        const refunds: OrderPaymentsResponse['refunds'] = [];
+        for (const r of mockRefundsStore.values()) {
+          if (r.orderId === id) {
+            refunds.push({
+              id: r.id,
+              paymentId: r.paymentId,
+              orderId: r.orderId,
+              providerRefundId: r.providerRefundId || null,
+              amount: r.amount,
+              currency: r.currency,
+              status: r.status,
+              reason: r.reason,
+              createdAt: r.createdAt,
+            });
+          }
+        }
+
+        const totalCaptured = payments
+          .filter((p) => p.status === 'captured')
+          .reduce((sum, p) => sum + p.amount, 0);
+        const totalRefunded = refunds
+          .filter((r) => r.status === 'refunded')
+          .reduce((sum, r) => sum + r.amount, 0);
+        const remainingRefundable = Math.max(0, totalCaptured - totalRefunded);
+
+        const response: OrderPaymentsResponse = {
+          orderId: id,
+          payments,
+          refunds,
+          totalCaptured,
+          totalRefunded,
+          remainingRefundable,
+        };
+        return reply.send(response);
+      }
+
+      // Live Supabase queries
+      const paymentRows = await supabaseRest<DbPaymentRow[]>(
+        `payments?order_id=eq.${encodeURIComponent(id)}&order=created_at.desc`
+      );
+      const refundRows = await supabaseRest<DbRefundRow[]>(
+        `refunds?order_id=eq.${encodeURIComponent(id)}&order=created_at.desc`
+      );
+
+      const payments: OrderPaymentsResponse['payments'] = (paymentRows || []).map((p) => ({
+        id: p.id,
+        orderId: p.order_id,
+        provider: p.provider,
+        providerOrderId: p.provider_order_id || null,
+        providerPaymentId: p.provider_payment_id || null,
+        amount: Number(p.amount),
+        currency: p.currency,
+        status: p.status as OrderPaymentsResponse['payments'][number]['status'],
+        createdAt: p.created_at,
+      }));
+
+      const refunds: OrderPaymentsResponse['refunds'] = (refundRows || []).map((r) => ({
+        id: r.id,
+        paymentId: r.payment_id,
+        orderId: r.order_id,
+        providerRefundId: r.provider_refund_id || null,
+        amount: Number(r.amount),
+        currency: r.currency,
+        status: r.status as OrderPaymentsResponse['refunds'][number]['status'],
+        reason: r.reason || '',
+        createdAt: r.created_at,
+      }));
+
+      const totalCaptured = payments
+        .filter((p) => p.status === 'captured')
+        .reduce((sum: number, p) => sum + p.amount, 0);
+      const totalRefunded = refunds
+        .filter((r) => r.status === 'refunded')
+        .reduce((sum: number, r) => sum + r.amount, 0);
+      const remainingRefundable = Math.max(0, totalCaptured - totalRefunded);
+
+      const response: OrderPaymentsResponse = {
+        orderId: id,
+        payments,
+        refunds,
+        totalCaptured,
+        totalRefunded,
+        remainingRefundable,
+      };
+      return reply.send(response);
     }
   );
 };

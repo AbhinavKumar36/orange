@@ -11,6 +11,9 @@ import type {
   AdminInventoryItem,
   AdminInventoryWriteOff,
   AdminInventoryAdjust,
+  AdminRefundRequest,
+  AdminRefundResponse,
+  OrderPaymentsResponse,
   Order,
 } from '@orange/api-contracts';
 
@@ -240,4 +243,22 @@ export async function adjustAdminInventory(
       body: JSON.stringify(payload),
     }
   );
+}
+
+export async function fetchAdminOrderPayments(
+  token: string,
+  orderId: string
+): Promise<OrderPaymentsResponse> {
+  return request<OrderPaymentsResponse>(`/admin/orders/${orderId}/payments`, token);
+}
+
+export async function refundAdminOrder(
+  token: string,
+  orderId: string,
+  payload: AdminRefundRequest
+): Promise<AdminRefundResponse> {
+  return request<AdminRefundResponse>(`/admin/orders/${orderId}/refund`, token, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
 }

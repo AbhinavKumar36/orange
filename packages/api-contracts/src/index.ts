@@ -460,6 +460,100 @@ export const AdminInventoryAdjustSchema = z.object({
 });
 export type AdminInventoryAdjust = z.infer<typeof AdminInventoryAdjustSchema>;
 
+// ============================================================================
+// Phase 7: Payments, Checkout & Refunds Domain Contracts
+// ============================================================================
+
+export const InitiatePaymentRequestSchema = z.object({
+  orderId: z.string().uuid(),
+});
+export type InitiatePaymentRequest = z.infer<typeof InitiatePaymentRequestSchema>;
+
+export const InitiatePaymentResponseSchema = z.object({
+  orderId: z.string().uuid(),
+  razorpayOrderId: z.string().min(1),
+  amount: MoneyInPaiseSchema,
+  currency: z.literal('INR'),
+  keyId: z.string().min(1),
+  customerName: z.string(),
+  customerPhone: z.string(),
+});
+export type InitiatePaymentResponse = z.infer<typeof InitiatePaymentResponseSchema>;
+
+export const VerifyPaymentRequestSchema = z.object({
+  orderId: z.string().uuid(),
+  razorpayOrderId: z.string().min(1),
+  razorpayPaymentId: z.string().min(1),
+  razorpaySignature: z.string().min(1),
+});
+export type VerifyPaymentRequest = z.infer<typeof VerifyPaymentRequestSchema>;
+
+export const VerifyPaymentResponseSchema = z.object({
+  success: z.boolean(),
+  orderId: z.string().uuid(),
+  orderNumber: z.string(),
+  orderStatus: OrderStatusSchema,
+  paymentStatus: PaymentStatusSchema,
+  paymentId: z.string(),
+});
+export type VerifyPaymentResponse = z.infer<typeof VerifyPaymentResponseSchema>;
+
+export const AdminRefundRequestSchema = z.object({
+  amount: MoneyInPaiseSchema.optional(),
+  reason: z.string().min(1, 'Refund reason is required').max(300),
+  idempotencyKey: z.string().min(1).optional(),
+});
+export type AdminRefundRequest = z.infer<typeof AdminRefundRequestSchema>;
+
+export const AdminRefundResponseSchema = z.object({
+  refundId: z.string(),
+  orderId: z.string().uuid(),
+  paymentId: z.string().uuid(),
+  providerRefundId: z.string().nullable().optional(),
+  amount: MoneyInPaiseSchema,
+  status: RefundStatusSchema,
+  remainingRefundable: MoneyInPaiseSchema,
+  orderStatus: OrderStatusSchema,
+  paymentStatus: PaymentStatusSchema,
+});
+export type AdminRefundResponse = z.infer<typeof AdminRefundResponseSchema>;
+
+export const PaymentAttemptSchema = z.object({
+  id: z.string().uuid(),
+  orderId: z.string().uuid(),
+  provider: z.string(),
+  providerOrderId: z.string().nullable().optional(),
+  providerPaymentId: z.string().nullable().optional(),
+  amount: MoneyInPaiseSchema,
+  currency: z.string(),
+  status: PaymentStatusSchema,
+  createdAt: z.string(),
+});
+export type PaymentAttempt = z.infer<typeof PaymentAttemptSchema>;
+
+export const RefundRecordSchema = z.object({
+  id: z.string().uuid(),
+  paymentId: z.string().uuid(),
+  orderId: z.string().uuid(),
+  providerRefundId: z.string().nullable().optional(),
+  amount: MoneyInPaiseSchema,
+  currency: z.string(),
+  status: RefundStatusSchema,
+  reason: z.string(),
+  createdAt: z.string(),
+});
+export type RefundRecord = z.infer<typeof RefundRecordSchema>;
+
+export const OrderPaymentsResponseSchema = z.object({
+  orderId: z.string().uuid(),
+  payments: z.array(PaymentAttemptSchema),
+  refunds: z.array(RefundRecordSchema),
+  totalCaptured: MoneyInPaiseSchema,
+  totalRefunded: MoneyInPaiseSchema,
+  remainingRefundable: MoneyInPaiseSchema,
+});
+export type OrderPaymentsResponse = z.infer<typeof OrderPaymentsResponseSchema>;
+
 // Export Phone Normalization & Validation utilities
 export {
   normalizeIndianPhoneNumber,

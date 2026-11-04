@@ -67,7 +67,7 @@ export const ConfigSchema = z
         });
       }
 
-      // 3. Razorpay credentials must not use placeholders if provided
+      // 3. Razorpay credentials must not use placeholders in production if provided
       if (data.RAZORPAY_KEY_ID && PLACEHOLDER_PATTERN.test(data.RAZORPAY_KEY_ID)) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
@@ -75,11 +75,20 @@ export const ConfigSchema = z
           path: ['RAZORPAY_KEY_ID'],
         });
       }
+
       if (data.RAZORPAY_KEY_SECRET && PLACEHOLDER_PATTERN.test(data.RAZORPAY_KEY_SECRET)) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           message: 'RAZORPAY_KEY_SECRET cannot use placeholder credentials in production',
           path: ['RAZORPAY_KEY_SECRET'],
+        });
+      }
+
+      if (data.RAZORPAY_WEBHOOK_SECRET && PLACEHOLDER_PATTERN.test(data.RAZORPAY_WEBHOOK_SECRET)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'RAZORPAY_WEBHOOK_SECRET cannot use placeholder credentials in production',
+          path: ['RAZORPAY_WEBHOOK_SECRET'],
         });
       }
     } else {
@@ -95,6 +104,20 @@ export const ConfigSchema = z
           message:
             'Placeholder Supabase service role key detected without ALLOW_MOCK_SERVICES=true. Set ALLOW_MOCK_SERVICES=true to enable mock service mode locally.',
           path: ['SUPABASE_SERVICE_ROLE_KEY'],
+        });
+      }
+
+      // In development or test, if Razorpay credentials are placeholder, require ALLOW_MOCK_SERVICES
+      if (
+        ((data.RAZORPAY_KEY_ID && PLACEHOLDER_PATTERN.test(data.RAZORPAY_KEY_ID)) ||
+          (data.RAZORPAY_KEY_SECRET && PLACEHOLDER_PATTERN.test(data.RAZORPAY_KEY_SECRET))) &&
+        !data.ALLOW_MOCK_SERVICES
+      ) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message:
+            'Placeholder Razorpay credentials detected without ALLOW_MOCK_SERVICES=true. Set ALLOW_MOCK_SERVICES=true to enable mock service mode locally.',
+          path: ['RAZORPAY_KEY_ID'],
         });
       }
     }

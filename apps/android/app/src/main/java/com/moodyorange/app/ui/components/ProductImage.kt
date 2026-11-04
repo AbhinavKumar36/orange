@@ -8,7 +8,7 @@ import coil.compose.SubcomposeAsyncImage
 
 /**
  * Image component that loads remote product images with Coil and gracefully falls back
- * to the artisanal vector-based ProductPlaceholder during loading, on error, or if imageUrl is absent.
+ * to the editorial vector-based ProductPlaceholder during loading, on error, or if imageUrl is absent.
  */
 @Composable
 fun ProductImage(
@@ -44,4 +44,3 @@ fun ProductImage(
         )
     }
 }
-

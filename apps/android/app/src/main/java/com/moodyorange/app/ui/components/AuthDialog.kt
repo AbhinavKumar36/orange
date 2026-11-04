@@ -43,6 +43,7 @@ import androidx.compose.ui.window.Dialog
 import com.moodyorange.app.ui.theme.BorderMuted
 import com.moodyorange.app.ui.theme.CardBackground
 import com.moodyorange.app.ui.theme.CreamBackground
+import com.moodyorange.app.ui.theme.EditorialSerif
 import com.moodyorange.app.ui.theme.OrangeLight
 import com.moodyorange.app.ui.theme.OrangePrimary
 import com.moodyorange.app.ui.theme.OutOfStockRed
@@ -105,7 +106,8 @@ fun AuthDialog(
                         2 -> "Verify One-Time Code"
                         else -> "Complete Your Profile"
                     },
-                    fontSize = 18.sp,
+                    fontFamily = EditorialSerif,
+                    fontSize = 20.sp,
                     fontWeight = FontWeight.Bold,
                     color = TextPrimary
                 )

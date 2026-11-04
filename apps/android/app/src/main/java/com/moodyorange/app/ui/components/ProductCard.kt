@@ -36,7 +36,7 @@ import com.moodyorange.app.ui.theme.OrangeLight
 import com.moodyorange.app.ui.theme.OrangePrimary
 import com.moodyorange.app.ui.theme.OutOfStockBg
 import com.moodyorange.app.ui.theme.OutOfStockRed
-import com.moodyorange.app.ui.theme.SurfaceVariant
+import com.moodyorange.app.ui.theme.TextMuted
 import com.moodyorange.app.ui.theme.TextPrimary
 import com.moodyorange.app.ui.theme.TextSecondary
 import com.moodyorange.app.ui.theme.VegGreen
@@ -45,33 +45,36 @@ import com.moodyorange.app.ui.theme.VegGreen
 fun ProductCard(
     product: Product,
     onClick: () -> Unit,
+    onQuickAdd: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .border(1.dp, BorderMuted, RoundedCornerShape(16.dp))
+            .clip(RoundedCornerShape(18.dp))
+            .border(1.dp, BorderMuted, RoundedCornerShape(18.dp))
             .clickable(onClick = onClick),
         colors = CardDefaults.cardColors(containerColor = CardBackground),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(18.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Column {
-            // Product image area with Coil loader and placeholder fallback
+            // Product image area with badges overlay
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(140.dp)
+                    .height(145.dp)
             ) {
                 ProductImage(
                     imageUrl = product.imageUrl,
                     categorySlug = product.categorySlug,
                     contentDescription = product.name,
-                    modifier = Modifier.fillMaxWidth().height(140.dp)
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(145.dp)
                 )
 
-                // Top badges: Veg indicator & Availability
+                // Top badges row: Veg icon & Stock status
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -79,7 +82,7 @@ fun ProductCard(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Veg indicator
+                    // Vegetarian square icon with green dot
                     if (product.isVeg) {
                         Box(
                             modifier = Modifier
@@ -91,7 +94,7 @@ fun ProductCard(
                         ) {
                             Box(
                                 modifier = Modifier
-                                    .size(8.dp)
+                                    .size(7.dp)
                                     .clip(CircleShape)
                                     .background(VegGreen)
                             )
@@ -100,18 +103,18 @@ fun ProductCard(
                         Spacer(modifier = Modifier.width(1.dp))
                     }
 
-                    // Stock availability badge
+                    // Stock status chip
                     if (product.isInStock) {
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(6.dp))
                                 .background(InStockBg)
-                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                                .padding(horizontal = 7.dp, vertical = 3.dp)
                         ) {
                             Text(
                                 text = "In Stock",
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
                                 color = InStockGreen
                             )
                         }
@@ -120,12 +123,12 @@ fun ProductCard(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(6.dp))
                                 .background(OutOfStockBg)
-                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                                .padding(horizontal = 7.dp, vertical = 3.dp)
                         ) {
                             Text(
                                 text = "Unavailable",
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
                                 color = OutOfStockRed
                             )
                         }
@@ -139,16 +142,30 @@ fun ProductCard(
                     .fillMaxWidth()
                     .padding(14.dp)
             ) {
-                Text(
-                    text = product.categoryName.uppercase(),
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = OrangePrimary,
-                    letterSpacing = 0.8.sp
-                )
+                // Category & Prep Time row
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = product.categoryName.uppercase(),
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = OrangePrimary,
+                        letterSpacing = 0.8.sp
+                    )
+
+                    Text(
+                        text = "⏱️ ${product.prepTimeMinutes}m",
+                        fontSize = 10.sp,
+                        color = TextMuted
+                    )
+                }
 
                 Spacer(modifier = Modifier.height(4.dp))
 
+                // Product Name
                 Text(
                     text = product.name,
                     fontSize = 15.sp,
@@ -164,13 +181,14 @@ fun ProductCard(
                         text = product.description,
                         fontSize = 12.sp,
                         color = TextSecondary,
-                        maxLines = 2,
+                        maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
                 }
 
-                Spacer(modifier = Modifier.height(10.dp))
+                Spacer(modifier = Modifier.height(12.dp))
 
+                // Price & Quick Add Button Row
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -183,15 +201,32 @@ fun ProductCard(
                         color = TextPrimary
                     )
 
-                    Text(
-                        text = "View Details →",
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = OrangePrimary
-                    )
+                    if (onQuickAdd != null && product.isInStock) {
+                        Box(
+                            modifier = Modifier
+                                .size(32.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(OrangePrimary)
+                                .clickable { onQuickAdd() },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "+",
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
+                            )
+                        }
+                    } else {
+                        Text(
+                            text = "Details →",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = OrangePrimary
+                        )
+                    }
                 }
             }
         }
     }
 }
-

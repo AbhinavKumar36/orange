@@ -14,6 +14,7 @@ import com.moodyorange.app.data.model.CheckoutRequest
 import com.moodyorange.app.data.model.CheckoutResponse
 import com.moodyorange.app.data.model.CustomerProfile
 import com.moodyorange.app.data.model.CustomerSession
+import com.moodyorange.app.data.model.InitiatePaymentResponse
 import com.moodyorange.app.data.model.Order
 import com.moodyorange.app.data.model.Product
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -26,6 +27,8 @@ sealed interface CheckoutUiState {
     object Idle : CheckoutUiState
     object Validating : CheckoutUiState
     object Submitting : CheckoutUiState
+    data class AwaitingPayment(val order: CheckoutResponse, val paymentInit: InitiatePaymentResponse) : CheckoutUiState
+    object VerifyingPayment : CheckoutUiState
     data class Success(val order: CheckoutResponse) : CheckoutUiState
     data class Error(val message: String) : CheckoutUiState
 }
@@ -194,10 +197,62 @@ class ShopViewModel(application: Application) : AndroidViewModel(application) {
             val res = apiClient.checkout(req, session.accessToken, idempotencyKey)
             res.onSuccess { order ->
                 currentCheckoutAttemptKey = null
-                _checkoutState.value = CheckoutUiState.Success(order)
-                cartManager.clearCart()
+                if (paymentMethod == "online_razorpay") {
+                    val initRes = apiClient.initiatePayment(order.orderId, session.accessToken)
+                    initRes.onSuccess { initData ->
+                        _checkoutState.value = CheckoutUiState.AwaitingPayment(order, initData)
+                    }.onFailure { pErr ->
+                        _checkoutState.value = CheckoutUiState.Error("Stock reserved, but failed to launch payment: ${pErr.message}")
+                    }
+                } else {
+                    _checkoutState.value = CheckoutUiState.Success(order)
+                    cartManager.clearCart()
+                }
             }.onFailure { err ->
                 _checkoutState.value = CheckoutUiState.Error(err.message ?: "Checkout failed. Please try again.")
+            }
+        }
+    }
+
+    fun verifyOnlinePayment(
+        order: CheckoutResponse,
+        razorpayOrderId: String,
+        razorpayPaymentId: String,
+        razorpaySignature: String
+    ) {
+        val session = sessionState.value ?: return
+        viewModelScope.launch {
+            _checkoutState.value = CheckoutUiState.VerifyingPayment
+            val res = apiClient.verifyPayment(
+                orderId = order.orderId,
+                razorpayOrderId = razorpayOrderId,
+                razorpayPaymentId = razorpayPaymentId,
+                razorpaySignature = razorpaySignature,
+                token = session.accessToken
+            )
+            res.onSuccess { verifyData ->
+                cartManager.clearCart()
+                _checkoutState.value = CheckoutUiState.Success(
+                    order.copy(
+                        orderStatus = verifyData.orderStatus,
+                        paymentStatus = verifyData.paymentStatus
+                    )
+                )
+            }.onFailure { err ->
+                _checkoutState.value = CheckoutUiState.Error("Payment verification failed on server: ${err.message}")
+            }
+        }
+    }
+
+    fun retryOnlinePayment(order: CheckoutResponse) {
+        val session = sessionState.value ?: return
+        viewModelScope.launch {
+            _checkoutState.value = CheckoutUiState.Submitting
+            val initRes = apiClient.initiatePayment(order.orderId, session.accessToken)
+            initRes.onSuccess { initData ->
+                _checkoutState.value = CheckoutUiState.AwaitingPayment(order, initData)
+            }.onFailure { pErr ->
+                _checkoutState.value = CheckoutUiState.Error("Failed to initiate payment retry: ${pErr.message}")
             }
         }
     }

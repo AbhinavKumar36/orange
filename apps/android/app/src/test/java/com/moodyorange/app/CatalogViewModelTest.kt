@@ -6,6 +6,7 @@ import com.moodyorange.app.data.model.Product
 import com.moodyorange.app.data.repository.CatalogRepository
 import com.moodyorange.app.ui.viewmodel.CatalogViewModel
 import com.moodyorange.app.ui.viewmodel.ProductDetailUiState
+import com.moodyorange.app.ui.viewmodel.SortOption
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -126,6 +127,31 @@ class CatalogViewModelTest {
 
         viewModel.clearProductDetail()
         assertTrue(viewModel.productDetailState.value is ProductDetailUiState.Idle)
+    }
+
+    @Test
+    fun testFilterAndSortOptions() {
+        val repo = TrackingCatalogRepository(testProduct)
+        val testScope = CoroutineScope(Dispatchers.Unconfined)
+        val viewModel = CatalogViewModel(repository = repo, coroutineScope = testScope)
+
+        assertEquals(SortOption.FEATURED, viewModel.sortOption.value)
+        assertEquals(false, viewModel.isVegOnly.value)
+        assertEquals(false, viewModel.isInStockOnly.value)
+
+        viewModel.setSortOption(SortOption.PRICE_ASC)
+        assertEquals(SortOption.PRICE_ASC, viewModel.sortOption.value)
+
+        viewModel.toggleVegOnly()
+        assertEquals(true, viewModel.isVegOnly.value)
+
+        viewModel.toggleInStockOnly()
+        assertEquals(true, viewModel.isInStockOnly.value)
+
+        viewModel.resetFilters()
+        assertEquals(SortOption.FEATURED, viewModel.sortOption.value)
+        assertEquals(false, viewModel.isVegOnly.value)
+        assertEquals(false, viewModel.isInStockOnly.value)
     }
 }
 

@@ -73,6 +73,7 @@ interface StoredMockOrder {
   taxAmount: number;
   packagingAmount: number;
   totalAmount: number;
+  providerOrderId?: string | null;
   specialNotes?: string | null;
   expiresAt: string | null;
   createdAt: string;

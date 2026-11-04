@@ -29,6 +29,7 @@ import androidx.compose.ui.window.Dialog
 import com.moodyorange.app.data.model.CheckoutResponse
 import com.moodyorange.app.ui.theme.CardBackground
 import com.moodyorange.app.ui.theme.CreamBackground
+import com.moodyorange.app.ui.theme.EditorialSerif
 import com.moodyorange.app.ui.theme.InStockBg
 import com.moodyorange.app.ui.theme.InStockGreen
 import com.moodyorange.app.ui.theme.OrangePrimary
@@ -71,7 +72,8 @@ fun OrderConfirmationDialog(
 
                 Text(
                     text = "Order Reserved!",
-                    fontSize = 20.sp,
+                    fontFamily = EditorialSerif,
+                    fontSize = 22.sp,
                     fontWeight = FontWeight.Bold,
                     color = TextPrimary
                 )
