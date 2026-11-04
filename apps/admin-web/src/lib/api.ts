@@ -180,18 +180,44 @@ export async function deleteAdminCategory(token: string, id: string): Promise<vo
   });
 }
 
+export interface FetchAdminOrdersParams {
+  status?: string;
+  paymentStatus?: string;
+  fulfillment?: string;
+  search?: string;
+  sortBy?: 'created_at' | 'total_amount';
+  sortOrder?: 'asc' | 'desc';
+  limit?: number;
+  offset?: number;
+}
+
 export async function fetchAdminOrders(
   token: string,
-  params: { status?: string; search?: string } = {}
+  params: FetchAdminOrdersParams = {}
 ): Promise<Order[]> {
   const q = new URLSearchParams();
   if (params.status && params.status !== 'all') q.set('status', params.status);
+  if (params.paymentStatus && params.paymentStatus !== 'all') q.set('paymentStatus', params.paymentStatus);
+  if (params.fulfillment && params.fulfillment !== 'all') q.set('fulfillment', params.fulfillment);
   if (params.search) q.set('search', params.search);
+  if (params.sortBy) q.set('sortBy', params.sortBy);
+  if (params.sortOrder) q.set('sortOrder', params.sortOrder);
+  if (params.limit) q.set('limit', String(params.limit));
+  if (params.offset) q.set('offset', String(params.offset));
+
   const res = await request<{ orders: Order[] }>(
     `/admin/orders${q.toString() ? `?${q}` : ''}`,
     token
   );
   return res.orders;
+}
+
+export async function fetchAdminOrderById(
+  token: string,
+  id: string
+): Promise<Order> {
+  const res = await request<{ order: Order }>(`/admin/orders/${encodeURIComponent(id)}`, token);
+  return res.order;
 }
 
 export async function updateAdminOrderStatus(

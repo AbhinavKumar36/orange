@@ -32,8 +32,8 @@ export function BrandStory(): ReactElement {
                 <div className="story-stat-lbl">Single-Origin Cacao Couverture</div>
               </div>
               <div className="story-stat-card">
-                <div className="story-stat-val">~15m</div>
-                <div className="story-stat-lbl">Fresh Kitchen Preparation Lead</div>
+                <div className="story-stat-val">Instant</div>
+                <div className="story-stat-lbl">In-Store Ready Counter Handover</div>
               </div>
             </div>
 
@@ -72,9 +72,9 @@ export function BrandStory(): ReactElement {
                   </div>
                 </div>
                 <div className="story-feature-item">
-                  <div className="feature-bullet">⏱️</div>
+                  <div className="feature-bullet">🛍️</div>
                   <div>
-                    <strong>Live Inventory Sync:</strong> Real-time kitchen tracking ensures you only order items ready for fresh counter pickup.
+                    <strong>Ready to Sell Stock:</strong> Curated and pre-packed delicacies in store display vitrines for zero-wait immediate handover.
                   </div>
                 </div>
               </div>

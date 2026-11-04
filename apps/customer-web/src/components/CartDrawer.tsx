@@ -177,7 +177,7 @@ export function CartDrawer({ isOpen, onClose }: CartDrawerProps): ReactElement |
                 <div className="cart-pickup-banner">
                   <span className="banner-icon">🛍️</span>
                   <div className="banner-text">
-                    <strong>In-Store Counter Pickup:</strong> Delicacies are prepared fresh at optimal serving temperature.
+                    <strong>In-Store Counter Pickup:</strong> Pre-packed and ready in display vitrine for instant collection.
                   </div>
                 </div>
 

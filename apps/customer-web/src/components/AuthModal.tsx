@@ -78,8 +78,11 @@ export function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps): React
       if (!result.session.user.fullName) {
         setStep('NAME');
       } else {
-        onClose();
-        if (onSuccess) onSuccess();
+        if (onSuccess) {
+          onSuccess();
+        } else {
+          onClose();
+        }
       }
     } else {
       setError(result.error || 'Invalid verification code.');
@@ -100,12 +103,18 @@ export function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps): React
         await updateProfileApi(name.trim(), token);
       }
       setIsLoading(false);
-      onClose();
-      if (onSuccess) onSuccess();
+      if (onSuccess) {
+        onSuccess();
+      } else {
+        onClose();
+      }
     } catch {
       setIsLoading(false);
-      onClose();
-      if (onSuccess) onSuccess();
+      if (onSuccess) {
+        onSuccess();
+      } else {
+        onClose();
+      }
     }
   }
 

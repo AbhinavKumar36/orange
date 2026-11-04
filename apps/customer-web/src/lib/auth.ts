@@ -236,10 +236,12 @@ export async function verifyPhoneOtp(
       // In development test mode ONLY: allow canonical dev test numbers to establish a dev session
       // Password grant fallback is strictly removed; test credentials cannot be used in production builds
       if (devModeActive && LOCAL_DEV_TEST_OTPS[formatted] && cleanToken === LOCAL_DEV_TEST_OTPS[formatted]) {
+        // Seeded canonical demo customer UUID from Supabase auth.users & public.profiles
+        const customerId = '00000000-0000-0000-0000-000000000001';
         const session: CustomerSession = {
-          accessToken: `dev_customer_token:${formatted}:${Date.now()}`,
+          accessToken: `dev_customer_token:${customerId}:${formatted}:${Date.now()}`,
           user: {
-            id: `dev-customer-${formatted.replace(/\D/g, '').slice(-4)}`,
+            id: customerId,
             phone: formatted,
             fullName: 'Demo Customer',
           },

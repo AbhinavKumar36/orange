@@ -1097,17 +1097,36 @@ export const adminRoutes: FastifyPluginAsync<AdminRoutesOptions> = async (app, o
     '/api/v1/admin/orders',
     { preHandler: [createStaffAuthPreHandler(config)] },
     async (request, reply) => {
-      const { status, search, limit = 50, offset = 0 } = request.query as {
-        status?: Order['orderStatus'];
+      const {
+        status,
+        paymentStatus,
+        fulfillment,
+        search,
+        sortBy = 'created_at',
+        sortOrder = 'desc',
+        limit = 50,
+        offset = 0,
+      } = request.query as {
+        status?: string;
+        paymentStatus?: string;
+        fulfillment?: string;
         search?: string;
+        sortBy?: 'created_at' | 'total_amount';
+        sortOrder?: 'asc' | 'desc';
         limit?: number;
         offset?: number;
       };
 
       if (config.NODE_ENV !== 'production' && (config.ALLOW_MOCK_SERVICES || config.NODE_ENV === 'test')) {
         let list = Array.from(mockOrdersStore.values());
-        if (status) {
+        if (status && status !== 'all') {
           list = list.filter((o) => o.orderStatus === status);
+        }
+        if (paymentStatus && paymentStatus !== 'all') {
+          list = list.filter((o) => o.paymentStatus === paymentStatus);
+        }
+        if (fulfillment && fulfillment !== 'all') {
+          list = list.filter((o) => o.fulfillmentType === fulfillment);
         }
         if (search && search.trim()) {
           const q = search.trim().toLowerCase();
@@ -1119,7 +1138,14 @@ export const adminRoutes: FastifyPluginAsync<AdminRoutesOptions> = async (app, o
           );
         }
 
-        const sorted = list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        const sorted = list.sort((a, b) => {
+          if (sortBy === 'total_amount') {
+            return sortOrder === 'asc' ? a.totalAmount - b.totalAmount : b.totalAmount - a.totalAmount;
+          }
+          const timeA = new Date(a.createdAt).getTime();
+          const timeB = new Date(b.createdAt).getTime();
+          return sortOrder === 'asc' ? timeA - timeB : timeB - timeA;
+        });
         const paginated = sorted.slice(Number(offset), Number(offset) + Number(limit));
 
         return reply.send({
@@ -1148,8 +1174,16 @@ export const adminRoutes: FastifyPluginAsync<AdminRoutesOptions> = async (app, o
       }
 
       // Live Supabase
-      let query = `orders?select=id,order_number,customer_id,customer_phone,customer_name,fulfillment_type,scheduled_pickup_at,estimated_pickup_at,order_status,payment_status,payment_method,subtotal_amount,tax_amount,packaging_amount,total_amount,special_notes,expires_at,created_at,order_items(id,product_id,product_name_snapshot,unit_price_snapshot,tax_rate_snapshot,quantity,line_total)&order=created_at.desc&limit=${limit}&offset=${offset}`;
-      if (status) query += `&order_status=eq.${encodeURIComponent(status)}`;
+      const sortField = sortBy === 'total_amount' ? 'total_amount' : 'created_at';
+      const sortDir = sortOrder === 'asc' ? 'asc' : 'desc';
+      let query = `orders?select=id,order_number,customer_id,customer_phone,customer_name,fulfillment_type,scheduled_pickup_at,estimated_pickup_at,order_status,payment_status,payment_method,subtotal_amount,tax_amount,packaging_amount,total_amount,special_notes,expires_at,created_at,order_items(id,product_id,product_name_snapshot,unit_price_snapshot,tax_rate_snapshot,quantity,line_total)&order=${sortField}.${sortDir}&limit=${limit}&offset=${offset}`;
+      if (status && status !== 'all') query += `&order_status=eq.${encodeURIComponent(status)}`;
+      if (paymentStatus && paymentStatus !== 'all') query += `&payment_status=eq.${encodeURIComponent(paymentStatus)}`;
+      if (fulfillment && fulfillment !== 'all') query += `&fulfillment_type=eq.${encodeURIComponent(fulfillment)}`;
+      if (search && search.trim()) {
+        const q = encodeURIComponent(`*${search.trim()}*`);
+        query += `&or=(order_number.ilike.${q},customer_name.ilike.${q},customer_phone.ilike.${q})`;
+      }
 
       const ordersData = await supabaseRest<Array<{
         id: string;
@@ -1378,6 +1412,36 @@ export const adminRoutes: FastifyPluginAsync<AdminRoutesOptions> = async (app, o
       });
 
       if (error) {
+        if (error.includes('Could not find the function') || error.includes('PGRST202')) {
+          // Direct fallback if procedure was not applied on remote database
+          const rows = await supabaseRest<Array<{ id: string; order_status: Order['orderStatus'] }>>(
+            `orders?id=eq.${encodeURIComponent(id)}&select=id,order_status`
+          );
+          if (!rows || rows.length === 0) {
+            return reply.status(404).send({
+              error: { statusCode: 404, code: 'ORDER_NOT_FOUND', message: `Order ${id} not found.` },
+            });
+          }
+          const current = rows[0].order_status;
+          const isValid =
+            (current === 'confirmed' && targetStatus === 'preparing') ||
+            (current === 'preparing' && targetStatus === 'ready_for_pickup');
+          if (!isValid) {
+            return reply.status(400).send({
+              error: {
+                statusCode: 400,
+                code: 'INVALID_ORDER_TRANSITION',
+                message: `Cannot transition order from status '${current}' to '${targetStatus}'.`,
+              },
+            });
+          }
+          await supabaseRest(`orders?id=eq.${encodeURIComponent(id)}`, {
+            method: 'PATCH',
+            body: JSON.stringify({ order_status: targetStatus, updated_at: new Date().toISOString() }),
+          });
+          return reply.send({ success: true, orderStatus: targetStatus });
+        }
+
         const isNotFound = error.includes('not found');
         return reply.status(isNotFound ? 404 : 400).send({
           error: {

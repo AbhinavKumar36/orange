@@ -77,7 +77,7 @@ export function Footer(): ReactElement {
             <span>•</span>
             <span>Vegetarian & Non-Veg Declarations</span>
             <span>•</span>
-            <span>Real-time Kitchen Availability</span>
+            <span>Ready to Sell In-Store Stock</span>
           </div>
         </div>
       </div>

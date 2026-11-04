@@ -169,7 +169,16 @@ input:focus, select:focus, textarea:focus {
 .badge-preparing { background: #FFF8E6; color: #B7791F; }
 .badge-ready_for_pickup { background: #E7F3FF; color: #0D6EFD; }
 .badge-completed { background: #E8E2D9; color: #4B4642; }
-.badge-cancelled { background: #FEECEB; color: #DC3545; }
+.badge-cancelled,
+.badge-cancelled_customer,
+.badge-cancelled_staff,
+.badge-cancelled_expired { background: #FEECEB; color: #DC3545; }
+.badge-unpaid { background: #FFF8E6; color: #B7791F; }
+.badge-pending { background: #FFF3CD; color: #856404; }
+.badge-captured { background: #EBF8EE; color: #198754; }
+.badge-refunded { background: #FEECEB; color: #DC3545; }
+.badge-partially_refunded { background: #FFF8E6; color: #D97706; }
+.badge-failed { background: #FEECEB; color: #DC3545; }
 .badge-role-admin { background: #7C3AED; color: #FFFFFF; }
 .badge-role-manager { background: #0284C7; color: #FFFFFF; }
 .badge-role-staff { background: #D9531E; color: #FFFFFF; }

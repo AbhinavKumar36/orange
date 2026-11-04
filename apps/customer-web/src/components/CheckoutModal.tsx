@@ -200,6 +200,12 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps): ReactEle
       return;
     }
 
+    const cleanPhone = (customerPhone.trim() || session.user.phone || '').trim();
+    if (!cleanPhone || cleanPhone.replace(/\D/g, '').length < 10) {
+      setError('Please provide a valid 10-digit mobile number for order notifications.');
+      return;
+    }
+
     if (fulfillment === 'scheduled' && !scheduledTime) {
       setError('Please select a scheduled pickup time.');
       return;
@@ -228,7 +234,7 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps): ReactEle
           scheduledPickupAt: scheduledIso,
           paymentMethod,
           customerName: customerName.trim(),
-          customerPhone: customerPhone || session.user.phone,
+          customerPhone: cleanPhone,
           specialNotes: specialNotes.trim() || undefined,
         },
         session.accessToken,
@@ -280,7 +286,7 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps): ReactEle
                   {confirmedOrder ? 'Order Confirmed!' : 'Mangala Enterprises — Counter Checkout'}
                 </h2>
                 <div className="modal-subtitle">
-                  {confirmedOrder ? 'Kitchen stock reserved' : 'Prepared fresh for in-store collection'}
+                  {confirmedOrder ? 'In-Store Display Stock Reserved' : 'Ready in vitrine for immediate counter collection'}
                 </div>
               </div>
             </div>
@@ -314,7 +320,7 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps): ReactEle
                 </h3>
 
                 <p className="confirmed-subtitle">
-                  Your boutique order has been confirmed and kitchen inventory is locked.
+                  Your boutique order has been confirmed and reserved from our in-store display counter.
                 </p>
 
                 <div className="receipt-card">
@@ -548,21 +554,9 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps): ReactEle
                   </div>
                 </div>
 
-                {/* 4. Special Notes */}
-                <div className="checkout-field-section">
-                  <label className="input-field-label">
-                    Special Kitchen Instructions (Optional)
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Pack cold juice with ice pack; extra napkins"
-                    value={specialNotes}
-                    onChange={(e) => setSpecialNotes(e.target.value)}
-                    className="modal-text-input"
-                  />
-                </div>
+                {/* Special instructions field removed per ready-to-sell counter requirements */}
 
-                {/* 5. Authoritative Server Total Breakdown */}
+                {/* 4. Authoritative Server Total Breakdown */}
                 <div className="checkout-breakdown-card">
                   <div className="breakdown-line">
                     <span>Items Subtotal</span>
@@ -590,7 +584,7 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps): ReactEle
                   disabled={Boolean(isSubmitting || isValidating || (validation && !validation.isValid))}
                   className="btn-primary checkout-submit-btn"
                 >
-                  {isSubmitting ? 'Reserving Kitchen Stock...' : 'Confirm Order & Reserve Delicacies →'}
+                  {isSubmitting ? 'Reserving In-Store Stock...' : 'Confirm Order & Collect at Counter →'}
                 </button>
               </form>
             )}

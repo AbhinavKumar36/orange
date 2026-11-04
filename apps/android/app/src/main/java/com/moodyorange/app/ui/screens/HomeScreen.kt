@@ -41,7 +41,6 @@ import com.moodyorange.app.ui.components.HeaderBar
 import com.moodyorange.app.ui.components.ProductCard
 import com.moodyorange.app.ui.components.ProductCardSkeleton
 import com.moodyorange.app.ui.components.ProductShowcaseSection
-import com.moodyorange.app.ui.components.`3d`.Hero3DObject
 import com.moodyorange.app.ui.theme.EditorialSerif
 import com.moodyorange.app.ui.theme.ForestGreen
 import com.moodyorange.app.ui.theme.MangalaTheme
@@ -49,6 +48,9 @@ import com.moodyorange.app.ui.theme.MutedGold
 import com.moodyorange.app.ui.theme.WhiteSurface
 import com.moodyorange.app.ui.viewmodel.CatalogViewModel
 import com.moodyorange.app.ui.viewmodel.UiState
+import coil.compose.SubcomposeAsyncImage
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.graphics.Brush
 
 @Composable
 fun HomeScreen(
@@ -62,6 +64,8 @@ fun HomeScreen(
     onProfileClick: () -> Unit = {},
     onThemeToggle: (() -> Unit)? = null,
     onNavigateToShop: (Category?) -> Unit = {},
+    onNavigateToOrders: () -> Unit = {},
+    activePackedOrdersCount: Int = 0,
     modifier: Modifier = Modifier
 ) {
     val colors = MangalaTheme.colors
@@ -83,6 +87,47 @@ fun HomeScreen(
             onThemeToggle = onThemeToggle,
             isDark = colors.isDark
         )
+
+        // Live Order Packed Notification Banner (if customer has active packed order)
+        if (activePackedOrdersCount > 0) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 6.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(if (colors.isDark) Color(0xFF0F2532) else Color(0xFFE8F5EC))
+                    .border(1.dp, if (colors.isDark) MutedGold else ForestGreen, RoundedCornerShape(12.dp))
+                    .clickable { onNavigateToOrders() }
+                    .padding(horizontal = 14.dp, vertical = 10.dp)
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(text = "🎉", fontSize = 20.sp)
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "ORDER PACKED & READY FOR PICKUP!",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (colors.isDark) MutedGold else ForestGreen,
+                            letterSpacing = 0.5.sp
+                        )
+                        Text(
+                            text = "Your delicacies are packed in our boutique packaging waiting at the counter.",
+                            fontSize = 11.5.sp,
+                            color = colors.textPrimary,
+                            lineHeight = 15.sp
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "View →",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (colors.isDark) MutedGold else ForestGreen
+                    )
+                }
+            }
+        }
 
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
@@ -255,7 +300,7 @@ private fun HeroSection(
             Spacer(modifier = Modifier.height(8.dp))
 
             Text(
-                text = "Handcrafted in small daily batches using single-origin cacao, pure cold-pressed fruit extracts, and farm-fresh ingredients. Available for fresh in-store counter pickup.",
+                text = "Curated daily in our boutique vitrines using single-origin cacao, pure cold-pressed fruit extracts, and farm-fresh ingredients. In-store ready to sell for instant counter pickup.",
                 fontSize = 12.5.sp,
                 lineHeight = 18.sp,
                 textAlign = TextAlign.Center,
@@ -265,11 +310,47 @@ private fun HeroSection(
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            // Interactive 3D Object
-            Hero3DObject(
-                size = 210.dp,
-                modifier = Modifier.padding(vertical = 2.dp)
-            )
+            // Boutique In-Store Display Counter Photo
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(200.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .border(1.dp, colors.border, RoundedCornerShape(14.dp))
+            ) {
+                SubcomposeAsyncImage(
+                    model = "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=800&q=80",
+                    contentDescription = "Mangala Enterprises In-Store Display Counter",
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.verticalGradient(
+                                colors = listOf(Color.Transparent, Color(0xAA040D12))
+                            )
+                        )
+                )
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(10.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(Color(0xCC040D12))
+                        .border(0.5.dp, colors.gold, RoundedCornerShape(6.dp))
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                ) {
+                    Text(
+                        text = "✨ IN-STORE DISPLAY VITRINE • READY TO SELL",
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = colors.gold,
+                        letterSpacing = 0.5.sp
+                    )
+                }
+            }
 
             Spacer(modifier = Modifier.height(10.dp))
 
@@ -278,9 +359,9 @@ private fun HeroSection(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                HeroPill(text = "🛍️ Counter Pickup")
+                HeroPill(text = "🛍️ Ready Stock")
+                HeroPill(text = "⚡ Instant Handover")
                 HeroPill(text = "🌿 FSSAI Declared")
-                HeroPill(text = "✨ Small Batch")
             }
 
             Spacer(modifier = Modifier.height(18.dp))

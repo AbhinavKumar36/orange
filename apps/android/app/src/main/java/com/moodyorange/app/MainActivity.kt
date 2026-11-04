@@ -78,8 +78,10 @@ fun MoodyOrangeApp(
     val isAuthOpen by shopViewModel.isAuthOpen.collectAsState()
     val isCheckoutOpen by shopViewModel.isCheckoutOpen.collectAsState()
     val checkoutState by shopViewModel.checkoutState.collectAsState()
+    val orders by shopViewModel.orders.collectAsState()
 
     val totalItemCount = cartItems.sumOf { it.quantity }
+    val activePackedOrdersCount = orders.count { it.orderStatus.equals("ready_for_pickup", ignoreCase = true) }
 
     when (val dest = currentDestination) {
         is AppDestination.ProductDetail -> {
@@ -143,7 +145,9 @@ fun MoodyOrangeApp(
                                         catalogViewModel.selectCategory(category)
                                     }
                                     selectedTab = NavTab.SHOP
-                                }
+                                },
+                                onNavigateToOrders = { selectedTab = NavTab.ORDERS },
+                                activePackedOrdersCount = activePackedOrdersCount
                             )
                         }
 

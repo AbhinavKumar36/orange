@@ -35,14 +35,26 @@ val SurfaceHoverLight = Color(0xFFEFE9DD)
 val CardBorderLight = Color(0xFFE2DBD0)
 val DividerLight = Color(0xFFE5DFD4)
 
-// Dark Mode Surfaces (Deep Forest Charcoal & Obsidian)
-val DeepCharcoalCanvas = Color(0xFF0A1612)
-val DeepForestSurface = Color(0xFF11221B)
-val SurfaceElevatedDark = Color(0xFF182E25)
-val SurfaceHoverDark = Color(0xFF1F3A2F)
-val CardBorderDark = Color(0xFF1F3A2F)
-val CardBorderGoldDark = Color(0x33D7A34A)
-val DividerDark = Color(0xFF1E332B)
+// ==============================================================================
+// ABYSS COLOR PALETTE (Luxury Deep Midnight Oceanic / Abyss Surfaces)
+// Replaces stark flat black with rich oceanic abyss tones
+// ==============================================================================
+val AbyssCanvas = Color(0xFF040D12)          // Midnight Abyss base canvas (#040D12)
+val AbyssSurface = Color(0xFF0A1922)         // Deep Abyss surface (#0A1922)
+val AbyssSurfaceElevated = Color(0xFF0F2532) // Elevated Abyss card (#0F2532)
+val AbyssSurfaceHover = Color(0xFF153243)    // Interactive Abyss hover (#153243)
+val AbyssCardBorder = Color(0xFF1D3545)      // Crisp Abyss border (#1D3545)
+val AbyssCardBorderGold = Color(0x33D7A34A)  // Gold accent border
+val AbyssDivider = Color(0xFF162A37)         // Abyss separator line (#162A37)
+
+// Dark Mode Surfaces Mapped to Abyss Color System
+val DeepCharcoalCanvas = AbyssCanvas
+val DeepForestSurface = AbyssSurface
+val SurfaceElevatedDark = AbyssSurfaceElevated
+val SurfaceHoverDark = AbyssSurfaceHover
+val CardBorderDark = AbyssCardBorder
+val CardBorderGoldDark = AbyssCardBorderGold
+val DividerDark = AbyssDivider
 
 // Typography Hierarchies
 // Light Mode:

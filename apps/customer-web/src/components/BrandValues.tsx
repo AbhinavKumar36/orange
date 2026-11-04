@@ -8,9 +8,9 @@ export function BrandValues(): ReactElement {
       <div className="container">
         <div className="section-header" style={{ textAlign: 'center', marginBottom: '3rem' }}>
           <div className="section-subtitle">Store Standards</div>
-          <h2 className="section-title">Crafted for Quality, Prepared for Pickup</h2>
+          <h2 className="section-title">In-Store Ready Stock, Prepared for Instant Pickup</h2>
           <p className="section-lead" style={{ maxWidth: '640px', margin: '0.75rem auto 0' }}>
-            We combine high culinary standards with seamless digital convenience. Every order is freshly prepared for immediate or scheduled collection at Mangala Enterprises.
+            We combine high culinary standards with seamless digital convenience. Every order is pre-packed and ready in our boutique display counter for immediate collection at Mangala Enterprises.
           </p>
         </div>
 
@@ -19,11 +19,11 @@ export function BrandValues(): ReactElement {
             <div className="value-icon-box" aria-hidden="true">
               <span>🛍️</span>
             </div>
-            <h3 className="value-heading">Counter Pickup Service</h3>
+            <h3 className="value-heading">Instant Counter Handover</h3>
             <p className="value-text">
-              Collect directly from our store counter. Choose between immediate fresh preparation (~15-20 minutes) or schedule a dedicated pickup window.
+              Collect directly from our store counter with zero waiting time. Every item is packed and ready to sell in our display vitrine.
             </p>
-            <div className="value-footer-note">Served fresh at optimal temperature</div>
+            <div className="value-footer-note">Ready in display counter</div>
           </div>
 
           <div className="value-card">
@@ -41,9 +41,9 @@ export function BrandValues(): ReactElement {
             <div className="value-icon-box" aria-hidden="true">
               <span>⚡</span>
             </div>
-            <h3 className="value-heading">Live Kitchen Availability</h3>
+            <h3 className="value-heading">Live In-Store Stock</h3>
             <p className="value-text">
-              Our digital catalog synchronizes in real time with physical inventory so you only see and order delicacies that are genuinely in stock.
+              Our digital catalog synchronizes in real time with physical vitrine inventory so you only see and order delicacies that are genuinely in stock and ready to sell.
             </p>
             <div className="value-footer-note">Zero phantom reservations</div>
           </div>

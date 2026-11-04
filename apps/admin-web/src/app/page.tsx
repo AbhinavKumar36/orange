@@ -147,6 +147,12 @@ export default function AdminDashboardPage(): ReactElement {
   const [writeOffError, setWriteOffError] = useState<string | null>(null);
 
   const [orderFilter, setOrderFilter] = useState('all');
+  const [orderPaymentFilter, setOrderPaymentFilter] = useState('all');
+  const [orderFulfillmentFilter, setOrderFulfillmentFilter] = useState('all');
+  const [orderSortBy, setOrderSortBy] = useState<'created_at' | 'total_amount'>('created_at');
+  const [orderSortOrder, setOrderSortOrder] = useState<'desc' | 'asc'>('desc');
+  const [selectedOrderDetails, setSelectedOrderDetails] = useState<Order | null>(null);
+  const [isOrdersLoading, setIsOrdersLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [isActionLoading, setIsActionLoading] = useState(false);
@@ -180,8 +186,17 @@ export default function AdminDashboardPage(): ReactElement {
         const d = await fetchDashboardMetrics(token);
         setMetrics(d);
       } else if (activeTab === 'queue') {
-        const ords = await fetchAdminOrders(token, { status: orderFilter, search: searchQuery });
+        setIsOrdersLoading(true);
+        const ords = await fetchAdminOrders(token, {
+          status: orderFilter,
+          paymentStatus: orderPaymentFilter,
+          fulfillment: orderFulfillmentFilter,
+          search: searchQuery,
+          sortBy: orderSortBy,
+          sortOrder: orderSortOrder,
+        });
         setOrders(ords);
+        setIsOrdersLoading(false);
       } else if (activeTab === 'products') {
         const [prods, cats] = await Promise.all([
           fetchAdminProducts(token, { search: searchQuery }),
@@ -198,8 +213,9 @@ export default function AdminDashboardPage(): ReactElement {
       }
     } catch (e: unknown) {
       console.error('Failed to load tab data:', e);
+      setIsOrdersLoading(false);
     }
-  }, [token, activeTab, orderFilter, searchQuery]);
+  }, [token, activeTab, orderFilter, orderPaymentFilter, orderFulfillmentFilter, orderSortBy, orderSortOrder, searchQuery]);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -252,7 +268,11 @@ export default function AdminDashboardPage(): ReactElement {
     setIsLoggingIn(true);
     setLoginErrorMessage(null);
     try {
-      const res = await login(email, 'password123');
+      const targetEmail = email.endsWith('.local') ? email.replace('.local', '.com') : email;
+      let res = await login(targetEmail, 'password123');
+      if (!res.success && targetEmail !== email) {
+        res = await login(email, 'password123');
+      }
       if (!res.success) {
         setLoginErrorMessage(res.error || 'Failed to authenticate staff credentials.');
       }
@@ -393,6 +413,7 @@ export default function AdminDashboardPage(): ReactElement {
     try {
       await updateAdminOrderStatus(token, order.id, nextStatus);
       setStatusMessage(`Order #${order.orderNumber} advanced to ${nextStatus.replace('_', ' ')}.`);
+      setSelectedOrderDetails((prev) => (prev?.id === order.id ? { ...prev, orderStatus: nextStatus } : prev));
       loadData();
     } catch (e: unknown) {
       setStatusMessage(`Error: ${e instanceof Error ? e.message : 'Failed to update order status'}`);
@@ -407,9 +428,13 @@ export default function AdminDashboardPage(): ReactElement {
     setHandoverError(null);
     try {
       await completeAdminOrderHandover(token, handoverOrder.id, cashCollected);
+      const completedOrderId = handoverOrder.id;
       setHandoverOrder(null);
       setCashCollected(false);
       setStatusMessage(`Order #${handoverOrder.orderNumber} successfully handed over.`);
+      setSelectedOrderDetails((prev) =>
+        prev?.id === completedOrderId ? { ...prev, orderStatus: 'completed', paymentStatus: 'captured' } : prev
+      );
       loadData();
     } catch (e: unknown) {
       setHandoverError(e instanceof Error ? e.message : 'Handover failed');
@@ -427,6 +452,7 @@ export default function AdminDashboardPage(): ReactElement {
     try {
       await cancelAdminOrder(token, order.id, reason.trim());
       setStatusMessage(`Order #${order.orderNumber} cancelled.`);
+      setSelectedOrderDetails((prev) => (prev?.id === order.id ? { ...prev, orderStatus: 'cancelled_by_staff' } : prev));
       loadData();
     } catch (e: unknown) {
       alert(`Error cancelling order: ${e instanceof Error ? e.message : 'Unknown error'}`);
@@ -594,52 +620,147 @@ export default function AdminDashboardPage(): ReactElement {
         )}
 
         {/* ========================================================================= */}
-        {/* TAB 1: LIVE DISPATCH QUEUE */}
+        {/* TAB 1: LIVE DISPATCH QUEUE & ORDER OPERATIONS */}
         {/* ========================================================================= */}
         {activeTab === 'queue' && (
           <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.2rem', flexWrap: 'wrap', gap: '0.8rem' }}>
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
-                {['all', 'confirmed', 'preparing', 'ready_for_pickup', 'completed'].map((st) => (
+            {/* Filter & Operations Toolbar */}
+            <div style={{ background: '#FFF', padding: '1rem 1.25rem', borderRadius: '10px', border: '1px solid var(--color-border)', marginBottom: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+              {/* Primary Status Tabs */}
+              <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--color-text-muted)', marginRight: '0.4rem' }}>
+                  STATUS:
+                </span>
+                {[
+                  { id: 'all', label: 'All Orders' },
+                  { id: 'confirmed', label: 'Confirmed' },
+                  { id: 'preparing', label: 'Preparing' },
+                  { id: 'ready_for_pickup', label: '📦 Order Packed / Ready' },
+                  { id: 'completed', label: 'Completed' },
+                  { id: 'cancelled_by_staff', label: 'Cancelled' },
+                ].map((st) => (
                   <button
-                    key={st}
+                    key={st.id}
                     type="button"
-                    onClick={() => setOrderFilter(st)}
+                    onClick={() => setOrderFilter(st.id)}
                     style={{
-                      padding: '0.4rem 0.8rem',
+                      padding: '0.35rem 0.75rem',
                       borderRadius: '6px',
                       fontSize: '0.85rem',
                       fontWeight: 600,
-                      background: orderFilter === st ? 'var(--color-brand-primary)' : '#FFF',
-                      color: orderFilter === st ? '#FFF' : 'var(--color-text-main)',
-                      border: '1px solid var(--color-border)',
-                      textTransform: 'capitalize',
+                      background: orderFilter === st.id ? 'var(--color-brand-primary)' : '#F8F5F0',
+                      color: orderFilter === st.id ? '#FFF' : 'var(--color-text-main)',
+                      border: `1px solid ${orderFilter === st.id ? 'var(--color-brand-primary)' : 'var(--color-border)'}`,
                     }}
                   >
-                    {st.replace(/_/g, ' ')}
+                    {st.label}
                   </button>
                 ))}
               </div>
 
-              <div style={{ display: 'flex', gap: '0.5rem', maxWidth: '300px', width: '100%' }}>
-                <input
-                  type="text"
-                  placeholder="Search order #, customer..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
-                <button type="button" className="btn-secondary" onClick={loadData}>
-                  Refresh
+              {/* Secondary Filters & Search Bar */}
+              <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                {/* Payment Status Dropdown */}
+                <div style={{ minWidth: '150px' }}>
+                  <select
+                    value={orderPaymentFilter}
+                    onChange={(e) => setOrderPaymentFilter(e.target.value)}
+                    style={{ fontSize: '0.85rem', padding: '0.45rem 0.65rem' }}
+                  >
+                    <option value="all">All Payments</option>
+                    <option value="unpaid">Unpaid (Counter)</option>
+                    <option value="pending">Pending (Online Draft)</option>
+                    <option value="captured">Captured (Paid)</option>
+                    <option value="refunded">Refunded</option>
+                    <option value="failed">Failed</option>
+                  </select>
+                </div>
+
+                {/* Fulfillment Type Dropdown */}
+                <div style={{ minWidth: '140px' }}>
+                  <select
+                    value={orderFulfillmentFilter}
+                    onChange={(e) => setOrderFulfillmentFilter(e.target.value)}
+                    style={{ fontSize: '0.85rem', padding: '0.45rem 0.65rem' }}
+                  >
+                    <option value="all">All Fulfillment</option>
+                    <option value="immediate">⚡ Immediate</option>
+                    <option value="scheduled">📅 Scheduled Slot</option>
+                  </select>
+                </div>
+
+                {/* Sort Order Dropdown */}
+                <div style={{ minWidth: '150px' }}>
+                  <select
+                    value={`${orderSortBy}-${orderSortOrder}`}
+                    onChange={(e) => {
+                      const [by, order] = e.target.value.split('-') as ['created_at' | 'total_amount', 'asc' | 'desc'];
+                      setOrderSortBy(by);
+                      setOrderSortOrder(order);
+                    }}
+                    style={{ fontSize: '0.85rem', padding: '0.45rem 0.65rem' }}
+                  >
+                    <option value="created_at-desc">Newest First</option>
+                    <option value="created_at-asc">Oldest First</option>
+                    <option value="total_amount-desc">Highest Amount</option>
+                    <option value="total_amount-asc">Lowest Amount</option>
+                  </select>
+                </div>
+
+                {/* Search Input */}
+                <div style={{ flex: 1, minWidth: '200px' }}>
+                  <input
+                    type="text"
+                    placeholder="Search order #, customer name, mobile..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    style={{ fontSize: '0.85rem', padding: '0.45rem 0.75rem' }}
+                  />
+                </div>
+
+                {/* Refresh Action */}
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  disabled={isOrdersLoading}
+                  onClick={loadData}
+                  style={{ fontSize: '0.85rem', padding: '0.45rem 0.85rem', whiteSpace: 'nowrap' }}
+                >
+                  {isOrdersLoading ? 'Refreshing...' : '↻ Refresh Queue'}
                 </button>
               </div>
             </div>
 
-            {orders.length === 0 ? (
-              <div style={{ background: '#FFF', padding: '3rem', borderRadius: '12px', textAlign: 'center', border: '1px solid var(--color-border)' }}>
-                <p style={{ color: 'var(--color-text-muted)' }}>No orders in this queue filter.</p>
+            {/* Orders Feed */}
+            {isOrdersLoading && orders.length === 0 ? (
+              <div style={{ background: '#FFF', padding: '3.5rem', borderRadius: '12px', textAlign: 'center', border: '1px solid var(--color-border)' }}>
+                <p style={{ color: 'var(--color-text-muted)', fontSize: '0.95rem' }}>Loading live orders from Supabase...</p>
+              </div>
+            ) : orders.length === 0 ? (
+              <div style={{ background: '#FFF', padding: '3.5rem', borderRadius: '12px', textAlign: 'center', border: '1px solid var(--color-border)' }}>
+                <div style={{ fontSize: '2.5rem', marginBottom: '0.75rem' }}>📋</div>
+                <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '0.4rem' }}>No orders found</h3>
+                <p style={{ color: 'var(--color-text-muted)', fontSize: '0.9rem', maxWidth: '400px', margin: '0 auto' }}>
+                  No customer orders match the selected status, payment, or search filters.
+                </p>
+                {(orderFilter !== 'all' || orderPaymentFilter !== 'all' || orderFulfillmentFilter !== 'all' || searchQuery) && (
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    onClick={() => {
+                      setOrderFilter('all');
+                      setOrderPaymentFilter('all');
+                      setOrderFulfillmentFilter('all');
+                      setSearchQuery('');
+                    }}
+                    style={{ marginTop: '1rem', fontSize: '0.85rem' }}
+                  >
+                    Reset All Filters
+                  </button>
+                )}
               </div>
             ) : (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: '1rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: '1rem' }}>
                 {orders.map((ord) => (
                   <div
                     key={ord.id}
@@ -652,14 +773,29 @@ export default function AdminDashboardPage(): ReactElement {
                       flexDirection: 'column',
                       justifyContent: 'space-between',
                       boxShadow: 'var(--shadow-sm)',
+                      transition: 'border-color 0.15s ease',
                     }}
                   >
                     <div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
+                      {/* Card Header */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.6rem' }}>
                         <div>
-                          <strong style={{ fontSize: '1rem' }}>#{ord.orderNumber}</strong>
-                          <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
-                            {new Date(ord.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <strong style={{ fontSize: '1.05rem', color: 'var(--color-brand-primary)' }}>
+                              #{ord.orderNumber}
+                            </strong>
+                            {ord.fulfillmentType === 'scheduled' ? (
+                              <span style={{ fontSize: '0.7rem', padding: '0.15rem 0.45rem', borderRadius: '4px', background: '#E0F2FE', color: '#0369A1', fontWeight: 600 }}>
+                                📅 Scheduled
+                              </span>
+                            ) : (
+                              <span style={{ fontSize: '0.7rem', padding: '0.15rem 0.45rem', borderRadius: '4px', background: '#FEF3C7', color: '#B45309', fontWeight: 600 }}>
+                                ⚡ Immediate
+                              </span>
+                            )}
+                          </div>
+                          <div style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)', marginTop: '0.15rem' }}>
+                            Placed {new Date(ord.createdAt).toLocaleDateString()} at {new Date(ord.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                           </div>
                         </div>
                         <span className={`badge badge-${ord.orderStatus}`}>
@@ -667,53 +803,81 @@ export default function AdminDashboardPage(): ReactElement {
                         </span>
                       </div>
 
-                      <div style={{ margin: '0.75rem 0', padding: '0.5rem 0', borderTop: '1px solid var(--color-border-light)', borderBottom: '1px solid var(--color-border-light)' }}>
-                        <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>{ord.customerName}</div>
-                        <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>{ord.customerPhone}</div>
+                      {/* Customer Info */}
+                      <div style={{ margin: '0.65rem 0', padding: '0.55rem 0', borderTop: '1px solid var(--color-border-light)', borderBottom: '1px solid var(--color-border-light)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>{ord.customerName}</span>
+                          <span style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>{ord.customerPhone}</span>
+                        </div>
+                        {ord.fulfillmentType === 'scheduled' && ord.scheduledPickupAt && (
+                          <div style={{ marginTop: '0.35rem', fontSize: '0.75rem', color: '#0369A1', background: '#F0F9FF', padding: '0.25rem 0.5rem', borderRadius: '4px' }}>
+                            ⏰ Pickup Slot: {new Date(ord.scheduledPickupAt).toLocaleString()}
+                          </div>
+                        )}
                         {ord.specialNotes && (
-                          <div style={{ marginTop: '0.4rem', fontSize: '0.75rem', background: 'var(--color-bg-cream)', padding: '0.3rem 0.5rem', borderRadius: '4px' }}>
+                          <div style={{ marginTop: '0.35rem', fontSize: '0.75rem', background: 'var(--color-bg-cream)', padding: '0.3rem 0.5rem', borderRadius: '4px', color: '#444' }}>
                             📝 {ord.specialNotes}
                           </div>
                         )}
                       </div>
 
+                      {/* Line Items Snapshot */}
                       <div style={{ marginBottom: '0.75rem' }}>
-                        <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-text-muted)', marginBottom: '0.3rem' }}>
-                          ITEMS ({(ord.items || []).length})
+                        <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-text-muted)', marginBottom: '0.3rem', letterSpacing: '0.03em' }}>
+                          ORDER ITEMS ({(ord.items || []).length})
                         </div>
                         {(ord.items || []).map((it) => (
-                          <div key={it.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginBottom: '0.2rem' }}>
-                            <span>{it.quantity}x {it.productNameSnapshot}</span>
-                            <span>{formatPaiseToRupees(it.lineTotal)}</span>
+                          <div key={it.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginBottom: '0.25rem' }}>
+                            <span>
+                              <span style={{ fontWeight: 600 }}>{it.quantity}x</span> {it.productNameSnapshot}
+                            </span>
+                            <span style={{ color: 'var(--color-text-muted)' }}>{formatPaiseToRupees(it.lineTotal)}</span>
                           </div>
                         ))}
                       </div>
                     </div>
 
                     <div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '0.75rem 0 1rem 0' }}>
+                      {/* Price & Payment Summary */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '0.75rem 0 0.9rem 0', padding: '0.6rem 0.8rem', background: '#F8F5F0', borderRadius: '8px' }}>
                         <div>
-                          <span style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>
-                            {ord.paymentMethod === 'cash_at_pickup' ? 'Cash at Counter' : 'Online Payment'}
-                          </span>
+                          <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
+                            {ord.paymentMethod === 'cash_at_pickup' ? 'Cash at Counter' : 'Online Payment (Razorpay)'}
+                          </div>
                           <span
                             className={`badge badge-${ord.paymentStatus}`}
-                            style={{ marginLeft: '0.5rem', fontSize: '0.75rem' }}
+                            style={{ marginTop: '0.2rem', fontSize: '0.7rem' }}
                           >
                             {ord.paymentStatus.replace(/_/g, ' ')}
                           </span>
                         </div>
-                        <strong style={{ fontSize: '1.1rem', color: 'var(--color-brand-primary)' }}>
-                          {formatPaiseToRupees(ord.totalAmount)}
-                        </strong>
+                        <div style={{ textAlign: 'right' }}>
+                          <div style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)' }}>Total Amount</div>
+                          <strong style={{ fontSize: '1.15rem', color: 'var(--color-brand-primary)' }}>
+                            {formatPaiseToRupees(ord.totalAmount)}
+                          </strong>
+                        </div>
                       </div>
 
-                      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                      {/* Operations Actions */}
+                      <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                        {/* Details Modal Trigger */}
+                        <button
+                          type="button"
+                          className="btn-secondary"
+                          style={{ fontSize: '0.8rem', padding: '0.35rem 0.6rem' }}
+                          onClick={() => setSelectedOrderDetails(ord)}
+                          title="Open full order details modal"
+                        >
+                          🔍 Details
+                        </button>
+
                         <button
                           type="button"
                           className="btn-secondary"
                           style={{ fontSize: '0.8rem', padding: '0.35rem 0.6rem' }}
                           onClick={() => handleInspectPayments(ord)}
+                          title="View payment attempts and gateway transactions"
                         >
                           💳 Payments
                         </button>
@@ -740,11 +904,11 @@ export default function AdminDashboardPage(): ReactElement {
                           <button
                             type="button"
                             className="btn-primary"
-                            style={{ flex: 1, justifyContent: 'center', fontSize: '0.85rem' }}
+                            style={{ flex: 1, justifyContent: 'center', fontSize: '0.82rem', padding: '0.35rem 0.6rem', background: '#0D6EFD' }}
                             disabled={isActionLoading}
                             onClick={() => handleAdvanceStatus(ord, 'preparing')}
                           >
-                            Start Preparing
+                            📦 Mark Order Packed
                           </button>
                         )}
 
@@ -752,7 +916,7 @@ export default function AdminDashboardPage(): ReactElement {
                           <button
                             type="button"
                             className="btn-primary"
-                            style={{ flex: 1, justifyContent: 'center', fontSize: '0.85rem', background: '#0D6EFD' }}
+                            style={{ flex: 1, justifyContent: 'center', fontSize: '0.82rem', padding: '0.35rem 0.6rem', background: '#198754' }}
                             disabled={isActionLoading}
                             onClick={() => handleAdvanceStatus(ord, 'ready_for_pickup')}
                           >
@@ -764,7 +928,7 @@ export default function AdminDashboardPage(): ReactElement {
                           <button
                             type="button"
                             className="btn-primary"
-                            style={{ flex: 1, justifyContent: 'center', fontSize: '0.85rem', background: '#198754' }}
+                            style={{ flex: 1, justifyContent: 'center', fontSize: '0.82rem', padding: '0.35rem 0.6rem', background: '#198754' }}
                             disabled={isActionLoading}
                             onClick={() => {
                               setHandoverOrder(ord);
@@ -780,6 +944,7 @@ export default function AdminDashboardPage(): ReactElement {
                             type="button"
                             className="btn-danger"
                             onClick={() => handleCancelOrder(ord)}
+                            title="Cancel order with authoritative reason"
                           >
                             Cancel
                           </button>
@@ -1951,6 +2116,268 @@ export default function AdminDashboardPage(): ReactElement {
               <button type="button" className="btn-secondary" onClick={() => setInspectPaymentsOrder(null)}>
                 Close
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* ORDER OPERATIONS: FULL ORDER DETAILS MODAL */}
+      {/* ========================================================================= */}
+      {selectedOrderDetails && (
+        <div
+          className="modal-backdrop"
+          onClick={() => setSelectedOrderDetails(null)}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Order Operations Details"
+        >
+          <div
+            className="modal-card"
+            style={{ maxWidth: '680px' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="modal-header">
+              <div>
+                <h3 style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--color-brand-primary)' }}>
+                  Order Details — #{selectedOrderDetails.orderNumber}
+                </h3>
+                <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', marginTop: '0.2rem' }}>
+                  Placed on {new Date(selectedOrderDetails.createdAt).toLocaleString()}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedOrderDetails(null)}
+                style={{ fontSize: '1.2rem', color: 'var(--color-text-muted)', padding: '0.2rem 0.5rem' }}
+                aria-label="Close details"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
+              {/* Lifecycle & Payment Badges */}
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                <span className={`badge badge-${selectedOrderDetails.orderStatus}`} style={{ fontSize: '0.85rem', padding: '0.3rem 0.75rem' }}>
+                  Status: {selectedOrderDetails.orderStatus.replace(/_/g, ' ')}
+                </span>
+                <span className={`badge badge-${selectedOrderDetails.paymentStatus}`} style={{ fontSize: '0.85rem', padding: '0.3rem 0.75rem' }}>
+                  Payment: {selectedOrderDetails.paymentStatus.replace(/_/g, ' ')}
+                </span>
+                <span style={{ fontSize: '0.8rem', padding: '0.3rem 0.65rem', borderRadius: '9999px', background: '#F1F5F9', color: '#334155', fontWeight: 600 }}>
+                  Mode: {selectedOrderDetails.paymentMethod === 'cash_at_pickup' ? 'Cash at Counter' : 'Online Razorpay'}
+                </span>
+                <span style={{ fontSize: '0.8rem', padding: '0.3rem 0.65rem', borderRadius: '9999px', background: selectedOrderDetails.fulfillmentType === 'scheduled' ? '#E0F2FE' : '#FEF3C7', color: selectedOrderDetails.fulfillmentType === 'scheduled' ? '#0369A1' : '#B45309', fontWeight: 600 }}>
+                  {selectedOrderDetails.fulfillmentType === 'scheduled' ? '📅 Scheduled Pickup' : '⚡ Immediate Pickup'}
+                </span>
+              </div>
+
+              {/* Customer & Fulfillment Information */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1rem', background: '#F8F5F0', padding: '1rem', borderRadius: '8px', border: '1px solid var(--color-border)' }}>
+                <div>
+                  <h4 style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--color-text-muted)', marginBottom: '0.4rem', letterSpacing: '0.04em' }}>
+                    CUSTOMER CONTACT
+                  </h4>
+                  <div style={{ fontWeight: 600, fontSize: '0.95rem' }}>{selectedOrderDetails.customerName}</div>
+                  <div style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)', marginTop: '0.15rem' }}>
+                    📱 {selectedOrderDetails.customerPhone}
+                  </div>
+                  <div style={{ fontSize: '0.72rem', color: '#888', marginTop: '0.25rem', fontFamily: 'monospace' }}>
+                    ID: {selectedOrderDetails.customerId}
+                  </div>
+                </div>
+
+                <div>
+                  <h4 style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--color-text-muted)', marginBottom: '0.4rem', letterSpacing: '0.04em' }}>
+                    FULFILLMENT SCHEDULE
+                  </h4>
+                  <div style={{ fontSize: '0.85rem' }}>
+                    <strong>Type:</strong> {selectedOrderDetails.fulfillmentType === 'scheduled' ? 'Scheduled Slot' : 'Immediate Preparation'}
+                  </div>
+                  {selectedOrderDetails.fulfillmentType === 'scheduled' && selectedOrderDetails.scheduledPickupAt && (
+                    <div style={{ fontSize: '0.85rem', color: '#0369A1', marginTop: '0.2rem', fontWeight: 600 }}>
+                      ⏰ Target Slot: {new Date(selectedOrderDetails.scheduledPickupAt).toLocaleString()}
+                    </div>
+                  )}
+                  {selectedOrderDetails.estimatedPickupAt && (
+                    <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', marginTop: '0.2rem' }}>
+                      Estimated Ready: {new Date(selectedOrderDetails.estimatedPickupAt).toLocaleTimeString()}
+                    </div>
+                  )}
+                  {selectedOrderDetails.expiresAt && (
+                    <div style={{ fontSize: '0.75rem', color: '#B45309', marginTop: '0.2rem' }}>
+                      TTL Reservation Expires: {new Date(selectedOrderDetails.expiresAt).toLocaleTimeString()}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Special Instructions */}
+              {selectedOrderDetails.specialNotes && (
+                <div style={{ background: '#FFFBEB', border: '1px solid #FCD34D', borderRadius: '8px', padding: '0.75rem 1rem' }}>
+                  <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#92400E', marginBottom: '0.2rem' }}>
+                    📝 Customer Special Instructions:
+                  </div>
+                  <div style={{ fontSize: '0.85rem', color: '#78350F' }}>
+                    {selectedOrderDetails.specialNotes}
+                  </div>
+                </div>
+              )}
+
+              {/* Line Items Table */}
+              <div>
+                <h4 style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--color-text-muted)', marginBottom: '0.5rem', letterSpacing: '0.03em' }}>
+                  ORDER ITEMS ({(selectedOrderDetails.items || []).length})
+                </h4>
+                <div style={{ border: '1px solid var(--color-border)', borderRadius: '8px', overflow: 'hidden' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+                    <thead>
+                      <tr style={{ background: '#F8F5F0', borderBottom: '1px solid var(--color-border)', textAlign: 'left' }}>
+                        <th style={{ padding: '0.6rem 0.8rem', fontWeight: 600 }}>Item</th>
+                        <th style={{ padding: '0.6rem 0.8rem', fontWeight: 600, textAlign: 'center' }}>Qty</th>
+                        <th style={{ padding: '0.6rem 0.8rem', fontWeight: 600, textAlign: 'right' }}>Unit Price</th>
+                        <th style={{ padding: '0.6rem 0.8rem', fontWeight: 600, textAlign: 'right' }}>Tax</th>
+                        <th style={{ padding: '0.6rem 0.8rem', fontWeight: 600, textAlign: 'right' }}>Line Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(selectedOrderDetails.items || []).map((it) => (
+                        <tr key={it.id} style={{ borderBottom: '1px solid var(--color-border-light)' }}>
+                          <td style={{ padding: '0.6rem 0.8rem', fontWeight: 500 }}>
+                            {it.productNameSnapshot}
+                          </td>
+                          <td style={{ padding: '0.6rem 0.8rem', textAlign: 'center', fontWeight: 600 }}>
+                            {it.quantity}
+                          </td>
+                          <td style={{ padding: '0.6rem 0.8rem', textAlign: 'right', color: 'var(--color-text-muted)' }}>
+                            {formatPaiseToRupees(it.unitPriceSnapshot)}
+                          </td>
+                          <td style={{ padding: '0.6rem 0.8rem', textAlign: 'right', color: 'var(--color-text-muted)' }}>
+                            {it.taxRateSnapshot}%
+                          </td>
+                          <td style={{ padding: '0.6rem 0.8rem', textAlign: 'right', fontWeight: 600 }}>
+                            {formatPaiseToRupees(it.lineTotal)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Financial Breakdown */}
+              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                <div style={{ minWidth: '240px', background: '#F8F5F0', padding: '0.8rem 1rem', borderRadius: '8px', border: '1px solid var(--color-border)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginBottom: '0.3rem' }}>
+                    <span style={{ color: 'var(--color-text-muted)' }}>Subtotal:</span>
+                    <span>{formatPaiseToRupees(selectedOrderDetails.subtotalAmount)}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginBottom: '0.3rem' }}>
+                    <span style={{ color: 'var(--color-text-muted)' }}>Tax (GST):</span>
+                    <span>{formatPaiseToRupees(selectedOrderDetails.taxAmount)}</span>
+                  </div>
+                  {selectedOrderDetails.packagingAmount > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginBottom: '0.3rem' }}>
+                      <span style={{ color: 'var(--color-text-muted)' }}>Packaging:</span>
+                      <span>{formatPaiseToRupees(selectedOrderDetails.packagingAmount)}</span>
+                    </div>
+                  )}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1.05rem', fontWeight: 700, paddingTop: '0.5rem', marginTop: '0.4rem', borderTop: '1px solid var(--color-border)', color: 'var(--color-brand-primary)' }}>
+                    <span>Total Amount:</span>
+                    <span>{formatPaiseToRupees(selectedOrderDetails.totalAmount)}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer with Operational Action Controls */}
+            <div className="modal-footer" style={{ flexWrap: 'wrap', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => handleInspectPayments(selectedOrderDetails)}
+                >
+                  💳 View Payments
+                </button>
+
+                {isManager &&
+                  selectedOrderDetails.paymentMethod === 'online_razorpay' &&
+                  ['captured', 'partially_refunded'].includes(selectedOrderDetails.paymentStatus) && (
+                    <button
+                      type="button"
+                      className="btn-secondary"
+                      style={{ color: '#b91c1c', borderColor: '#fca5a5' }}
+                      onClick={() => handleOpenRefund(selectedOrderDetails)}
+                    >
+                      ↩️ Issue Refund
+                    </button>
+                  )}
+
+                {isManager &&
+                  selectedOrderDetails.orderStatus !== 'completed' &&
+                  !selectedOrderDetails.orderStatus.startsWith('cancelled') && (
+                    <button
+                      type="button"
+                      className="btn-danger"
+                      onClick={() => handleCancelOrder(selectedOrderDetails)}
+                    >
+                      Cancel Order
+                    </button>
+                  )}
+              </div>
+
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                {selectedOrderDetails.orderStatus === 'confirmed' && (
+                  <button
+                    type="button"
+                    className="btn-primary"
+                    style={{ background: '#0D6EFD' }}
+                    disabled={isActionLoading}
+                    onClick={() => handleAdvanceStatus(selectedOrderDetails, 'preparing')}
+                  >
+                    📦 Mark Order Packed
+                  </button>
+                )}
+
+                {selectedOrderDetails.orderStatus === 'preparing' && (
+                  <button
+                    type="button"
+                    className="btn-primary"
+                    style={{ background: '#198754' }}
+                    disabled={isActionLoading}
+                    onClick={() => handleAdvanceStatus(selectedOrderDetails, 'ready_for_pickup')}
+                  >
+                    Ready for Pickup
+                  </button>
+                )}
+
+                {selectedOrderDetails.orderStatus === 'ready_for_pickup' && (
+                  <button
+                    type="button"
+                    className="btn-primary"
+                    style={{ background: '#198754' }}
+                    disabled={isActionLoading}
+                    onClick={() => {
+                      setHandoverOrder(selectedOrderDetails);
+                      setCashCollected(selectedOrderDetails.paymentMethod !== 'cash_at_pickup');
+                    }}
+                  >
+                    🤝 Complete Handover
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => setSelectedOrderDetails(null)}
+                >
+                  Close
+                </button>
+              </div>
             </div>
           </div>
         </div>

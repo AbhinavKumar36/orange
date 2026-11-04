@@ -244,10 +244,22 @@ fun OrdersScreen(
 @Composable
 private fun OrderCard(order: Order) {
     val colors = MangalaTheme.colors
+    val isReady = order.orderStatus.equals("ready_for_pickup", ignoreCase = true) || order.orderStatus.equals("packed", ignoreCase = true)
     val isConfirmed = order.orderStatus.equals("confirmed", ignoreCase = true)
     val isCompleted = order.orderStatus.equals("completed", ignoreCase = true)
-    val statusBg = if (isConfirmed || isCompleted) colors.inStockBg else colors.outOfStockBg
-    val statusColor = if (isConfirmed || isCompleted) colors.inStockGreen else colors.outOfStockRed
+    val isCancelled = order.orderStatus.startsWith("cancelled", ignoreCase = true)
+
+    val (badgeText, statusBg, statusColor) = when {
+        isReady -> Triple(
+            "ORDER PACKED • READY FOR PICKUP",
+            if (colors.isDark) Color(0xFF0F2532) else Color(0xFFE8F5EC),
+            if (colors.isDark) colors.gold else colors.inStockGreen
+        )
+        isCompleted -> Triple("COMPLETED", colors.inStockBg, colors.inStockGreen)
+        isConfirmed -> Triple("CONFIRMED", colors.inStockBg, colors.inStockGreen)
+        isCancelled -> Triple("CANCELLED", colors.outOfStockBg, colors.outOfStockRed)
+        else -> Triple(order.orderStatus.replace('_', ' ').uppercase(Locale.ROOT), colors.surfaceElevated, colors.textPrimary)
+    }
 
     Column(
         modifier = Modifier
@@ -271,7 +283,7 @@ private fun OrderCard(order: Order) {
                         .background(colors.surfaceElevated),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(text = "📦", fontSize = 14.sp)
+                    Text(text = if (isReady) "🎉" else "📦", fontSize = 14.sp)
                 }
                 Spacer(modifier = Modifier.width(10.dp))
                 Column {
@@ -293,14 +305,43 @@ private fun OrderCard(order: Order) {
                 modifier = Modifier
                     .clip(RoundedCornerShape(5.dp))
                     .background(statusBg)
+                    .border(
+                        width = if (isReady) 1.dp else 0.dp,
+                        color = if (isReady) statusColor else Color.Transparent,
+                        shape = RoundedCornerShape(5.dp)
+                    )
                     .padding(horizontal = 7.dp, vertical = 3.dp)
             ) {
                 Text(
-                    text = order.orderStatus.replace('_', ' ').uppercase(Locale.ROOT),
+                    text = badgeText,
                     fontSize = 9.5.sp,
                     fontWeight = FontWeight.Bold,
                     color = statusColor
                 )
+            }
+        }
+
+        if (isReady) {
+            Spacer(modifier = Modifier.height(10.dp))
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(if (colors.isDark) Color(0xFF153243) else Color(0xFFE8F5EC))
+                    .border(1.dp, if (colors.isDark) colors.gold else colors.inStockGreen, RoundedCornerShape(8.dp))
+                    .padding(10.dp)
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("🛍️", fontSize = 16.sp)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "ORDER PACKED: Your delicacies are packed in our boutique packaging and ready at the Mangala Enterprises counter. Present order #${order.orderNumber} for instant handover.",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = if (colors.isDark) colors.gold else colors.inStockGreen,
+                        lineHeight = 15.sp
+                    )
+                }
             }
         }
 

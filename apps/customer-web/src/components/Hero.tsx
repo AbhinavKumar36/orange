@@ -2,7 +2,6 @@
 
 import type { ReactElement } from 'react';
 import Link from 'next/link';
-import { Hero3DCanvas } from './3d/Hero3DCanvas';
 
 export function Hero(): ReactElement {
   const handleScrollToMenu = (e: React.MouseEvent) => {
@@ -27,7 +26,7 @@ export function Hero(): ReactElement {
           <div className="hero-content">
             <div className="hero-pill">
               <span className="pill-dot" aria-hidden="true" />
-              <span className="pill-text">Boutique Artisanal Delicacies & Fresh Confections</span>
+              <span className="pill-text">Ready-to-Collect In-Store Stock • Instant Pickup</span>
             </div>
 
             <div className="hero-brand-marquee" aria-hidden="true">
@@ -39,7 +38,7 @@ export function Hero(): ReactElement {
             </h1>
 
             <p className="hero-copy">
-              Handcrafted in small daily batches using single-origin Belgian cacao, pure cold-pressed fruit extracts, and farm-fresh ingredients. Available for fresh in-store counter pickup.
+              Curated daily in our boutique display vitrines using single-origin Belgian cacao, pure cold-pressed fruit extracts, and farm-fresh ingredients. Every delicacy is in stock and ready for immediate in-store counter collection.
             </p>
 
             <div className="hero-cta-group">
@@ -48,7 +47,7 @@ export function Hero(): ReactElement {
                 onClick={handleScrollToMenu}
                 className="btn-primary hero-btn-main"
               >
-                <span>Shop Live Menu</span>
+                <span>Shop In-Stock Menu</span>
                 <span className="btn-arrow" aria-hidden="true">→</span>
               </a>
               <Link href="#collections" className="btn-secondary hero-btn-secondary">
@@ -62,33 +61,47 @@ export function Hero(): ReactElement {
                 <span className="hero-feature-icon" aria-hidden="true">
                   ✓
                 </span>
-                <span>FSSAI Certified Fresh Daily Bakes</span>
+                <span>Ready to Sell In-Store Stock</span>
               </div>
               <div className="hero-feature-item">
                 <span className="hero-feature-icon" aria-hidden="true">
                   ✓
                 </span>
-                <span>In-Store Counter Pickup</span>
+                <span>Immediate Counter Collection</span>
               </div>
               <div className="hero-feature-item">
                 <span className="hero-feature-icon" aria-hidden="true">
                   ✓
                 </span>
-                <span>Real-Time Kitchen Availability</span>
+                <span>FSSAI Certified Transparency</span>
               </div>
             </div>
           </div>
 
-          {/* Right Column: Interactive 3D Centerpiece */}
+          {/* Right Column: In-Store Display Counter Showcase */}
           <div className="hero-3d-wrapper">
-            <div className="hero-3d-stage">
-              <Hero3DCanvas />
+            <div className="hero-display-counter-card">
+              <div className="counter-image-frame">
+                <img
+                  src="https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=1200&q=80"
+                  alt="Mangala Enterprises In-Store Display Counter with Artisanal Delicacies"
+                  className="counter-showcase-img"
+                  loading="eager"
+                />
+                <div className="counter-overlay-gradient" />
+                <div className="counter-badge-top-left">
+                  <span className="live-counter-pill">
+                    <span className="live-dot-pulse" />
+                    IN-STORE DISPLAY VITRINE
+                  </span>
+                </div>
+              </div>
 
-              {/* Floating Editorial Badge on 3D Stage */}
+              {/* Floating Editorial Badge */}
               <div className="hero-stage-badge">
-                <div className="badge-flair">INTERACTIVE ART</div>
-                <div className="badge-name">Botanical & Culinary Form</div>
-                <div className="badge-sub">Drag or move mouse to interact</div>
+                <div className="badge-flair">STORE DISPLAY COUNTER</div>
+                <div className="badge-name">Artisanal Patisserie Showcase</div>
+                <div className="badge-sub">Pre-packed & ready for immediate collection</div>
               </div>
             </div>
           </div>

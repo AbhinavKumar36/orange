@@ -364,14 +364,15 @@ export const ordersRoutes: FastifyPluginAsync<OrdersPluginOptions> = async (app,
             },
             body: JSON.stringify({
               p_customer_id: user.id,
-              p_customer_phone: user.phone,
-              p_customer_name: checkoutData.customerName,
+              p_customer_phone: user.phone || checkoutData.customerPhone,
+              p_customer_name: checkoutData.customerName || user.fullName || 'Valued Customer',
               p_items: checkoutData.items.map((i) => ({
                 product_id: i.productId,
                 quantity: i.quantity,
               })),
               p_fulfillment: checkoutData.fulfillment,
-              p_scheduled_pickup: checkoutData.scheduledPickupAt || null,
+              p_scheduled_pickup:
+                checkoutData.fulfillment === 'scheduled' ? checkoutData.scheduledPickupAt || null : null,
               p_payment_method: checkoutData.paymentMethod,
               p_idempotency_key: idempotencyKey,
               p_payload_hash: payloadHash,
@@ -425,6 +426,17 @@ export const ordersRoutes: FastifyPluginAsync<OrdersPluginOptions> = async (app,
 
           // Successful RPC returns TABLE (out_order_id, out_order_number, out_total_amount, out_expires_at, out_order_status, out_payment_status)
           const resultRow = Array.isArray(rpcJson) ? rpcJson[0] : rpcJson;
+          if (!resultRow || !resultRow.out_order_id) {
+            request.log.error({ rpcJson }, 'Supabase RPC returned invalid row structure');
+            return reply.status(500).send({
+              error: {
+                statusCode: 500,
+                code: 'CHECKOUT_FAILED',
+                message: 'Database did not return a valid order confirmation.',
+              },
+            });
+          }
+
           const checkoutResponse: CheckoutResponse = {
             orderId: resultRow.out_order_id,
             orderNumber: resultRow.out_order_number,
@@ -439,6 +451,13 @@ export const ordersRoutes: FastifyPluginAsync<OrdersPluginOptions> = async (app,
           return reply.status(201).send(checkoutResponse);
         } catch (err) {
           request.log.error(err, 'Supabase RPC call failed');
+          return reply.status(503).send({
+            error: {
+              statusCode: 503,
+              code: 'DATABASE_UNAVAILABLE',
+              message: 'Order reservation service is temporarily unreachable.',
+            },
+          });
         }
       }
 

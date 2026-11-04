@@ -3,7 +3,6 @@
 import { useState, useMemo, type ReactElement } from 'react';
 import Link from 'next/link';
 import { type Product, formatPaiseToRupees } from '@orange/api-contracts';
-import { Product3DViewer, type ProductModelType } from './3d/Product3DViewer';
 import { FoodIndicator } from './FoodIndicator';
 import { addToCart } from '../lib/cart';
 
@@ -14,11 +13,11 @@ interface ProductShowcaseProps {
 
 export function ProductShowcase({ products, onOpenCart }: ProductShowcaseProps): ReactElement {
   const [activeTab, setActiveTab] = useState<number>(0);
+  const [activeSlide, setActiveSlide] = useState<number>(0);
   const [addedToast, setAddedToast] = useState<string | null>(null);
 
-  // Map real catalog products to our 3D showcase items
+  // Map real catalog products to our showcase items with high-res gallery carousels
   const showcaseItems = useMemo(() => {
-    // Look for real products matching the 3 categories
     const cakeProd = products.find(
       (p) => p.categorySlug.includes('cake') || p.slug.includes('cake')
     );
@@ -32,8 +31,12 @@ export function ProductShowcase({ products, onOpenCart }: ProductShowcaseProps):
     return [
       {
         id: 'cake',
-        modelType: 'cake' as ProductModelType,
         tag: 'Signature Patisserie',
+        gallery: [
+          'https://images.unsplash.com/photo-1578985545062-69928b1d9587?auto=format&fit=crop&w=1000&q=80',
+          'https://images.unsplash.com/photo-1606313564200-e75d5e30476c?auto=format&fit=crop&w=1000&q=80',
+          'https://images.unsplash.com/photo-1588195538326-c5b1e9f80a1b?auto=format&fit=crop&w=1000&q=80',
+        ],
         product: cakeProd || {
           id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
           name: 'Dark Chocolate Truffle Cake (500g)',
@@ -44,17 +47,21 @@ export function ProductShowcase({ products, onOpenCart }: ProductShowcaseProps):
           basePrice: 65000,
           taxRatePct: 5.0,
           isVeg: true,
-          prepTimeMinutes: 20,
+          prepTimeMinutes: 0,
           isInStock: true,
           allergens: ['dairy', 'gluten'],
-          description: '70% Belgian dark chocolate sponge layered with silky ganache and candied orange crescent.',
+          description: '70% Belgian dark chocolate sponge layered with silky ganache and candied orange crescent. In-store ready to sell.',
         },
-        tastingNotes: 'Deep cocoa intensity with bright citrus aroma and velvety ganache mouthfeel.',
+        tastingNotes: 'Deep cocoa intensity with bright citrus aroma and velvety ganache mouthfeel. Ready in vitrine.',
       },
       {
         id: 'juice',
-        modelType: 'juice' as ProductModelType,
         tag: 'Cold-Pressed Nectar',
+        gallery: [
+          'https://images.unsplash.com/photo-1613478223719-2ab802602423?auto=format&fit=crop&w=1000&q=80',
+          'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=1000&q=80',
+          'https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=1000&q=80',
+        ],
         product: juiceProd || {
           id: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
           name: 'Valencia Orange Cold-Pressed (300ml)',
@@ -65,17 +72,21 @@ export function ProductShowcase({ products, onOpenCart }: ProductShowcaseProps):
           basePrice: 18000,
           taxRatePct: 5.0,
           isVeg: true,
-          prepTimeMinutes: 5,
+          prepTimeMinutes: 0,
           isInStock: true,
           allergens: [],
-          description: 'Pure sun-ripened Valencia oranges, cold-pressed daily without added water or sugars.',
+          description: 'Pure sun-ripened Valencia oranges, cold-pressed and bottled, chilled in display counter ready for immediate pickup.',
         },
-        tastingNotes: 'Crisp sun-drenched citrus brightness with natural balanced sweetness.',
+        tastingNotes: 'Crisp sun-drenched citrus brightness with natural balanced sweetness. Chilled to optimal temperature.',
       },
       {
         id: 'chocolate',
-        modelType: 'chocolate' as ProductModelType,
         tag: 'Master Chocolatier',
+        gallery: [
+          'https://images.unsplash.com/photo-1549007994-cb92caebd54b?auto=format&fit=crop&w=1000&q=80',
+          'https://images.unsplash.com/photo-1606313564200-e75d5e30476c?auto=format&fit=crop&w=1000&q=80',
+          'https://images.unsplash.com/photo-1586788680434-30d324b2d46f?auto=format&fit=crop&w=1000&q=80',
+        ],
         product: chocProd || {
           id: 'cccccccc-cccc-cccc-cccc-cccccccccccc',
           name: 'Artisanal Praline Box (6 pcs)',
@@ -86,10 +97,10 @@ export function ProductShowcase({ products, onOpenCart }: ProductShowcaseProps):
           basePrice: 35000,
           taxRatePct: 5.0,
           isVeg: true,
-          prepTimeMinutes: 10,
+          prepTimeMinutes: 0,
           isInStock: true,
           allergens: ['nuts', 'dairy'],
-          description: 'Handcrafted single-origin roasted hazelnut and almond pralines in a presentation box.',
+          description: 'Handcrafted single-origin roasted hazelnut and almond pralines in a presentation box. Pre-packaged and ready to collect.',
         },
         tastingNotes: 'Roasted Piedmont hazelnut crunch enveloped in 64% Madagascar single-origin chocolate.',
       },
@@ -97,6 +108,20 @@ export function ProductShowcase({ products, onOpenCart }: ProductShowcaseProps):
   }, [products]);
 
   const current = showcaseItems[activeTab] || showcaseItems[0];
+  const gallery = current.gallery || [];
+
+  function handleTabChange(idx: number) {
+    setActiveTab(idx);
+    setActiveSlide(0);
+  }
+
+  function handlePrevSlide() {
+    setActiveSlide((prev) => (prev > 0 ? prev - 1 : gallery.length - 1));
+  }
+
+  function handleNextSlide() {
+    setActiveSlide((prev) => (prev < gallery.length - 1 ? prev + 1 : 0));
+  }
 
   function handleAddToCart() {
     addToCart(current.product, 1);
@@ -108,19 +133,19 @@ export function ProductShowcase({ products, onOpenCart }: ProductShowcaseProps):
   }
 
   return (
-    <section className="showcase-section" aria-label="Interactive 3D Product Showcase">
+    <section className="showcase-section" aria-label="Curated In-Stock Delicacies Showcase">
       <div className="container">
         {/* Section Header */}
         <div className="section-header" style={{ textAlign: 'center', marginBottom: '2.5rem' }}>
-          <div className="section-subtitle">Tactile Digital Studio</div>
-          <h2 className="section-title">Interactive 3D Experience</h2>
+          <div className="section-subtitle">In-Store Ready Delicacies</div>
+          <h2 className="section-title">Curated Display Showcase</h2>
           <p className="section-lead" style={{ maxWidth: '620px', margin: '0.75rem auto 0' }}>
-            Rotate, inspect textures, and experience our handcrafted delicacies in high-fidelity 3D before collection.
+            Browse our signature creations currently packed and ready in our store display vitrine for instant counter pickup.
           </p>
         </div>
 
         {/* Tab Switcher */}
-        <div className="showcase-tabs" role="tablist" aria-label="Select 3D product to inspect">
+        <div className="showcase-tabs" role="tablist" aria-label="Select product to inspect">
           {showcaseItems.map((item, idx) => (
             <button
               key={item.id}
@@ -128,7 +153,7 @@ export function ProductShowcase({ products, onOpenCart }: ProductShowcaseProps):
               aria-selected={activeTab === idx}
               aria-controls={`showcase-panel-${item.id}`}
               className={`showcase-tab-btn ${activeTab === idx ? 'active' : ''}`}
-              onClick={() => setActiveTab(idx)}
+              onClick={() => handleTabChange(idx)}
             >
               <span className="tab-number">0{idx + 1}</span>
               <span className="tab-title">{item.product.name.split(' (')[0]}</span>
@@ -142,25 +167,70 @@ export function ProductShowcase({ products, onOpenCart }: ProductShowcaseProps):
           role="tabpanel"
           className="showcase-stage"
         >
-          {/* Left: 3D Interactive Canvas */}
+          {/* Left: Interactive Product Image Carousel */}
           <div className="showcase-viewer-col">
-            <div className="showcase-canvas-card">
-              <Product3DViewer
-                key={current.modelType}
-                productType={current.modelType}
-                interactive={true}
-                autoRotate={true}
-              />
+            <div className="showcase-carousel-card">
+              <div className="carousel-main-viewport">
+                <img
+                  src={gallery[activeSlide] || current.product.imageUrl || gallery[0]}
+                  alt={current.product.name}
+                  className="carousel-main-image"
+                />
+                <div className="carousel-vignette" />
+
+                {/* Counter & Stock Tag */}
+                <div className="carousel-meta-badge">
+                  <span className="carousel-slide-counter">
+                    0{activeSlide + 1} / 0{gallery.length}
+                  </span>
+                  <span className="carousel-stock-pill">
+                    READY IN VITRINE
+                  </span>
+                </div>
+
+                {/* Arrow Controls */}
+                <button
+                  type="button"
+                  className="carousel-nav-btn prev-btn"
+                  onClick={handlePrevSlide}
+                  aria-label="Previous product photo"
+                >
+                  ‹
+                </button>
+                <button
+                  type="button"
+                  className="carousel-nav-btn next-btn"
+                  onClick={handleNextSlide}
+                  aria-label="Next product photo"
+                >
+                  ›
+                </button>
+              </div>
+
+              {/* Thumbnails Row */}
+              <div className="carousel-thumbnails-row">
+                {gallery.map((imgUrl, sIdx) => (
+                  <button
+                    key={sIdx}
+                    type="button"
+                    className={`carousel-thumb-btn ${activeSlide === sIdx ? 'active' : ''}`}
+                    onClick={() => setActiveSlide(sIdx)}
+                    aria-label={`View photo ${sIdx + 1} of ${current.product.name}`}
+                  >
+                    <img src={imgUrl} alt="" className="carousel-thumb-img" />
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 
-          {/* Right: Editorial Product Details Card */}
+          {/* Right: Editorial Product Details Card (Preserved & Enhanced) */}
           <div className="showcase-info-col">
             <div className="showcase-details-card">
               <div className="showcase-badge-row">
                 <span className="category-tag">{current.tag}</span>
-                <span className="stock-pill">
-                  {current.product.isInStock ? '🟢 Kitchen Available' : '⚪ Sold Out'}
+                <span className="stock-pill in-stock-ready">
+                  {current.product.isInStock ? '🟢 Ready to Sell In-Store' : '⚪ Sold Out'}
                 </span>
               </div>
 
@@ -171,7 +241,7 @@ export function ProductShowcase({ products, onOpenCart }: ProductShowcaseProps):
                   {formatPaiseToRupees(current.product.basePrice)}
                 </span>
                 <span className="showcase-tax-note">
-                  (Incl. {current.product.taxRatePct}% GST • Counter Pickup)
+                  (Incl. {current.product.taxRatePct}% GST • Immediate Pickup)
                 </span>
               </div>
 
@@ -188,8 +258,8 @@ export function ProductShowcase({ products, onOpenCart }: ProductShowcaseProps):
               {/* Specification Grid */}
               <div className="showcase-specs-grid">
                 <div className="showcase-spec-item">
-                  <span className="spec-item-label">Prep Lead Time</span>
-                  <span className="spec-item-value">~{current.product.prepTimeMinutes} mins</span>
+                  <span className="spec-item-label">Availability</span>
+                  <span className="spec-item-value highlight-ready">Instant Counter Handover</span>
                 </div>
                 <div className="showcase-spec-item">
                   <span className="spec-item-label">Dietary</span>
@@ -214,8 +284,8 @@ export function ProductShowcase({ products, onOpenCart }: ProductShowcaseProps):
                   </span>
                 </div>
                 <div className="showcase-spec-item">
-                  <span className="spec-item-label">Collection</span>
-                  <span className="spec-item-value">In-Store Counter</span>
+                  <span className="spec-item-label">Stock Status</span>
+                  <span className="spec-item-value">Pre-Packed & Ready</span>
                 </div>
                 <div className="showcase-spec-item">
                   <span className="spec-item-label">Allergens</span>

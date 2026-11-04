@@ -23,8 +23,9 @@ export function FeaturedCollections({
       subtitle: 'Layered Belgian Sponges & Silky Ganache',
       description: 'Slow-baked with 70% dark chocolate, layered with fruit glazes, and finished with delicate artisanal touches.',
       theme: 'cake-theme',
-      accentColor: '#FF6E14',
+      accentColor: '#D7A34A',
       badge: 'Patisserie Signature',
+      imageUrl: 'https://images.unsplash.com/photo-1578985545062-69928b1d9587?auto=format&fit=crop&w=600&q=80',
     },
     {
       slug: 'cold-pressed-juices',
@@ -32,8 +33,9 @@ export function FeaturedCollections({
       subtitle: '100% Raw Valencia Citrus & Nectars',
       description: 'Hydraulic cold-pressed every morning to lock in natural vitamins, crisp acidity, and unadulterated freshness.',
       theme: 'juice-theme',
-      accentColor: '#FF8800',
-      badge: 'Daily Fresh Press',
+      accentColor: '#D7A34A',
+      badge: 'Bottled & Chilled',
+      imageUrl: 'https://images.unsplash.com/photo-1613478223719-2ab802602423?auto=format&fit=crop&w=600&q=80',
     },
     {
       slug: 'gourmet-chocolates',
@@ -41,8 +43,9 @@ export function FeaturedCollections({
       subtitle: 'Single-Origin Pralines & Cocoa Truffles',
       description: 'Handcrafted confections blending single-origin cocoa beans with roasted Piedmont hazelnuts and almonds.',
       theme: 'choc-theme',
-      accentColor: '#D4AF37',
+      accentColor: '#D7A34A',
       badge: 'Master Confectionery',
+      imageUrl: 'https://images.unsplash.com/photo-1549007994-cb92caebd54b?auto=format&fit=crop&w=600&q=80',
     },
   ];
 
@@ -88,11 +91,20 @@ export function FeaturedCollections({
 
                 {/* Visual Artwork Showcase */}
                 <div className="collection-visual-box">
-                  <ProductIllustration
-                    categorySlug={col.slug}
-                    name={col.title}
-                    className="collection-illustration"
-                  />
+                  {col.imageUrl ? (
+                    <img
+                      src={col.imageUrl}
+                      alt={col.title}
+                      className="collection-photo"
+                      loading="lazy"
+                    />
+                  ) : (
+                    <ProductIllustration
+                      categorySlug={col.slug}
+                      name={col.title}
+                      className="collection-illustration"
+                    />
+                  )}
                 </div>
 
                 {/* Content & Narrative */}
