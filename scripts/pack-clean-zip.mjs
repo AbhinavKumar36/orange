@@ -15,10 +15,12 @@ const allFiles = [...tracked, ...untracked]
     if (f.startsWith('.next/') || f.includes('/.next/')) return false;
     if (f.startsWith('.turbo/') || f.includes('/.turbo/')) return false;
     if (f.startsWith('.gradle/') || f.includes('/.gradle/')) return false;
+    if (f.startsWith('test-results') || f.includes('/test-results') || f.startsWith('e2e-screenshots') || f.includes('/e2e-screenshots')) return false;
     if (f.includes('/build/') || f.endsWith('.class') || f.endsWith('.apk')) return false;
     if (f.endsWith('.log')) return false;
     if (f.endsWith('.example')) return true;
     if (f === '.env' || f.endsWith('/.env') || f.includes('/.env.') || f.startsWith('.env.')) return false;
+    if (!fs.existsSync(f) || !fs.statSync(f).isFile()) return false;
     return true;
   });
 

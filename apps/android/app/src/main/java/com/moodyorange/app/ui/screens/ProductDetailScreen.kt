@@ -247,7 +247,7 @@ private fun ProductDetailContent(
                     modifier = Modifier
                         .weight(1f)
                         .clip(RoundedCornerShape(8.dp))
-                        .background(if (galleryMode == GalleryMode.STUDIO_2D) (if (isDark) MutedGold else ForestGreen) else Color.Transparent)
+                        .background(if (galleryMode == GalleryMode.STUDIO_2D) ForestGreen else Color.Transparent)
                         .clickable { galleryMode = GalleryMode.STUDIO_2D }
                         .padding(vertical = 7.dp),
                     contentAlignment = Alignment.Center
@@ -256,7 +256,7 @@ private fun ProductDetailContent(
                         text = "📷 Studio View",
                         fontSize = 11.5.sp,
                         fontWeight = FontWeight.Bold,
-                        color = if (galleryMode == GalleryMode.STUDIO_2D) (if (isDark) colors.canvas else WhiteSurface) else colors.textSecondary
+                        color = if (galleryMode == GalleryMode.STUDIO_2D) WhiteSurface else colors.textSecondary
                     )
                 }
 
@@ -264,7 +264,7 @@ private fun ProductDetailContent(
                     modifier = Modifier
                         .weight(1f)
                         .clip(RoundedCornerShape(8.dp))
-                        .background(if (galleryMode == GalleryMode.THREE_D) (if (isDark) MutedGold else ForestGreen) else Color.Transparent)
+                        .background(if (galleryMode == GalleryMode.THREE_D) ForestGreen else Color.Transparent)
                         .clickable { galleryMode = GalleryMode.THREE_D }
                         .padding(vertical = 7.dp),
                     contentAlignment = Alignment.Center
@@ -273,7 +273,7 @@ private fun ProductDetailContent(
                         text = "✨ 3D Orbit Viewer",
                         fontSize = 11.5.sp,
                         fontWeight = FontWeight.Bold,
-                        color = if (galleryMode == GalleryMode.THREE_D) (if (isDark) colors.canvas else WhiteSurface) else colors.textSecondary
+                        color = if (galleryMode == GalleryMode.THREE_D) WhiteSurface else colors.textSecondary
                     )
                 }
             }
@@ -372,7 +372,7 @@ private fun ProductDetailContent(
                             .padding(horizontal = 8.dp, vertical = 3.dp)
                     ) {
                         Text(
-                            text = "Unavailable",
+                            text = "Out of Stock",
                             fontSize = 10.5.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = colors.outOfStockRed
@@ -434,16 +434,16 @@ private fun ProductDetailContent(
                     .padding(14.dp)
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(text = "⏱️", fontSize = 16.sp)
+                    Text(text = "⚡", fontSize = 16.sp)
                     Spacer(modifier = Modifier.width(8.dp))
                     Column {
                         Text(
-                            text = "Preparation Time",
+                            text = "Counter Vitrine Availability",
                             fontSize = 10.5.sp,
                             color = colors.textMuted
                         )
                         Text(
-                            text = "${product.prepTimeMinutes} minutes fresh kitchen craft",
+                            text = "In-Store Display Confection • Instant Handover",
                             fontSize = 12.5.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = colors.textPrimary
@@ -539,7 +539,7 @@ private fun ProductDetailContent(
                     enabled = isInStock,
                     colors = ButtonDefaults.buttonColors(
                         containerColor = colors.primary,
-                        contentColor = if (isDark) colors.canvas else WhiteSurface
+                        contentColor = WhiteSurface
                     ),
                     shape = RoundedCornerShape(10.dp),
                     modifier = Modifier
@@ -547,7 +547,7 @@ private fun ProductDetailContent(
                         .height(46.dp)
                 ) {
                     Text(
-                        text = if (isInStock) "Add to Bag • $totalPriceFormatted" else "Temporarily Unavailable",
+                        text = if (isInStock) "Add to Bag • $totalPriceFormatted" else "Out of Stock",
                         fontSize = 13.5.sp,
                         fontWeight = FontWeight.Bold
                     )

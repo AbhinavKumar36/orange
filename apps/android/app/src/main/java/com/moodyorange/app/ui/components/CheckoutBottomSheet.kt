@@ -62,7 +62,6 @@ fun CheckoutBottomSheet(
 
     var isScheduled by remember { mutableStateOf(false) }
     var paymentMethod by remember { mutableStateOf("cash_at_pickup") } // "cash_at_pickup" or "online_razorpay"
-    var specialNotes by remember { mutableStateOf("") }
 
     val scrollState = rememberScrollState()
 
@@ -295,35 +294,7 @@ fun CheckoutBottomSheet(
                 }
             }
 
-            Spacer(modifier = Modifier.height(18.dp))
-
-            // Special notes
-            Text(
-                text = "Special Preparation Notes (Optional)",
-                fontSize = 12.sp,
-                fontWeight = FontWeight.SemiBold,
-                letterSpacing = 0.5.sp,
-                color = colors.textSecondary
-            )
-            Spacer(modifier = Modifier.height(6.dp))
-            OutlinedTextField(
-                value = specialNotes,
-                onValueChange = { specialNotes = it.take(200) },
-                placeholder = { Text("e.g. Please pack items separately or note dietary preferences", color = colors.textMuted) },
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = colors.primary,
-                    unfocusedBorderColor = colors.border,
-                    focusedContainerColor = colors.canvas,
-                    unfocusedContainerColor = colors.canvas,
-                    focusedTextColor = colors.textPrimary,
-                    unfocusedTextColor = colors.textPrimary
-                ),
-                shape = RoundedCornerShape(12.dp),
-                modifier = Modifier.fillMaxWidth(),
-                maxLines = 3
-            )
-
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
             // Price Breakdown
             val valRes = validation
@@ -479,7 +450,7 @@ fun CheckoutBottomSheet(
                         fulfillment = "counter_pickup",
                         scheduledPickupAt = scheduledTime,
                         paymentMethod = paymentMethod,
-                        specialNotes = specialNotes.trim().takeIf { it.isNotEmpty() }
+                        specialNotes = null
                     )
                 },
                 enabled = canSubmit,

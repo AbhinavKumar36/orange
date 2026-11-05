@@ -7,6 +7,7 @@ import {
   ProductDetailResponseSchema,
 } from '@orange/api-contracts';
 import { type AppConfig, loadConfig } from '../config/env.js';
+import { mockStockStore } from '../services/inventoryStore.js';
 
 // Canonical fallback catalog matching supabase/seed.sql
 export const CANONICAL_CATEGORIES: Category[] = [
@@ -254,7 +255,16 @@ async function loadProducts(config: AppConfig): Promise<Product[] | null> {
 
   // In production, NEVER return mock/sample products: return null to trigger 503 DATABASE_UNAVAILABLE
   if (config.NODE_ENV !== 'production' && (config.ALLOW_MOCK_SERVICES || config.NODE_ENV === 'test')) {
-    return mockProductsList.filter((p) => p.isActive);
+    return mockProductsList
+      .filter((p) => p.isActive)
+      .map((p) => {
+        const stock = mockStockStore.get(p.id);
+        const available = stock ? stock.physical - stock.reserved : 50;
+        return {
+          ...p,
+          isInStock: available > 0,
+        };
+      });
   }
 
   return null;

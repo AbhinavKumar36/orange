@@ -82,9 +82,11 @@ interface StoredMockOrder {
   items: OrderItem[];
 }
 
+import { mockStockStore, type MockStockRecord } from '../services/inventoryStore.js';
+export { mockStockStore, type MockStockRecord } from '../services/inventoryStore.js';
+
 // In-memory order & idempotency storage for test/mock service mode
 export const mockOrdersStore = new Map<string, StoredMockOrder>();
-export const mockStockStore = new Map<string, { physical: number; reserved: number }>();
 
 // Initialize mock inventory from CANONICAL_PRODUCTS
 CANONICAL_PRODUCTS.forEach((p) => {

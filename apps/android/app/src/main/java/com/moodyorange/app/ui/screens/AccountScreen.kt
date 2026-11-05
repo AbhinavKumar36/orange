@@ -341,7 +341,7 @@ private fun AccountMainView(
                         onClick = { shopViewModel.openAuth() },
                         colors = ButtonDefaults.buttonColors(
                             containerColor = colors.primary,
-                            contentColor = if (isDark) colors.canvas else WhiteSurface
+                            contentColor = WhiteSurface
                         ),
                         shape = RoundedCornerShape(10.dp),
                         modifier = Modifier
@@ -524,7 +524,7 @@ private fun ThemePreferenceCard(
                         .weight(1f)
                         .clip(RoundedCornerShape(8.dp))
                         .background(
-                            if (isSelected) (if (isDark) MutedGold else ForestGreen) else Color.Transparent
+                            if (isSelected) ForestGreen else Color.Transparent
                         )
                         .clickable { onThemeSelected(mode) }
                         .padding(vertical = 8.dp),
@@ -537,7 +537,7 @@ private fun ThemePreferenceCard(
                             text = mode.title,
                             fontSize = 11.5.sp,
                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                            color = if (isSelected) (if (isDark) colors.canvas else WhiteSurface) else colors.textSecondary
+                            color = if (isSelected) WhiteSurface else colors.textSecondary
                         )
                     }
                 }
@@ -737,7 +737,7 @@ private fun AccountInformationView(
                         },
                         colors = ButtonDefaults.buttonColors(
                             containerColor = colors.primary,
-                            contentColor = if (isDark) colors.canvas else WhiteSurface
+                            contentColor = WhiteSurface
                         ),
                         shape = RoundedCornerShape(10.dp),
                         modifier = Modifier
@@ -904,7 +904,7 @@ private fun AccountInformationView(
                             enabled = updateState !is ProfileUpdateUiState.Loading,
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = colors.primary,
-                                contentColor = if (isDark) colors.canvas else WhiteSurface
+                                contentColor = WhiteSurface
                             ),
                             shape = RoundedCornerShape(10.dp),
                             modifier = Modifier
@@ -913,7 +913,7 @@ private fun AccountInformationView(
                         ) {
                             if (updateState is ProfileUpdateUiState.Loading) {
                                 CircularProgressIndicator(
-                                    color = if (isDark) colors.canvas else WhiteSurface,
+                                    color = WhiteSurface,
                                     strokeWidth = 2.dp,
                                     modifier = Modifier.size(18.dp)
                                 )

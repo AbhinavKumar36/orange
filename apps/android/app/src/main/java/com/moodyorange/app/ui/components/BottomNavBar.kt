@@ -49,8 +49,8 @@ fun BottomNavBar(
 ) {
     val colors = MangalaTheme.colors
     val isDark = colors.isDark
-    val activeColor = if (isDark) MutedGold else ForestGreen
-    val activePillBg = if (isDark) colors.surfaceElevated else SoftSageSubtle
+    val activeColor = if (isDark) Color(0xFF28A745) else ForestGreen
+    val activePillBg = if (isDark) Color(0xFF0F2D24) else SoftSageSubtle
 
     Box(
         modifier = modifier

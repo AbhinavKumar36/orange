@@ -49,7 +49,7 @@ fun BrandStorySection(modifier: Modifier = Modifier) {
                     modifier = Modifier
                         .size(6.dp)
                         .clip(CircleShape)
-                        .background(if (isDark) MutedGold else ForestGreen)
+                        .background(ForestGreen)
                 )
                 Text(
                     text = "THE MANGALA ENTERPRISES HERITAGE",

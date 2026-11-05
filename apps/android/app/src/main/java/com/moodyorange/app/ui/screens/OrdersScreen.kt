@@ -166,7 +166,7 @@ fun OrdersScreen(
                     onClick = { shopViewModel.openAuth() },
                     colors = ButtonDefaults.buttonColors(
                         containerColor = colors.primary,
-                        contentColor = if (isDark) colors.canvas else WhiteSurface
+                        contentColor = WhiteSurface
                     ),
                     shape = RoundedCornerShape(10.dp)
                 ) {
@@ -220,7 +220,7 @@ fun OrdersScreen(
                     onClick = onNavigateToShop,
                     colors = ButtonDefaults.buttonColors(
                         containerColor = colors.primary,
-                        contentColor = if (isDark) colors.canvas else WhiteSurface
+                        contentColor = WhiteSurface
                     ),
                     shape = RoundedCornerShape(10.dp)
                 ) {
@@ -252,8 +252,8 @@ private fun OrderCard(order: Order) {
     val (badgeText, statusBg, statusColor) = when {
         isReady -> Triple(
             "ORDER PACKED • READY FOR PICKUP",
-            if (colors.isDark) Color(0xFF0F2532) else Color(0xFFE8F5EC),
-            if (colors.isDark) colors.gold else colors.inStockGreen
+            if (colors.isDark) Color(0xFF0F2D24) else Color(0xFFE8F5EC),
+            if (colors.isDark) Color(0xFF28A745) else colors.inStockGreen
         )
         isCompleted -> Triple("COMPLETED", colors.inStockBg, colors.inStockGreen)
         isConfirmed -> Triple("CONFIRMED", colors.inStockBg, colors.inStockGreen)
@@ -327,8 +327,8 @@ private fun OrderCard(order: Order) {
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(8.dp))
-                    .background(if (colors.isDark) Color(0xFF153243) else Color(0xFFE8F5EC))
-                    .border(1.dp, if (colors.isDark) colors.gold else colors.inStockGreen, RoundedCornerShape(8.dp))
+                    .background(if (colors.isDark) Color(0xFF0F2D24) else Color(0xFFE8F5EC))
+                    .border(1.dp, if (colors.isDark) Color(0xFF28A745) else colors.inStockGreen, RoundedCornerShape(8.dp))
                     .padding(10.dp)
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -338,7 +338,7 @@ private fun OrderCard(order: Order) {
                         text = "ORDER PACKED: Your delicacies are packed in our boutique packaging and ready at the Mangala Enterprises counter. Present order #${order.orderNumber} for instant handover.",
                         fontSize = 11.sp,
                         fontWeight = FontWeight.SemiBold,
-                        color = if (colors.isDark) colors.gold else colors.inStockGreen,
+                        color = if (colors.isDark) Color(0xFF28A745) else colors.inStockGreen,
                         lineHeight = 15.sp
                     )
                 }
@@ -386,13 +386,31 @@ private fun OrderCard(order: Order) {
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column {
-                Text(
-                    text = "Payment: ${order.paymentStatus.replace('_', ' ').uppercase()}",
-                    fontSize = 10.5.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = colors.textMuted
-                )
+            val isPaid = order.paymentStatus.equals("paid", ignoreCase = true) || order.paymentStatus.equals("captured", ignoreCase = true)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (isPaid) {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(if (colors.isDark) Color(0xFF0F2D24) else Color(0xFFE8F5EC))
+                            .border(0.5.dp, Color(0xFF28A745), RoundedCornerShape(4.dp))
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            text = "PAID ONLINE (RAZORPAY) ✓",
+                            fontSize = 9.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF28A745)
+                        )
+                    }
+                } else {
+                    Text(
+                        text = "Payment: ${if (order.paymentMethod == "cash_at_pickup") "Pay at Counter (Pending)" else order.paymentStatus.replace('_', ' ').uppercase()}",
+                        fontSize = 10.5.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = colors.textMuted
+                    )
+                }
             }
 
             Text(

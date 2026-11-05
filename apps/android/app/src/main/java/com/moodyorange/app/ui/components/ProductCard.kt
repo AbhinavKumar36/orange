@@ -106,7 +106,7 @@ fun ProductCard(
                                 .padding(horizontal = 6.dp, vertical = 2.5.dp)
                         ) {
                             Text(
-                                text = "Unavailable",
+                                text = "Out of Stock",
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.SemiBold,
                                 color = colors.outOfStockRed
@@ -140,7 +140,7 @@ fun ProductCard(
                     )
 
                     Text(
-                        text = "⏱️ ${product.prepTimeMinutes}m",
+                        text = "⚡ Instant Handover",
                         fontSize = 10.sp,
                         color = colors.textMuted
                     )
@@ -201,7 +201,7 @@ fun ProductCard(
                                 text = "+",
                                 fontSize = 17.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = if (isDark) colors.canvas else WhiteSurface
+                                color = WhiteSurface
                             )
                         }
                     } else {

@@ -71,19 +71,19 @@ fun CategoryPill(
     val isDark = colors.isDark
 
     val bg = if (isSelected) {
-        if (isDark) MutedGold else ForestGreen
+        ForestGreen
     } else {
         colors.surfaceElevated
     }
 
     val textColor = if (isSelected) {
-        if (isDark) colors.canvas else WhiteSurface
+        WhiteSurface
     } else {
         colors.textSecondary
     }
 
     val borderColor = if (isSelected) {
-        if (isDark) MutedGold else ForestGreen
+        ForestGreen
     } else {
         colors.border
     }

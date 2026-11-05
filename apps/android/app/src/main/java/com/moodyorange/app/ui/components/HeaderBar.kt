@@ -83,8 +83,8 @@ fun HeaderBar(
                 modifier = Modifier
                     .size(36.dp)
                     .clip(RoundedCornerShape(9.dp))
-                    .background(if (isDark) MutedGold else ForestGreen)
-                    .border(1.dp, if (isDark) MutedGold else ForestGreen, RoundedCornerShape(9.dp)),
+                    .background(ForestGreen)
+                    .border(1.dp, ForestGreen, RoundedCornerShape(9.dp)),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
@@ -92,7 +92,7 @@ fun HeaderBar(
                     fontFamily = EditorialSerif,
                     fontWeight = FontWeight.Bold,
                     fontSize = 18.sp,
-                    color = if (isDark) colors.canvas else WhiteSurface
+                    color = WhiteSurface
                 )
             }
 
@@ -204,7 +204,7 @@ fun HeaderBar(
                             .size(18.dp)
                             .scale(badgeScale)
                             .clip(CircleShape)
-                            .background(if (isDark) MutedGold else ForestGreen)
+                            .background(ForestGreen)
                             .border(1.5.dp, bgColor, CircleShape),
                         contentAlignment = Alignment.Center
                     ) {
@@ -212,7 +212,7 @@ fun HeaderBar(
                             text = if (cartItemCount > 99) "99+" else "$cartItemCount",
                             fontSize = 9.sp,
                             fontWeight = FontWeight.Bold,
-                            color = if (isDark) colors.canvas else WhiteSurface
+                            color = WhiteSurface
                         )
                     }
                 }

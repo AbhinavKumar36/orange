@@ -96,8 +96,8 @@ fun HomeScreen(
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 6.dp)
                     .clip(RoundedCornerShape(12.dp))
-                    .background(if (colors.isDark) Color(0xFF0F2532) else Color(0xFFE8F5EC))
-                    .border(1.dp, if (colors.isDark) MutedGold else ForestGreen, RoundedCornerShape(12.dp))
+                    .background(if (colors.isDark) Color(0xFF0F2D24) else Color(0xFFE8F5EC))
+                    .border(1.dp, ForestGreen, RoundedCornerShape(12.dp))
                     .clickable { onNavigateToOrders() }
                     .padding(horizontal = 14.dp, vertical = 10.dp)
             ) {
@@ -109,7 +109,7 @@ fun HomeScreen(
                             text = "ORDER PACKED & READY FOR PICKUP!",
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
-                            color = if (colors.isDark) MutedGold else ForestGreen,
+                            color = ForestGreen,
                             letterSpacing = 0.5.sp
                         )
                         Text(
@@ -124,7 +124,7 @@ fun HomeScreen(
                         text = "View →",
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
-                        color = if (colors.isDark) MutedGold else ForestGreen
+                        color = ForestGreen
                     )
                 }
             }
@@ -372,7 +372,7 @@ private fun HeroSection(
                 onClick = onShopNow,
                 colors = ButtonDefaults.buttonColors(
                     containerColor = colors.primary,
-                    contentColor = if (isDark) colors.canvas else WhiteSurface
+                    contentColor = WhiteSurface
                 ),
                 shape = RoundedCornerShape(10.dp),
                 modifier = Modifier
@@ -469,7 +469,7 @@ private fun HomeFooter() {
             modifier = Modifier
                 .size(34.dp)
                 .clip(RoundedCornerShape(8.dp))
-                .background(if (isDark) MutedGold else ForestGreen),
+                .background(ForestGreen),
             contentAlignment = Alignment.Center
         ) {
             Text(
@@ -477,7 +477,7 @@ private fun HomeFooter() {
                 fontFamily = EditorialSerif,
                 fontWeight = FontWeight.Bold,
                 fontSize = 16.sp,
-                color = if (isDark) colors.canvas else WhiteSurface
+                color = WhiteSurface
             )
         }
 

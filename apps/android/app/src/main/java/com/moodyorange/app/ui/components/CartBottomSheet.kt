@@ -148,7 +148,7 @@ fun CartBottomSheet(
                         onClick = onDismiss,
                         colors = ButtonDefaults.buttonColors(
                             containerColor = colors.primary,
-                            contentColor = if (isDark) colors.canvas else WhiteSurface
+                            contentColor = WhiteSurface
                         ),
                         shape = RoundedCornerShape(10.dp)
                     ) {
@@ -224,7 +224,7 @@ fun CartBottomSheet(
                         },
                         colors = ButtonDefaults.buttonColors(
                             containerColor = colors.primary,
-                            contentColor = if (isDark) colors.canvas else WhiteSurface
+                            contentColor = WhiteSurface
                         ),
                         shape = RoundedCornerShape(10.dp),
                         modifier = Modifier
