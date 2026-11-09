@@ -50,6 +50,7 @@ export const PaymentStatusSchema = z.enum(PaymentStatusEnum);
 export type PaymentStatus = z.infer<typeof PaymentStatusSchema>;
 
 export const PaymentMethodEnum = [
+  'online_youpi',
   'online_razorpay',
   'cash_at_pickup',
 ] as const;
@@ -489,20 +490,32 @@ export type InitiatePaymentRequest = z.infer<typeof InitiatePaymentRequestSchema
 
 export const InitiatePaymentResponseSchema = z.object({
   orderId: z.string().uuid(),
-  razorpayOrderId: z.string().min(1),
+  // YouPI-PG Gateway Fields
+  youpiPaymentId: z.string().min(1),
+  checkoutUrl: z.string().min(1),
+  vpa: z.string().min(1),
+  qrPayload: z.string().min(1),
   amount: MoneyInPaiseSchema,
   currency: z.literal('INR'),
-  keyId: z.string().min(1),
+  merchantId: z.string().min(1),
   customerName: z.string(),
   customerPhone: z.string(),
+  // Backwards-compatible aliases
+  razorpayOrderId: z.string().min(1).optional(),
+  keyId: z.string().min(1).optional(),
 });
 export type InitiatePaymentResponse = z.infer<typeof InitiatePaymentResponseSchema>;
 
 export const VerifyPaymentRequestSchema = z.object({
   orderId: z.string().uuid(),
-  razorpayOrderId: z.string().min(1),
-  razorpayPaymentId: z.string().min(1),
-  razorpaySignature: z.string().min(1),
+  // YouPI-PG Fields
+  youpiPaymentId: z.string().min(1).optional(),
+  utr: z.string().min(1).optional(),
+  verificationToken: z.string().optional(),
+  // Backwards-compatible aliases
+  razorpayOrderId: z.string().min(1).optional(),
+  razorpayPaymentId: z.string().min(1).optional(),
+  razorpaySignature: z.string().min(1).optional(),
 });
 export type VerifyPaymentRequest = z.infer<typeof VerifyPaymentRequestSchema>;
 

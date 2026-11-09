@@ -6,17 +6,8 @@ import { formatPaiseToRupees, type ValidateCartResponse, type CheckoutResponse }
 import { useCart } from '../lib/cart';
 import { useCustomerAuth } from '../lib/auth';
 import { validateCartApi, checkoutOrderApi, initiatePaymentApi, verifyPaymentApi } from '../lib/api';
-import { loadRazorpayScript } from '../lib/razorpay';
+import { loadYoupiScript, buildUpiDeepLinks } from '../lib/youpi';
 import { AuthModal } from './AuthModal';
-
-declare global {
-  interface Window {
-    Razorpay?: new (options: Record<string, unknown>) => {
-      open: () => void;
-      on: (event: string, callback: (resp: { error?: { description?: string; code?: string; step?: string } }) => void) => void;
-    };
-  }
-}
 
 interface CheckoutModalProps {
   isOpen: boolean;
@@ -29,7 +20,7 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps): ReactEle
 
   const [fulfillment, setFulfillment] = useState<'immediate' | 'scheduled'>('immediate');
   const [scheduledTime, setScheduledTime] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState<'cash_at_pickup' | 'online_razorpay'>('cash_at_pickup');
+  const [paymentMethod, setPaymentMethod] = useState<'cash_at_pickup' | 'online_youpi' | 'online_razorpay'>('cash_at_pickup');
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [specialNotes, setSpecialNotes] = useState('');
@@ -41,6 +32,17 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps): ReactEle
 
   const [confirmedOrder, setConfirmedOrder] = useState<CheckoutResponse | null>(null);
   const [pendingOnlineOrder, setPendingOnlineOrder] = useState<CheckoutResponse | null>(null);
+  const [activeYoupiData, setActiveYoupiData] = useState<{
+    youpiPaymentId: string;
+    vpa: string;
+    qrPayload: string;
+    amount: number;
+    checkoutUrl: string;
+    merchantId: string;
+  } | null>(null);
+  const [enteredUtr, setEnteredUtr] = useState('');
+  const [copiedVpa, setCopiedVpa] = useState(false);
+  const [customVpa, setCustomVpa] = useState('');
   const [paymentStep, setPaymentStep] = useState<
     'idle' | 'initiating' | 'gateway_open' | 'verifying' | 'failed'
   >('idle');
@@ -92,7 +94,43 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps): ReactEle
     );
   }
 
-  async function launchRazorpayCheckout(targetOrder: CheckoutResponse) {
+  async function handleVerifyYoupiPayment(targetOrder: CheckoutResponse, youpiId: string, utrInput?: string) {
+    if (!session) return;
+    setIsSubmitting(true);
+    setPaymentStep('verifying');
+    setError(null);
+    try {
+      const verifyRes = await verifyPaymentApi(
+        {
+          orderId: targetOrder.orderId,
+          youpiPaymentId: youpiId,
+          utr: utrInput || `utr_${Date.now()}`,
+          razorpayOrderId: youpiId,
+          razorpayPaymentId: utrInput || `pay_${youpiId}`,
+          razorpaySignature: `mock_sig_${youpiId}`,
+        },
+        session.accessToken
+      );
+
+      setConfirmedOrder({
+        ...targetOrder,
+        orderStatus: verifyRes.orderStatus,
+        paymentStatus: verifyRes.paymentStatus,
+      });
+      setPendingOnlineOrder(null);
+      setActiveYoupiData(null);
+      setPaymentStep('idle');
+      clearCart();
+      setIsSubmitting(false);
+    } catch (vErr: unknown) {
+      const msg = vErr instanceof Error ? vErr.message : 'Payment verification failed.';
+      setError('Payment verification failed on server: ' + msg);
+      setPaymentStep('failed');
+      setIsSubmitting(false);
+    }
+  }
+
+  async function launchYoupiCheckout(targetOrder: CheckoutResponse) {
     if (!session) {
       setIsAuthModalOpen(true);
       return;
@@ -102,84 +140,54 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps): ReactEle
     setPaymentStep('initiating');
 
     try {
-      const isLoaded = await loadRazorpayScript();
-      if (!isLoaded || !window.Razorpay) {
-        throw new Error('Unable to load payment gateway SDK. Please verify internet connection.');
-      }
-
       const initData = await initiatePaymentApi(targetOrder.orderId, session.accessToken);
       setPaymentStep('gateway_open');
 
-      const rzp = new window.Razorpay({
-        key: initData.keyId,
+      const rawVpa = initData.vpa || process.env.NEXT_PUBLIC_YOUPI_VPA || 'itsabhinav36@ibl';
+      const resolvedVpa = rawVpa.includes('@') ? rawVpa : `${rawVpa}@upi`;
+      setActiveYoupiData({
+        youpiPaymentId: initData.youpiPaymentId || initData.razorpayOrderId || '',
+        vpa: resolvedVpa,
+        qrPayload: initData.qrPayload || `upi://pay?pa=${resolvedVpa}&pn=Moody+Orange&am=${(initData.amount / 100).toFixed(2)}&cu=INR&tn=${encodeURIComponent(targetOrder.orderNumber)}`,
         amount: initData.amount,
-        currency: initData.currency,
-        name: 'Moody Orange',
-        description: `Boutique Order #${targetOrder.orderNumber}`,
-        order_id: initData.razorpayOrderId,
-        prefill: {
-          name: initData.customerName,
-          contact: initData.customerPhone,
-        },
-        theme: {
-          color: '#f97316',
-        },
-        handler: async function (response: {
-          razorpay_order_id: string;
-          razorpay_payment_id: string;
-          razorpay_signature: string;
-        }) {
-          setPaymentStep('verifying');
-          try {
-            const verifyRes = await verifyPaymentApi(
-              {
-                orderId: targetOrder.orderId,
-                razorpayOrderId: response.razorpay_order_id,
-                razorpayPaymentId: response.razorpay_payment_id,
-                razorpaySignature: response.razorpay_signature,
-              },
-              session.accessToken
-            );
+        checkoutUrl: initData.checkoutUrl || '',
+        merchantId: initData.merchantId || '',
+      });
 
-            setConfirmedOrder({
-              ...targetOrder,
-              orderStatus: verifyRes.orderStatus,
-              paymentStatus: verifyRes.paymentStatus,
-            });
-            setPendingOnlineOrder(null);
-            setPaymentStep('idle');
-            clearCart();
-            setIsSubmitting(false);
-          } catch (vErr: unknown) {
-            const msg = vErr instanceof Error ? vErr.message : 'Server signature verification failed.';
-            setError('Payment verification failed on server: ' + msg);
-            setPaymentStep('failed');
-            setIsSubmitting(false);
-          }
-        },
-        modal: {
-          ondismiss: function () {
-            setError(
-              'Payment window was closed. Your boutique reservation is held. You can retry payment below.'
+      const isLoaded = await loadYoupiScript(
+        process.env.NEXT_PUBLIC_YOUPI_BASE_URL,
+        initData.merchantId
+      );
+
+      if (isLoaded && window.Youpi?.pay) {
+        window.Youpi.pay({
+          orderId: targetOrder.orderNumber,
+          amount: (initData.amount / 100).toFixed(2),
+          currency: initData.currency,
+          checkoutUrl: initData.checkoutUrl,
+          onSuccess: async (response: { youpiPaymentId?: string; utr?: string }) => {
+            await handleVerifyYoupiPayment(
+              targetOrder,
+              response?.youpiPaymentId || initData.youpiPaymentId || '',
+              response?.utr
             );
-            setPaymentStep('failed');
+          },
+          onClose: () => {
+            setError(
+              'YouPI payment window closed. You can complete payment using the UPI QR below or retry.'
+            );
+            setPaymentStep('idle');
             setIsSubmitting(false);
           },
-        },
-      });
-
-      rzp.on('payment.failed', function (resp: { error?: { description?: string } }) {
-        const failReason = resp?.error?.description || 'Payment was declined by payment gateway.';
-        setError('Payment Failed: ' + failReason);
-        setPaymentStep('failed');
+        });
+      } else {
+        // Direct embedded YouPI-PG UPI QR view
         setIsSubmitting(false);
-      });
-
-      rzp.open();
+      }
     } catch (err: unknown) {
       setIsSubmitting(false);
       setPaymentStep('failed');
-      const msg = err instanceof Error ? err.message : 'Failed to launch payment checkout.';
+      const msg = err instanceof Error ? err.message : 'Failed to launch YouPI-PG payment.';
       setError(msg);
     }
   }
@@ -242,9 +250,9 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps): ReactEle
         idempotencyKey
       );
 
-      if (paymentMethod === 'online_razorpay') {
+      if (paymentMethod === 'online_youpi' || paymentMethod === 'online_razorpay') {
         setPendingOnlineOrder(orderResult);
-        await launchRazorpayCheckout(orderResult);
+        await launchYoupiCheckout(orderResult);
       } else {
         setConfirmedOrder(orderResult);
         idempotencyKeyRef.current = null;
@@ -419,6 +427,156 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps): ReactEle
                   </div>
                 </div>
 
+                {activeYoupiData && (
+                  <div
+                    style={{
+                      marginTop: '1.25rem',
+                      padding: '1rem',
+                      background: '#FFF7ED',
+                      borderRadius: '8px',
+                      border: '1px solid #FFEDD5',
+                      textAlign: 'center',
+                    }}
+                  >
+                    <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#C2410C', marginBottom: '0.5rem' }}>
+                      ⚡ Scan Dynamic UPI QR Code (YouPI-PG)
+                    </div>
+
+                    {/* Vector QR Code */}
+                    <div style={{ display: 'inline-block', padding: '0.5rem', background: '#FFFFFF', borderRadius: '8px', border: '1px solid #FED7AA' }}>
+                      <img
+                        src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(activeYoupiData.qrPayload)}`}
+                        alt="YouPI UPI QR Code"
+                        width={180}
+                        height={180}
+                        style={{ display: 'block', margin: '0 auto' }}
+                      />
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', marginTop: '0.6rem' }}>
+                      <span style={{ fontSize: '0.82rem', color: '#7C2D12' }}>
+                        UPI ID: <strong style={{ fontFamily: 'monospace', fontSize: '0.9rem' }}>{activeYoupiData.vpa}</strong>
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (typeof navigator !== 'undefined' && navigator.clipboard) {
+                            navigator.clipboard.writeText(activeYoupiData.vpa);
+                          }
+                          setCopiedVpa(true);
+                          setTimeout(() => setCopiedVpa(false), 2000);
+                        }}
+                        style={{
+                          fontSize: '0.72rem',
+                          padding: '0.2rem 0.5rem',
+                          background: '#FFFFFF',
+                          border: '1px solid #FED7AA',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                          color: '#C2410C',
+                        }}
+                      >
+                        {copiedVpa ? '✓ Copied' : '📋 Copy'}
+                      </button>
+                    </div>
+
+                    {/* Quick Bank Handle Switcher */}
+                    <div style={{ marginTop: '0.6rem', fontSize: '0.72rem', color: '#9A3412', display: 'flex', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap', gap: '0.25rem' }}>
+                      <span style={{ fontWeight: 600 }}>Suffix:</span>
+                      {['@ibl', '@ybl', '@okaxis', '@okhdfcbank', '@paytm', '@oksbi', '@upi'].map((suffix) => {
+                        const baseUser = activeYoupiData.vpa.split('@')[0] || 'itsabhinav36';
+                        const newVpa = `${baseUser}${suffix}`;
+                        const isCurrent = activeYoupiData.vpa.endsWith(suffix);
+                        return (
+                          <button
+                            key={suffix}
+                            type="button"
+                            onClick={() => {
+                              const amountRupees = (activeYoupiData.amount / 100).toFixed(2);
+                              setActiveYoupiData({
+                                ...activeYoupiData,
+                                vpa: newVpa,
+                                qrPayload: `upi://pay?pa=${newVpa}&pn=Moody+Orange&am=${amountRupees}&cu=INR&tn=${encodeURIComponent(pendingOnlineOrder.orderNumber)}`,
+                              });
+                            }}
+                            style={{
+                              padding: '0.15rem 0.35rem',
+                              fontSize: '0.7rem',
+                              borderRadius: '4px',
+                              border: isCurrent ? '1.5.dp solid #EA580C' : '1px solid #FED7AA',
+                              background: isCurrent ? '#FFEDD5' : '#FFFFFF',
+                              color: isCurrent ? '#9A3412' : '#4B5563',
+                              cursor: 'pointer',
+                              fontWeight: isCurrent ? 700 : 500,
+                            }}
+                          >
+                            {suffix}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* UPI App Deep Links for Mobile */}
+                    <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'center', flexWrap: 'wrap', marginTop: '0.75rem' }}>
+                      {(() => {
+                        const links = buildUpiDeepLinks({
+                          vpa: activeYoupiData.vpa,
+                          payeeName: 'Moody Orange',
+                          amountRupees: (activeYoupiData.amount / 100).toFixed(2),
+                          orderNumber: pendingOnlineOrder.orderNumber,
+                        });
+                        return (
+                          <>
+                            <a href={links.gpay} className="btn-secondary" style={{ fontSize: '0.75rem', padding: '0.35rem 0.6rem' }}>
+                              Google Pay
+                            </a>
+                            <a href={links.phonepe} className="btn-secondary" style={{ fontSize: '0.75rem', padding: '0.35rem 0.6rem' }}>
+                              PhonePe
+                            </a>
+                            <a href={links.paytm} className="btn-secondary" style={{ fontSize: '0.75rem', padding: '0.35rem 0.6rem' }}>
+                              Paytm
+                            </a>
+                            <a href={links.cred} className="btn-secondary" style={{ fontSize: '0.75rem', padding: '0.35rem 0.6rem' }}>
+                              CRED
+                            </a>
+                          </>
+                        );
+                      })()}
+                    </div>
+
+                    {/* Manual UTR Verification Input */}
+                    <div style={{ marginTop: '1rem', textAlign: 'left' }}>
+                      <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#4B5563', display: 'block', marginBottom: '0.25rem' }}>
+                        12-Digit Bank UTR / Reference No. (Optional for auto-observer):
+                      </label>
+                      <div style={{ display: 'flex', gap: '0.5rem' }}>
+                        <input
+                          type="text"
+                          placeholder="e.g. 431200192831"
+                          value={enteredUtr}
+                          onChange={(e) => setEnteredUtr(e.target.value)}
+                          style={{
+                            flex: 1,
+                            padding: '0.4rem 0.6rem',
+                            border: '1px solid #D1D5DB',
+                            borderRadius: '6px',
+                            fontSize: '0.85rem',
+                          }}
+                        />
+                        <button
+                          type="button"
+                          className="btn-primary"
+                          disabled={isSubmitting || paymentStep === 'verifying'}
+                          onClick={() => handleVerifyYoupiPayment(pendingOnlineOrder, activeYoupiData.youpiPaymentId, enteredUtr)}
+                          style={{ fontSize: '0.8rem', padding: '0.4rem 0.75rem' }}
+                        >
+                          Verify
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 <div
                   style={{
                     display: 'flex',
@@ -431,13 +589,21 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps): ReactEle
                     type="button"
                     className="btn-primary"
                     disabled={isSubmitting || paymentStep === 'verifying'}
-                    onClick={() => launchRazorpayCheckout(pendingOnlineOrder)}
+                    onClick={() => {
+                      if (activeYoupiData) {
+                        handleVerifyYoupiPayment(pendingOnlineOrder, activeYoupiData.youpiPaymentId, enteredUtr);
+                      } else {
+                        launchYoupiCheckout(pendingOnlineOrder);
+                      }
+                    }}
                   >
                     {paymentStep === 'verifying'
                       ? 'Verifying Payment with Server...'
                       : paymentStep === 'initiating'
                       ? 'Opening Gateway...'
-                      : `Retry Online Payment (${formatPaiseToRupees(pendingOnlineOrder.totalAmount)}) →`}
+                      : activeYoupiData
+                      ? 'I Have Paid / Verify UPI Payment →'
+                      : `Launch YouPI-PG Checkout (${formatPaiseToRupees(pendingOnlineOrder.totalAmount)}) →`}
                   </button>
 
                   <button
@@ -446,6 +612,7 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps): ReactEle
                     disabled={isSubmitting}
                     onClick={() => {
                       setPendingOnlineOrder(null);
+                      setActiveYoupiData(null);
                       setPaymentStep('idle');
                     }}
                   >
@@ -575,14 +742,14 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps): ReactEle
 
                     <button
                       type="button"
-                      onClick={() => setPaymentMethod('online_razorpay')}
-                      className={`fulfillment-option-card ${paymentMethod === 'online_razorpay' ? 'active' : ''}`}
+                      onClick={() => setPaymentMethod('online_youpi')}
+                      className={`fulfillment-option-card ${paymentMethod === 'online_youpi' || paymentMethod === 'online_razorpay' ? 'active' : ''}`}
                     >
                       <div className="option-title-row">
-                        <span className="option-icon">💳</span>
-                        <strong>Online Draft</strong>
+                        <span className="option-icon">⚡</span>
+                        <strong>UPI Online (YouPI-PG)</strong>
                       </div>
-                      <span className="option-caption">Reserve with 10-min payment hold</span>
+                      <span className="option-caption">0% fee instant bank settlement via UPI QR / Apps</span>
                     </button>
                   </div>
                 </div>

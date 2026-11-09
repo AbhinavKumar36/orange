@@ -11,7 +11,7 @@ The system encompasses three client interfaces powered by a single, authoritativ
 - **Customer Website:** Built with Next.js & TypeScript (`apps/customer-web` — responsive for mobile, tablet, desktop)
 - **Native Android App:** Built with Kotlin & Jetpack Compose (`apps/android` — 100% native, no web wrappers)
 - **Admin & Counter Portal:** Built with Next.js & TypeScript (`apps/admin-web` — live Kanban dispatch queue, audio alerts, collection verification)
-- **Authoritative Backend API:** Standalone modular monolith in Node.js/Fastify/TypeScript (`apps/backend-api` — versioned REST API `/api/v1/...`, inventory transaction engine, Razorpay checkout, webhook verification, and refund automation)
+- **Authoritative Backend API:** Standalone modular monolith in Node.js/Fastify/TypeScript (`apps/backend-api` — versioned REST API `/api/v1/...`, inventory transaction engine, YouPI-PG self-hosted zero-fee UPI & COD checkout, webhook verification, and refund automation)
 - **Managed Data Layer:** Supabase PostgreSQL 15+ with Row Level Security, Storage CDN, and Realtime WebSockets
 - **API Contracts:** Authoritative OpenAPI 3.1 specification (`packages/api-contracts` — linted via Redocly)
 

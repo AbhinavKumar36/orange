@@ -2,12 +2,16 @@ package com.moodyorange.app.data.model
 
 data class InitiatePaymentResponse(
     val orderId: String,
-    val razorpayOrderId: String,
+    val youpiPaymentId: String = "",
+    val razorpayOrderId: String = "",
+    val checkoutUrl: String = "",
+    val vpa: String = "",
+    val qrPayload: String = "",
     val amount: Long,
     val currency: String,
-    val keyId: String,
-    val customerName: String,
-    val customerPhone: String
+    val keyId: String = "",
+    val customerName: String = "",
+    val customerPhone: String = ""
 )
 
 data class VerifyPaymentResponse(

@@ -428,7 +428,7 @@ fun CheckoutBottomSheet(
                             shape = RoundedCornerShape(10.dp),
                             modifier = Modifier.fillMaxWidth().height(44.dp)
                         ) {
-                            Text("Pay Now with Razorpay →", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                            Text("Pay Now with UPI (YouPI-PG) →", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
                         }
                     }
                 }

@@ -6,8 +6,9 @@ import { ConfigSchema, type AppConfig } from '../src/config/env.js';
 import { resetMockOrderStore, mockOrdersStore } from '../src/routes/orders.js';
 import { resetMockPaymentStores, mockPaymentsStore } from '../src/services/paymentStore.js';
 import { verifyPaymentSignature, verifyWebhookSignature } from '../src/services/razorpay.js';
+import { verifyYoupiWebhookSignature } from '../src/services/youpi.js';
 
-describe('Phase 7: Payments, Razorpay Gateway, Verification, Webhooks & Refunds', () => {
+describe('Phase 7: Payments, YouPI-PG Gateway, Verification, Webhooks & Refunds', () => {
   let app: FastifyInstance;
 
   const testKeySecret = 'test_secret_key_1234567890abcdef';
@@ -19,6 +20,11 @@ describe('Phase 7: Payments, Razorpay Gateway, Verification, Webhooks & Refunds'
     NODE_ENV: 'test',
     ALLOW_MOCK_SERVICES: true,
     SUPABASE_URL: 'https://test-project.supabase.co',
+    YOUPI_BASE_URL: 'http://localhost:8080',
+    YOUPI_MERCHANT_ID: '00000000-0000-0000-0000-000000000001',
+    YOUPI_PUBLIC_KEY: 'youpi_pub_test123',
+    YOUPI_WEBHOOK_SECRET: testWebhookSecret,
+    YOUPI_VPA: 'moodyorange@upi',
     RAZORPAY_KEY_ID: 'rzp_test_exampleKey123',
     RAZORPAY_KEY_SECRET: testKeySecret,
     RAZORPAY_WEBHOOK_SECRET: testWebhookSecret,
@@ -78,7 +84,7 @@ describe('Phase 7: Payments, Razorpay Gateway, Verification, Webhooks & Refunds'
     return JSON.parse(checkoutRes.payload);
   }
 
-  // Scenario 1: Online order payment initiation creates a valid Razorpay order on the backend
+  // Scenario 1: Online order payment initiation creates a valid YouPI-PG session on backend
   it('1. Online order payment initiation creates a valid Razorpay order on backend', async () => {
     const order = await createDraftOnlineOrder();
 
@@ -92,10 +98,13 @@ describe('Phase 7: Payments, Razorpay Gateway, Verification, Webhooks & Refunds'
     expect(res.statusCode).toBe(200);
     const body = JSON.parse(res.payload);
     expect(body.orderId).toBe(order.orderId);
-    expect(body.razorpayOrderId).toMatch(/^order_/);
+    expect(body.youpiPaymentId).toMatch(/^youpi_/);
+    expect(body.checkoutUrl).toBeDefined();
+    expect(body.vpa).toBeDefined();
+    expect(body.qrPayload).toBeDefined();
     expect(body.currency).toBe('INR');
     expect(body.amount).toBe(order.totalAmount);
-    expect(body.keyId).toBeDefined();
+    expect(body.merchantId).toBeDefined();
   });
 
   // Scenario 2: Order payable amount is strictly server-calculated from database pricing, ignoring frontend totals
@@ -388,6 +397,53 @@ describe('Phase 7: Payments, Razorpay Gateway, Verification, Webhooks & Refunds'
       headers: {
         'content-type': 'application/json',
         'x-razorpay-signature': signature,
+      },
+      payload: rawBody,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.payload);
+    expect(body.received).toBe(true);
+
+    const stored = mockOrdersStore.get(order.orderId);
+    expect(stored?.orderStatus).toBe('confirmed');
+    expect(stored?.paymentStatus).toBe('captured');
+  });
+
+  // Scenario 10b: YouPI-PG webhook delivery (OBSERVED_SUCCESS) to /api/v1/webhooks/youpi marks order confirmed
+  it('10b. YouPI-PG webhook delivery (OBSERVED_SUCCESS) marks order confirmed', async () => {
+    const order = await createDraftOnlineOrder();
+
+    const initRes = await app.inject({
+      method: 'POST',
+      url: '/api/v1/payments/initiate',
+      headers: { authorization: `Bearer ${customerA.token}` },
+      payload: { orderId: order.orderId },
+    });
+    const { youpiPaymentId } = JSON.parse(initRes.payload);
+
+    const utr = '431200987654';
+    const rawBody = JSON.stringify({
+      event: 'OBSERVED_SUCCESS',
+      paymentId: youpiPaymentId,
+      orderId: order.orderNumber,
+      amount: (order.totalAmount / 100).toFixed(2),
+      amountPaise: order.totalAmount,
+      currency: 'INR',
+      method: 'UPI',
+      settlementState: 'NOT_RECONCILED',
+      utr,
+      metadata: { internalOrderId: order.orderId },
+    });
+    const hash = createHmac('sha256', testWebhookSecret).update(rawBody).digest('hex');
+    const signature = `sha256=${hash}`;
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/v1/webhooks/youpi',
+      headers: {
+        'content-type': 'application/json',
+        'x-gateway-signature': signature,
       },
       payload: rawBody,
     });

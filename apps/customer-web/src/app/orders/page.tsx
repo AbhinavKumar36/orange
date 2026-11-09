@@ -148,7 +148,7 @@ export default function CustomerOrdersPage(): ReactElement {
       bg = 'rgba(16, 185, 129, 0.15)';
       text = '#34D399';
       border = '1px solid rgba(16, 185, 129, 0.4)';
-      label = 'PAID ONLINE (RAZORPAY) ✓';
+      label = 'PAID ONLINE (YOUPI-PG UPI) ✓';
     } else if (isUnpaid && paymentMethod === 'cash_at_pickup') {
       bg = 'rgba(215, 163, 74, 0.15)';
       text = 'var(--color-gold, #D7A34A)';

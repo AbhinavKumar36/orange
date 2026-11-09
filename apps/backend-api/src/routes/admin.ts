@@ -29,6 +29,7 @@ import {
   type MockPaymentRecord,
   type MockRefundRecord,
 } from '../services/paymentStore.js';
+import { createStoreRefund } from '../services/youpi.js';
 import { createRazorpayRefund } from '../services/razorpay.js';
 
 // Concurrency mutex locks for atomic state transitions in mock memory
@@ -1969,8 +1970,8 @@ export const adminRoutes: FastifyPluginAsync<AdminRoutesOptions> = async (app, o
         const payment: MockPaymentRecord = foundPayment ?? {
           id: randomUUID(),
           orderId: id,
-          provider: 'razorpay',
-          providerOrderId: order.providerOrderId || 'order_mock_dummy',
+          provider: 'youpi',
+          providerOrderId: order.providerOrderId || 'youpi_mock_dummy',
           providerPaymentId: 'pay_mock_' + randomUUID().slice(0, 8),
           amount: Number(order.totalAmount || order.total || 0),
           currency: 'INR',
@@ -2040,9 +2041,10 @@ export const adminRoutes: FastifyPluginAsync<AdminRoutesOptions> = async (app, o
           }
         }
 
-        const rzpRefund = await createRazorpayRefund({
+        const rzpRefund = await createStoreRefund({
           paymentId: payment.providerPaymentId || 'pay_mock',
           amount: refundAmount,
+          reason,
           notes: { reason, orderId: id },
           config,
         });
@@ -2137,12 +2139,13 @@ export const adminRoutes: FastifyPluginAsync<AdminRoutesOptions> = async (app, o
       const refundId = rpcResult?.out_refund_id || randomUUID();
       const remainingRefundable = Number(rpcResult?.out_remaining_refundable ?? 0);
 
-      // 3. Trigger Gateway Refund API
+      // 3. Trigger Store / Gateway Refund
       let providerRefundId: string | null = null;
       try {
-        const rzpRefund = await createRazorpayRefund({
+        const rzpRefund = await createStoreRefund({
           paymentId: payment.provider_payment_id || payment.id,
           amount: refundAmount,
+          reason,
           notes: { reason, orderId: id },
           config,
         });
@@ -2169,7 +2172,7 @@ export const adminRoutes: FastifyPluginAsync<AdminRoutesOptions> = async (app, o
           });
         }
       } catch (gwErr) {
-        app.log.error(gwErr, 'Razorpay refund API call failed');
+        app.log.error(gwErr, 'Store refund processing failed');
       }
 
       // Audit log entry

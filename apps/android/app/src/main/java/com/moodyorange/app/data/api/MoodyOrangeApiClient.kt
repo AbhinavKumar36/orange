@@ -447,12 +447,17 @@ class MoodyOrangeApiClient(
 
     fun parseInitiatePaymentResponse(jsonString: String): InitiatePaymentResponse {
         val root = JSONObject(jsonString)
+        val youpiId = root.optString("youpiPaymentId", root.optString("razorpayOrderId", ""))
         return InitiatePaymentResponse(
             orderId = root.getString("orderId"),
-            razorpayOrderId = root.getString("razorpayOrderId"),
+            youpiPaymentId = youpiId,
+            razorpayOrderId = youpiId,
+            checkoutUrl = root.optString("checkoutUrl", ""),
+            vpa = root.optString("vpa", "moodyorange@upi"),
+            qrPayload = root.optString("qrPayload", ""),
             amount = root.getLong("amount"),
             currency = root.optString("currency", "INR"),
-            keyId = root.getString("keyId"),
+            keyId = root.optString("keyId", root.optString("merchantId", "")),
             customerName = root.optString("customerName", "Customer"),
             customerPhone = root.optString("customerPhone", "")
         )

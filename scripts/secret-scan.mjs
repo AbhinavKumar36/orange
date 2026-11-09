@@ -29,6 +29,7 @@ const BINARY_EXTENSIONS = new Set([
 
 const SECRET_PATTERNS = [
   { name: 'Private Key', regex: /-----BEGIN (?:RSA |EC |OPENSSH |PGP )?PRIVATE KEY-----/ },
+  { name: 'Live YouPI Webhook Secret', regex: /YOUPI_WEBHOOK_SECRET\s*=\s*(?!whsec_youpi_test)[0-9a-zA-Z]{16,}/ },
   { name: 'Live Razorpay Key', regex: /rzp_live_[0-9a-zA-Z]{14,}/ },
   { name: 'Live Razorpay Secret', regex: /RAZORPAY_KEY_SECRET\s*=\s*(?!exampleSecretKeyString)[0-9a-zA-Z]{20,}/ },
   { name: 'Live Stripe Key', regex: /sk_live_[0-9a-zA-Z]{24,}/ },

@@ -434,6 +434,42 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /webhooks/youpi:
+    post:
+      summary: YouPI-PG webhook event receiver
+      description: Receives asynchronous UPI observer, reconciliation, and payment events from YouPI-PG.
+      operationId: handleYoupiWebhook
+      security: []
+      parameters:
+        - name: X-Gateway-Signature
+          in: header
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Webhook processed successfully.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  received:
+                    type: boolean
+                  deduplicated:
+                    type: boolean
+        '400':
+          description: Invalid webhook signature.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /webhooks/razorpay:
     post:
       summary: Razorpay webhook event receiver

@@ -27,6 +27,14 @@ export const ConfigSchema = z
     SUPABASE_SERVICE_ROLE_KEY: z.string().min(1).optional(),
     // Public anon key. Can be used in dev for public catalog reading if service role key is absent.
     SUPABASE_ANON_KEY: z.string().min(1).optional(),
+    // YouPI-PG Self-Hosted Payment Gateway Configuration
+    YOUPI_BASE_URL: z.string().url().default('http://localhost:8080'),
+    YOUPI_MERCHANT_ID: z.string().min(1).default('00000000-0000-0000-0000-000000000001'),
+    YOUPI_PUBLIC_KEY: z.string().min(1).default('youpi_pub_test123'),
+    YOUPI_WEBHOOK_SECRET: z.string().min(1).default('whsec_youpi_test987654321'),
+    YOUPI_VPA: z.string().min(1).default('itsabhinav36@ibl'),
+    CUSTOMER_APP_URL: z.string().url().default('http://localhost:3000'),
+    // Deprecated legacy Razorpay fields (optional for backwards compatibility)
     RAZORPAY_KEY_ID: z.string().min(1).optional(),
     RAZORPAY_KEY_SECRET: z.string().min(1).optional(),
     RAZORPAY_WEBHOOK_SECRET: z.string().min(1).optional(),

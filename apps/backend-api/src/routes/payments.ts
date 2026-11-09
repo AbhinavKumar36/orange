@@ -12,6 +12,10 @@ import { createAuthPreHandler } from '../plugins/auth.js';
 import { mockOrdersStore } from './orders.js';
 import { mockPaymentsStore } from '../services/paymentStore.js';
 import {
+  createYoupiPaymentSession,
+  verifyYoupiPaymentSession,
+} from '../services/youpi.js';
+import {
   createRazorpayOrder,
   verifyPaymentSignature,
 } from '../services/razorpay.js';
@@ -197,20 +201,28 @@ export const paymentsRoutes: FastifyPluginAsync<PaymentsPluginOptions> = async (
       }
 
       // Reuse existing active provider order if not retrying after failure
-      let razorpayOrderId = order.providerOrderId;
-      if (!razorpayOrderId || order.paymentStatus === 'failed') {
+      let youpiPaymentId = order.providerOrderId;
+      let checkoutUrl = '';
+      const rawVpa = config.YOUPI_VPA || 'itsabhinav36';
+      let vpa = rawVpa.includes('@') ? rawVpa : `${rawVpa}@upi`;
+      let qrPayload = '';
+
+      if (!youpiPaymentId || order.paymentStatus === 'failed') {
         try {
-          const rzpOrder = await createRazorpayOrder({
+          const youpiSession = await createYoupiPaymentSession({
+            orderId: order.id,
+            orderNumber: order.orderNumber,
             amount: order.totalAmount,
             currency: 'INR',
-            receipt: order.orderNumber,
-            notes: {
-              orderId: order.id,
-              customerId: user.id,
-            },
+            customerId: user.id,
+            customerName: order.customerName,
+            customerPhone: order.customerPhone,
             config,
           });
-          razorpayOrderId = rzpOrder.id;
+          youpiPaymentId = youpiSession.id;
+          checkoutUrl = youpiSession.checkoutUrl;
+          vpa = youpiSession.vpa;
+          qrPayload = youpiSession.qrPayload;
 
           // Update order in DB or mock store with provider_order_id
           const baseUrl = config.SUPABASE_URL.replace(/\/+$/, '');
@@ -224,7 +236,7 @@ export const paymentsRoutes: FastifyPluginAsync<PaymentsPluginOptions> = async (
                 'Content-Type': 'application/json',
               },
               body: JSON.stringify({
-                provider_order_id: razorpayOrderId,
+                provider_order_id: youpiPaymentId,
                 updated_at: new Date().toISOString(),
               }),
             });
@@ -233,11 +245,11 @@ export const paymentsRoutes: FastifyPluginAsync<PaymentsPluginOptions> = async (
           if (config.ALLOW_MOCK_SERVICES) {
             const mock = mockOrdersStore.get(order.id);
             if (mock) {
-              mock.providerOrderId = razorpayOrderId;
+              mock.providerOrderId = youpiPaymentId;
             }
           }
         } catch (err: unknown) {
-          const msg = err instanceof Error ? err.message : 'Razorpay order creation failed.';
+          const msg = err instanceof Error ? err.message : 'YouPI-PG payment session creation failed.';
           return reply.status(502).send({
             error: {
               statusCode: 502,
@@ -246,16 +258,27 @@ export const paymentsRoutes: FastifyPluginAsync<PaymentsPluginOptions> = async (
             },
           });
         }
+      } else {
+        const checkoutHost = (config.YOUPI_BASE_URL || 'http://localhost:8080').replace(/\/+$/, '');
+        checkoutUrl = `${checkoutHost}/checkout/${youpiPaymentId}`;
+        const amountRupees = (order.totalAmount / 100).toFixed(2);
+        qrPayload = `upi://pay?pa=${encodeURIComponent(vpa)}&pn=${encodeURIComponent('Moody Orange')}&am=${amountRupees}&tr=${encodeURIComponent(order.orderNumber)}&cu=INR`;
       }
 
       const response: InitiatePaymentResponse = {
         orderId: order.id,
-        razorpayOrderId,
+        youpiPaymentId,
+        checkoutUrl,
+        vpa,
+        qrPayload,
         amount: order.totalAmount,
         currency: 'INR',
-        keyId: config.RAZORPAY_KEY_ID || 'rzp_test_placeholder',
+        merchantId: config.YOUPI_MERCHANT_ID,
         customerName: order.customerName,
         customerPhone: order.customerPhone,
+        // Legacy backward compatibility aliases
+        razorpayOrderId: youpiPaymentId,
+        keyId: config.YOUPI_PUBLIC_KEY || config.RAZORPAY_KEY_ID || 'youpi_pub_test',
       };
 
       return reply.status(200).send(response);
@@ -280,7 +303,15 @@ export const paymentsRoutes: FastifyPluginAsync<PaymentsPluginOptions> = async (
         });
       }
 
-      const { orderId, razorpayOrderId, razorpayPaymentId, razorpaySignature } = parseResult.data;
+      const {
+        orderId,
+        youpiPaymentId,
+        utr,
+        verificationToken,
+        razorpayOrderId,
+        razorpayPaymentId,
+        razorpaySignature,
+      } = parseResult.data;
       const order = await getOrder(orderId);
 
       if (!order) {
@@ -304,42 +335,71 @@ export const paymentsRoutes: FastifyPluginAsync<PaymentsPluginOptions> = async (
         });
       }
 
+      const activeSessionId = youpiPaymentId || razorpayOrderId;
+      const activePaymentId = utr || razorpayPaymentId || `pay_${activeSessionId || randomUUID().slice(0, 8)}`;
+      const activeSignature = verificationToken || razorpaySignature || '';
+
       // Cross-order check: provider order ID must match if set
-      if (order.providerOrderId && order.providerOrderId !== razorpayOrderId) {
+      if (order.providerOrderId && activeSessionId && order.providerOrderId !== activeSessionId) {
         return reply.status(400).send({
           error: {
             statusCode: 400,
             code: 'PROVIDER_ORDER_MISMATCH',
-            message: 'Razorpay order ID does not match the payment attempt registered for this order.',
+            message: 'Payment session ID does not match the payment attempt registered for this order.',
           },
         });
       }
 
-      // Server-side cryptographic signature verification
-      const secret = config.RAZORPAY_KEY_SECRET || '';
-      let isSignatureValid = false;
+      // Verification: verify against YouPI-PG or signature validation
+      let isVerified = false;
+      const secret = config.YOUPI_WEBHOOK_SECRET || config.RAZORPAY_KEY_SECRET || '';
 
-      if (
-        (config.ALLOW_MOCK_SERVICES || config.NODE_ENV === 'test') &&
-        razorpaySignature.startsWith('mock_sig_')
-      ) {
-        // Deterministic mock test signature
-        isSignatureValid = true;
-      } else {
-        isSignatureValid = verifyPaymentSignature({
-          razorpayOrderId,
-          razorpayPaymentId,
-          razorpaySignature,
-          secret,
+      if (razorpayOrderId && razorpayPaymentId && razorpaySignature) {
+        if (
+          (config.ALLOW_MOCK_SERVICES || config.NODE_ENV === 'test') &&
+          razorpaySignature.startsWith('mock_sig_')
+        ) {
+          isVerified = true;
+        } else {
+          isVerified = verifyPaymentSignature({
+            razorpayOrderId,
+            razorpayPaymentId,
+            razorpaySignature,
+            secret: config.RAZORPAY_KEY_SECRET || secret,
+          });
+        }
+      } else if (verificationToken) {
+        if (
+          (config.ALLOW_MOCK_SERVICES || config.NODE_ENV === 'test') &&
+          verificationToken.startsWith('mock_sig_')
+        ) {
+          isVerified = true;
+        } else {
+          const verifyRes = await verifyYoupiPaymentSession({
+            orderId: order.id,
+            youpiPaymentId: activeSessionId!,
+            utr: activePaymentId,
+            verificationToken,
+            config,
+          });
+          isVerified = verifyRes.verified;
+        }
+      } else if (activeSessionId) {
+        const verifyRes = await verifyYoupiPaymentSession({
+          orderId: order.id,
+          youpiPaymentId: activeSessionId,
+          utr: activePaymentId,
+          config,
         });
+        isVerified = verifyRes.verified;
       }
 
-      if (!isSignatureValid) {
+      if (!isVerified) {
         return reply.status(400).send({
           error: {
             statusCode: 400,
             code: 'INVALID_PAYMENT_SIGNATURE',
-            message: 'Razorpay payment signature verification failed. Order will not be marked as paid.',
+            message: 'Payment verification failed. Order will not be marked as paid.',
           },
         });
       }
@@ -360,13 +420,15 @@ export const paymentsRoutes: FastifyPluginAsync<PaymentsPluginOptions> = async (
             },
             body: JSON.stringify({
               p_order_id: order.id,
-              p_provider_payment_id: razorpayPaymentId,
-              p_provider_order_id: razorpayOrderId,
+              p_provider_payment_id: activePaymentId,
+              p_provider_order_id: activeSessionId,
               p_amount: order.totalAmount,
               p_currency: 'INR',
               p_raw_payload: {
+                provider: 'youpi',
                 verifiedAt: new Date().toISOString(),
-                signature: razorpaySignature,
+                session: activeSessionId,
+                utr: activePaymentId,
               },
             }),
           });
@@ -395,13 +457,13 @@ export const paymentsRoutes: FastifyPluginAsync<PaymentsPluginOptions> = async (
 
       if (config.ALLOW_MOCK_SERVICES) {
         // Mock reconciliation
-        const existing = mockPaymentsStore.get(razorpayPaymentId);
+        const existing = mockPaymentsStore.get(activePaymentId);
         if (existing && existing.orderId !== order.id) {
           return reply.status(409).send({
             error: {
               statusCode: 409,
               code: 'PAYMENT_ALREADY_EXISTS',
-              message: `Payment ID ${razorpayPaymentId} was already used on another order.`,
+              message: `Payment ID ${activePaymentId} was already used on another order.`,
             },
           });
         }
@@ -413,13 +475,13 @@ export const paymentsRoutes: FastifyPluginAsync<PaymentsPluginOptions> = async (
           mockOrder.expiresAt = null;
         }
 
-        mockPaymentsStore.set(razorpayPaymentId, {
+        mockPaymentsStore.set(activePaymentId, {
           id: randomUUID(),
           orderId: order.id,
-          provider: 'razorpay',
-          providerOrderId: razorpayOrderId,
-          providerPaymentId: razorpayPaymentId,
-          providerSignature: razorpaySignature,
+          provider: 'youpi',
+          providerOrderId: activeSessionId,
+          providerPaymentId: activePaymentId,
+          providerSignature: activeSignature,
           amount: order.totalAmount,
           currency: 'INR',
           status: 'captured',
@@ -434,7 +496,7 @@ export const paymentsRoutes: FastifyPluginAsync<PaymentsPluginOptions> = async (
         orderNumber: order.orderNumber,
         orderStatus: 'confirmed',
         paymentStatus: 'captured',
-        paymentId: razorpayPaymentId,
+        paymentId: activePaymentId,
       };
 
       return reply.status(200).send(response);

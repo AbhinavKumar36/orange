@@ -24,7 +24,10 @@ API_BASE_URL=http://10.0.2.2:4000/api/v1/
 DEV_SUPABASE_URL=https://<your-dev-project-ref>.supabase.co
 DEV_SUPABASE_ANON_KEY=<your-hosted-dev-public-anon-key>
 
-# Razorpay Public Merchant ID (Secret key is NEVER present in Android application)
+# YouPI-PG Public Configuration (0% Platform Fee UPI Gateway)
+YOUPI_PUBLIC_KEY=youpi_pub_test123
+YOUPI_BASE_URL=http://10.0.2.2:8080/
+# Deprecated Razorpay Public Merchant ID
 RAZORPAY_KEY_ID=rzp_test_exampleKeyId1234
 
 # ==============================================================================

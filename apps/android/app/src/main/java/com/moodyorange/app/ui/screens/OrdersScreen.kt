@@ -397,7 +397,7 @@ private fun OrderCard(order: Order) {
                             .padding(horizontal = 6.dp, vertical = 2.dp)
                     ) {
                         Text(
-                            text = "PAID ONLINE (RAZORPAY) ✓",
+                            text = "PAID ONLINE (YOUPI-PG UPI) ✓",
                             fontSize = 9.5.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color(0xFF28A745)

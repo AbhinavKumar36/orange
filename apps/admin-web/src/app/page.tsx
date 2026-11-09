@@ -873,7 +873,7 @@ export default function AdminDashboardPage(): ReactElement {
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '0.75rem 0 0.9rem 0', padding: '0.6rem 0.8rem', background: '#F8F5F0', borderRadius: '8px' }}>
                         <div>
                           <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
-                            {ord.paymentMethod === 'cash_at_pickup' ? 'Cash at Counter' : 'Online Payment (Razorpay)'}
+                            {ord.paymentMethod === 'cash_at_pickup' ? 'Cash at Counter' : 'Online UPI (YouPI-PG)'}
                           </div>
                           <span
                             className={`badge badge-${ord.paymentStatus}`}
@@ -914,7 +914,7 @@ export default function AdminDashboardPage(): ReactElement {
                         </button>
 
                         {isManager &&
-                          ord.paymentMethod === 'online_razorpay' &&
+                          (ord.paymentMethod === 'online_youpi' || ord.paymentMethod === 'online_razorpay') &&
                           ['captured', 'partially_refunded'].includes(ord.paymentStatus) && (
                             <button
                               type="button"
@@ -2499,7 +2499,7 @@ export default function AdminDashboardPage(): ReactElement {
                   Payment: {selectedOrderDetails.paymentStatus.replace(/_/g, ' ')}
                 </span>
                 <span style={{ fontSize: '0.8rem', padding: '0.3rem 0.65rem', borderRadius: '9999px', background: '#F1F5F9', color: '#334155', fontWeight: 600 }}>
-                  Mode: {selectedOrderDetails.paymentMethod === 'cash_at_pickup' ? 'Cash at Counter' : 'Online Razorpay'}
+                  Mode: {selectedOrderDetails.paymentMethod === 'cash_at_pickup' ? 'Cash at Counter' : 'Online UPI (YouPI-PG)'}
                 </span>
                 <span style={{ fontSize: '0.8rem', padding: '0.3rem 0.65rem', borderRadius: '9999px', background: selectedOrderDetails.fulfillmentType === 'scheduled' ? '#E0F2FE' : '#FEF3C7', color: selectedOrderDetails.fulfillmentType === 'scheduled' ? '#0369A1' : '#B45309', fontWeight: 600 }}>
                   {selectedOrderDetails.fulfillmentType === 'scheduled' ? '📅 Scheduled Pickup' : '⚡ Immediate Pickup'}
@@ -2636,7 +2636,7 @@ export default function AdminDashboardPage(): ReactElement {
                 </button>
 
                 {isManager &&
-                  selectedOrderDetails.paymentMethod === 'online_razorpay' &&
+                  (selectedOrderDetails.paymentMethod === 'online_youpi' || selectedOrderDetails.paymentMethod === 'online_razorpay') &&
                   ['captured', 'partially_refunded'].includes(selectedOrderDetails.paymentStatus) && (
                     <button
                       type="button"

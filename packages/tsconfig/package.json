@@ -6,6 +6,11 @@
     "base.json",
     "node.json",
     "nextjs.json"
-  ]
+  ],
+  "exports": {
+    "./*.json": "./*.json",
+    "./*": "./*.json"
+  }
 }
+
 
