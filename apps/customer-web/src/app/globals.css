@@ -7,32 +7,32 @@
 
 :root {
   /* ==========================================================================
-     MANGALA ENTERPRISES — OPTION B: ELEGANT MINIMAL DESIGN SYSTEM
-     Palette: Forest Green (#123D30), Warm Ivory (#F6F1E7), Muted Gold (#D7A34A),
-              Charcoal (#252923), Soft Sage (#DCE5DB), White (#FFFFFF)
+     MOODY ORANGE — MOODY AMBER DESIGN SYSTEM
+     Palette: Burnt Amber (#C85C1A), Warm Cream (#FDF8F2), Muted Gold (#D7A34A),
+              Warm Brown (#2C1810), Soft Peach (#FDE8D6), White (#FFFFFF)
      ========================================================================== */
 
   /* Light Mode (Default) Surfaces */
-  --color-canvas: #F6F1E7;
+  --color-canvas: #FDF8F2;
   --color-surface: #FFFFFF;
-  --color-surface-elevated: #FAF6EF;
-  --color-surface-hover: #EFE9DD;
-  --color-card-border: #E2DBD0;
-  --color-divider: #E5DFD4;
+  --color-surface-elevated: #FDF5EE;
+  --color-surface-hover: #F7EDE0;
+  --color-card-border: #EAD9C8;
+  --color-divider: #EDD9C4;
 
-  /* Atmospheric / Hero Sections — Deep Abyss Luxury Palette */
-  --color-obsidian: #040D12;
-  --color-charcoal-dark: #02070A;
-  --color-charcoal: #08161E;
-  --color-charcoal-elevated: #0E222D;
-  --color-charcoal-border: rgba(215, 163, 74, 0.22);
+  /* Atmospheric / Hero Sections — Warm Espresso & Roasted Cacao Palette (Replaces Black) */
+  --color-obsidian: #361D12;
+  --color-charcoal-dark: #27130B;
+  --color-charcoal: #452416;
+  --color-charcoal-elevated: #542D1C;
+  --color-charcoal-border: rgba(215, 163, 74, 0.28);
 
-  /* Primary Brand Tokens (Forest Green & Muted Gold) */
-  --color-primary: #123D30;
-  --color-primary-hover: #0B2920;
-  --color-primary-dark: #071F17;
-  --color-primary-glow: rgba(18, 61, 48, 0.22);
-  --color-primary-subtle: #DCE5DB;
+  /* Primary Brand Tokens (Moody Amber & Muted Gold) */
+  --color-primary: #C85C1A;
+  --color-primary-hover: #A84810;
+  --color-primary-dark: #8A3A0C;
+  --color-primary-glow: rgba(200, 92, 26, 0.22);
+  --color-primary-subtle: #FDE8D6;
 
   --color-gold: #D7A34A;
   --color-gold-hover: #C6933B;
@@ -43,12 +43,12 @@
   --color-amber-glow: rgba(215, 163, 74, 0.25);
 
   /* Typography */
-  --color-text-main: #252923;
-  --color-text-body: #3F453B;
-  --color-text-muted: #6B7266;
-  --color-text-subtle: #8F968B;
-  --color-text-inverse: #F6F1E7;
-  --color-text-inverse-muted: #DCE5DB;
+  --color-text-main: #2C1810;
+  --color-text-body: #4A2E1E;
+  --color-text-muted: #7A5C4A;
+  --color-text-subtle: #A07A65;
+  --color-text-inverse: #FDF8F2;
+  --color-text-inverse-muted: #FDE8D6;
 
   /* Status & Dietary Accents */
   --color-veg-green: #168A45;
@@ -57,9 +57,9 @@
   --color-nonveg-bg: #FFEBEE;
   --color-stock-green: #168A45;
   --color-stock-bg: #E8F5EC;
-  --color-soldout-gray: #6B7266;
-  --color-soldout-bg: #EDE7DD;
-  --color-allergen-tag: #EAE3D7;
+  --color-soldout-gray: #7A5C4A;
+  --color-soldout-bg: #F0E4D8;
+  --color-allergen-tag: #F0E4D8;
 
   /* Typography Families */
   --font-serif: 'Playfair Display', Georgia, Cambria, 'Times New Roman', serif;
@@ -73,11 +73,11 @@
   --radius-lg: 20px;
   --radius-full: 9999px;
 
-  --shadow-subtle: 0 2px 8px rgba(37, 41, 35, 0.04);
-  --shadow-sm: 0 4px 14px rgba(37, 41, 35, 0.06);
-  --shadow-md: 0 10px 28px rgba(37, 41, 35, 0.08);
-  --shadow-lg: 0 20px 45px rgba(37, 41, 35, 0.12);
-  --shadow-glass: 0 16px 36px rgba(18, 61, 48, 0.35);
+  --shadow-subtle: 0 2px 8px rgba(44, 24, 16, 0.04);
+  --shadow-sm: 0 4px 14px rgba(44, 24, 16, 0.07);
+  --shadow-md: 0 10px 28px rgba(44, 24, 16, 0.10);
+  --shadow-lg: 0 20px 45px rgba(44, 24, 16, 0.14);
+  --shadow-glass: 0 16px 36px rgba(200, 92, 26, 0.30);
   --shadow-glow: 0 0 35px rgba(215, 163, 74, 0.3);
 
   /* Transitions */
@@ -88,41 +88,41 @@
 
 /* ==============================================================================
    DARK MODE TOKEN OVERRIDES ([data-theme="dark"] or .dark)
-   Surfaces: Deep forest-green and charcoal (#0D1C17, #132620, #1A3129)
-   Text: Warm ivory (#F6F1E7)
-   Highlights: Muted Gold (#D7A34A)
+   Surfaces: Warm Espresso & Dark Cocoa (#0D0905, #1A1008, #251508)
+   Text: Warm cream (#FDF8F2)
+   Highlights: Vibrant Amber (#E8792A) + Muted Gold (#D7A34A)
    ============================================================================== */
 [data-theme="dark"],
 html.dark {
-  --color-canvas: #040D12;
-  --color-surface: #0A1922;
-  --color-surface-elevated: #0F2532;
-  --color-surface-hover: #153243;
-  --color-card-border: rgba(29, 53, 69, 0.7);
-  --color-divider: #162A37;
+  --color-canvas: #2A160E;
+  --color-surface: #361D12;
+  --color-surface-elevated: #452416;
+  --color-surface-hover: #542D1C;
+  --color-card-border: rgba(180, 100, 45, 0.45);
+  --color-divider: #4A2718;
 
-  --color-obsidian: #02070A;
-  --color-charcoal-dark: #010406;
-  --color-charcoal: #061218;
-  --color-charcoal-elevated: #0A1922;
-  --color-charcoal-border: rgba(215, 163, 74, 0.25);
+  --color-obsidian: #361D12;
+  --color-charcoal-dark: #27130B;
+  --color-charcoal: #452416;
+  --color-charcoal-elevated: #542D1C;
+  --color-charcoal-border: rgba(215, 163, 74, 0.28);
 
-  --color-primary: #D7A34A;
-  --color-primary-hover: #E5B65F;
-  --color-primary-dark: #C6933B;
-  --color-primary-glow: rgba(215, 163, 74, 0.3);
-  --color-primary-subtle: rgba(215, 163, 74, 0.16);
+  --color-primary: #E8792A;
+  --color-primary-hover: #F08840;
+  --color-primary-dark: #C85C1A;
+  --color-primary-glow: rgba(232, 121, 42, 0.35);
+  --color-primary-subtle: rgba(200, 92, 26, 0.18);
 
-  --color-text-main: #F6F1E7;
-  --color-text-body: #D9D3C8;
-  --color-text-muted: #A6A094;
-  --color-text-subtle: #79746A;
-  --color-text-inverse: #040D12;
-  --color-text-inverse-muted: #0A1922;
+  --color-text-main: #F5EEE6;
+  --color-text-body: #DCCFC4;
+  --color-text-muted: #A8927E;
+  --color-text-subtle: #7A6050;
+  --color-text-inverse: #1E0C04;
+  --color-text-inverse-muted: #3D1A08;
 
-  --color-soldout-gray: #A6A094;
-  --color-soldout-bg: #0F2532;
-  --color-allergen-tag: #0F2532;
+  --color-soldout-gray: #A8927E;
+  --color-soldout-bg: #3D1A08;
+  --color-allergen-tag: #3D1A08;
 }
 
 /* ==============================================================================
@@ -495,7 +495,7 @@ html.dark .btn-signin {
 [data-theme="dark"] .btn-signin:hover,
 html.dark .btn-signin:hover {
   background: var(--color-gold);
-  color: #123D30;
+  color: #1E0C04;
 }
 
 .user-session-group {
@@ -595,7 +595,7 @@ html.dark .btn-signin:hover {
   top: -4px;
   right: -4px;
   background-color: var(--color-gold);
-  color: #040D12;
+  color: #1A0A04;
   font-size: 0.72rem;
   font-weight: 800;
   min-width: 20px;
@@ -606,13 +606,13 @@ html.dark .btn-signin:hover {
   align-items: center;
   justify-content: center;
   border: 2px solid var(--color-surface);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 2px 6px rgba(44, 24, 16, 0.28);
   transition: transform var(--transition-fast);
 }
 
 .cart-badge.has-items {
   background-color: #D7A34A;
-  color: #040D12;
+  color: #1A0A04;
   /* Statically clear and visible; blinking animation removed per user request */
 }
 
@@ -858,7 +858,7 @@ html.dark .btn-signin:hover {
   border-radius: var(--radius-lg);
   background: var(--color-obsidian);
   border: 1px solid rgba(215, 163, 74, 0.25);
-  box-shadow: 0 24px 60px rgba(4, 13, 18, 0.55);
+  box-shadow: 0 24px 60px rgba(54, 29, 18, 0.55);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -895,9 +895,9 @@ html.dark .btn-signin:hover {
   inset: 0;
   background: linear-gradient(
     180deg,
-    rgba(4, 13, 18, 0.2) 0%,
-    rgba(4, 13, 18, 0.1) 40%,
-    rgba(4, 13, 18, 0.85) 100%
+    rgba(54, 29, 18, 0.2) 0%,
+    rgba(54, 29, 18, 0.1) 40%,
+    rgba(54, 29, 18, 0.85) 100%
   );
   pointer-events: none;
 }
@@ -914,7 +914,7 @@ html.dark .btn-signin:hover {
   align-items: center;
   gap: 0.5rem;
   padding: 0.35rem 0.85rem;
-  background: rgba(4, 13, 18, 0.82);
+  background: rgba(54, 29, 18, 0.82);
   backdrop-filter: blur(10px);
   border: 1px solid rgba(215, 163, 74, 0.4);
   border-radius: 9999px;
@@ -1197,7 +1197,7 @@ html.dark .btn-signin:hover {
 
 .showcase-section {
   padding: 6rem 0;
-  background-color: #0E0C0B;
+  background-color: var(--color-obsidian);
   color: #FFFDF9;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
@@ -1266,12 +1266,12 @@ html.dark .btn-signin:hover {
 .showcase-canvas-card,
 .showcase-carousel-card {
   position: relative;
-  background: var(--color-obsidian);
+  background: var(--color-charcoal);
   border-radius: var(--radius-lg);
   border: 1px solid var(--color-charcoal-border);
   height: 480px;
   overflow: hidden;
-  box-shadow: 0 20px 50px rgba(4, 13, 18, 0.5);
+  box-shadow: 0 20px 50px rgba(54, 29, 18, 0.45);
   display: flex;
   flex-direction: column;
 }
@@ -1285,7 +1285,7 @@ html.dark .btn-signin:hover {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #000;
+  background: var(--color-obsidian);
 }
 
 .carousel-main-image {
@@ -1302,7 +1302,7 @@ html.dark .btn-signin:hover {
 .carousel-vignette {
   position: absolute;
   inset: 0;
-  background: linear-gradient(180deg, rgba(4, 13, 18, 0.1) 0%, rgba(4, 13, 18, 0.6) 100%);
+  background: linear-gradient(180deg, rgba(54, 29, 18, 0.1) 0%, rgba(54, 29, 18, 0.6) 100%);
   pointer-events: none;
 }
 
@@ -1319,7 +1319,7 @@ html.dark .btn-signin:hover {
 
 .carousel-slide-counter {
   padding: 0.3rem 0.75rem;
-  background: rgba(4, 13, 18, 0.82);
+  background: rgba(54, 29, 18, 0.82);
   backdrop-filter: blur(8px);
   border: 1px solid rgba(215, 163, 74, 0.3);
   border-radius: var(--radius-full);
@@ -1347,7 +1347,7 @@ html.dark .btn-signin:hover {
   width: 2.75rem;
   height: 2.75rem;
   border-radius: 50%;
-  background: rgba(4, 13, 18, 0.75);
+  background: rgba(54, 29, 18, 0.75);
   backdrop-filter: blur(8px);
   border: 1px solid rgba(255, 255, 255, 0.2);
   color: #FFF;
@@ -1363,7 +1363,7 @@ html.dark .btn-signin:hover {
 
 .carousel-nav-btn:hover {
   background: var(--color-gold);
-  color: #040D12;
+  color: #1A0A04;
   border-color: var(--color-gold);
   transform: translateY(-50%) scale(1.08);
 }
@@ -2099,7 +2099,7 @@ html.dark .btn-signin:hover {
 
 .brand-story-section {
   padding: 7rem 0;
-  background-color: #110F0E;
+  background-color: var(--color-obsidian);
   color: #FFFDF9;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
@@ -2175,9 +2175,9 @@ html.dark .btn-signin:hover {
 
 .story-art-card {
   position: relative;
-  background: radial-gradient(circle at top left, #231C18 0%, #151210 100%);
+  background: radial-gradient(circle at top left, #4E2818 0%, #2A160E 100%);
   border-radius: var(--radius-lg);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(215, 163, 74, 0.25);
   padding: 2.5rem 2rem;
   box-shadow: var(--shadow-glass);
 }
@@ -2508,7 +2508,7 @@ html.dark .btn-signin:hover {
   background: #FFFFFF;
   display: flex;
   flex-direction: column;
-  box-shadow: -8px 0 32px rgba(0, 0, 0, 0.2);
+  box-shadow: -8px 0 32px rgba(44, 24, 16, 0.22);
   animation: slideInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
@@ -2819,7 +2819,7 @@ html.dark .btn-signin:hover {
   background: #FFFFFF;
   border-radius: var(--radius-lg);
   border: 1px solid var(--color-card-border);
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 24px 60px rgba(44, 24, 16, 0.32);
   display: flex;
   flex-direction: column;
   animation: scaleUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
@@ -3263,7 +3263,7 @@ html.dark .btn-signin:hover {
 .thumb-3d-btn {
   flex-direction: column;
   gap: 0.2rem;
-  background: #0E0C0B;
+  background: var(--color-obsidian);
 }
 
 .thumb-3d-badge {
@@ -3503,7 +3503,7 @@ html.dark .btn-signin:hover {
    ============================================================================== */
 
 .collection-hero-banner {
-  background-color: #0E0C0B;
+  background-color: var(--color-obsidian);
   color: #FFFDF9;
   padding: 3.5rem 0 4rem;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
@@ -3851,7 +3851,7 @@ html.dark .account-title {
 [data-theme="dark"] .account-avatar,
 html.dark .account-avatar {
   background: var(--color-gold);
-  color: #123D30;
+  color: #1E0C04;
 }
 
 .account-user-name {
@@ -4160,7 +4160,7 @@ html.dark .edit-profile-trigger:hover {
 [data-theme="dark"] .form-save-btn,
 html.dark .form-save-btn {
   background: var(--color-gold);
-  color: #123D30;
+  color: #1E0C04;
 }
 
 .alert {
@@ -4325,7 +4325,7 @@ html.dark .alert-error {
 .stepper-step-node.active .stepper-node-circle {
   background: var(--color-gold);
   border-color: var(--color-gold);
-  color: #040D12;
+  color: #1A0A04;
   box-shadow: 0 0 12px rgba(215, 163, 74, 0.5);
   animation: pulseNode 2s infinite;
 }

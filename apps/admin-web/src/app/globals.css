@@ -1,14 +1,14 @@
 :root {
-  --color-bg-cream: #F6F1E7;
+  --color-bg-cream: #FDF8F2;
   --color-surface: #FFFFFF;
-  --color-brand-primary: #123D30;
-  --color-brand-hover: #0E3026;
-  --color-brand-light: #DCE5DB;
+  --color-brand-primary: #C85C1A;
+  --color-brand-hover: #A84810;
+  --color-brand-light: #FDE8D6;
   --color-gold: #D7A34A;
-  --color-text-main: #252923;
-  --color-text-muted: #6E7369;
-  --color-border: #E2DDD3;
-  --color-border-light: #ECE7DE;
+  --color-text-main: #2C1810;
+  --color-text-muted: #7A5C4A;
+  --color-border: #EAD9C8;
+  --color-border-light: #F0E4D8;
   --color-success-bg: #EBF8EE;
   --color-success-text: #198754;
   --color-warning-bg: #FFF8E6;
@@ -21,8 +21,8 @@
   --radius-sm: 6px;
   --radius-md: 10px;
   --radius-lg: 14px;
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.05);
-  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
+  --shadow-sm: 0 1px 3px rgba(44, 24, 16, 0.06);
+  --shadow-md: 0 4px 12px rgba(44, 24, 16, 0.10);
 }
 
 * {
@@ -114,7 +114,7 @@ input:focus, select:focus, textarea:focus {
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.45);
+  background: rgba(26, 10, 4, 0.52);
   backdrop-filter: blur(2px);
   display: flex;
   align-items: center;
