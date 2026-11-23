@@ -2,6 +2,7 @@
 
 import type { ReactElement } from 'react';
 import type { Category } from '@orange/api-contracts';
+import { Layers } from 'lucide-react';
 
 interface CategoryNavProps {
   categories: Category[];
@@ -15,7 +16,7 @@ export function CategoryNav({
   onSelectCategory,
 }: CategoryNavProps): ReactElement {
   return (
-    <div className="category-nav-bar" role="tablist" aria-label="Menu Categories">
+    <div className="category-nav-bar" role="tablist" aria-label="Product Categories">
       <button
         type="button"
         role="tab"
@@ -23,28 +24,22 @@ export function CategoryNav({
         className={`category-chip ${selectedSlug === '' ? 'active' : ''}`}
         onClick={() => onSelectCategory('')}
       >
-        <span>🍰</span>
-        <span>All Items</span>
+        <Layers size={15} aria-hidden="true" />
+        <span>All Products</span>
       </button>
 
       {categories.map((cat) => {
-        let icon = '🍊';
-        if (cat.slug.includes('cake')) icon = '🎂';
-        else if (cat.slug.includes('juice')) icon = '🥤';
-        else if (cat.slug.includes('chocolate')) icon = '🍫';
-
-        const isSelected = selectedSlug === cat.slug;
+        const isSelected = selectedSlug.toLowerCase() === cat.slug.toLowerCase();
 
         return (
           <button
-            key={cat.id}
+            key={cat.id || cat.slug}
             type="button"
             role="tab"
             aria-selected={isSelected}
             className={`category-chip ${isSelected ? 'active' : ''}`}
             onClick={() => onSelectCategory(cat.slug)}
           >
-            <span>{icon}</span>
             <span>{cat.name}</span>
           </button>
         );
@@ -52,4 +47,3 @@ export function CategoryNav({
     </div>
   );
 }
-

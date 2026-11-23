@@ -1,7 +1,20 @@
 'use client';
 
-import { useState, type ReactElement } from 'react';
+import { useState, useEffect, type ReactElement } from 'react';
 import Link from 'next/link';
+import {
+  Search,
+  ShoppingBag,
+  User,
+  Clock,
+  Menu,
+  X,
+  ChevronDown,
+  ArrowRight,
+  LogOut,
+} from 'lucide-react';
+import type { Category } from '@orange/api-contracts';
+import { fetchCategories } from '../lib/api';
 import { CartDrawer } from './CartDrawer';
 import { AuthModal } from './AuthModal';
 import { ThemeToggle } from './ThemeProvider';
@@ -9,19 +22,44 @@ import { useCart } from '../lib/cart';
 import { useCustomerAuth } from '../lib/auth';
 
 interface HeaderProps {
+  categories?: Category[];
   onCategorySelect?: (slug: string) => void;
 }
 
-export function Header({ onCategorySelect }: HeaderProps): ReactElement {
+export function Header({ categories: propCategories, onCategorySelect }: HeaderProps): ReactElement {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isCategoriesDropdownOpen, setIsCategoriesDropdownOpen] = useState(false);
+  const [categories, setCategories] = useState<Category[]>(propCategories || []);
 
   const { totalQuantity } = useCart();
   const { session, isAuthenticated, logout } = useCustomerAuth();
 
+  // If categories are not provided via props (e.g. on dedicated subpages), fetch them dynamically
+  useEffect(() => {
+    if (propCategories && propCategories.length > 0) {
+      setCategories(propCategories);
+      return;
+    }
+
+    let isMounted = true;
+    fetchCategories()
+      .then((cats) => {
+        if (isMounted) setCategories(cats);
+      })
+      .catch((err) => {
+        console.warn('Failed to fetch categories for header:', err);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [propCategories]);
+
   const handleNavClick = (slug: string) => {
     setIsMobileMenuOpen(false);
+    setIsCategoriesDropdownOpen(false);
     if (onCategorySelect) {
       onCategorySelect(slug);
     }
@@ -40,22 +78,27 @@ export function Header({ onCategorySelect }: HeaderProps): ReactElement {
 
   return (
     <>
-      {/* Announcement Bar */}
+      {/* Editorial Announcement Bar */}
       <div className="announcement-bar">
         <span className="announcement-dot" aria-hidden="true" />
-        <span>Mangala Enterprises • Artisanal Delicacies & Fresh Gourmet Confections • Fresh Counter Pickup</span>
+        <span className="announcement-text">
+          Mangala Enterprises • Contemporary Food, Beverages & Gourmet Treats • In-Store Counter Pickup
+        </span>
       </div>
 
       <header className="site-header">
         <div className="container header-inner">
-          {/* Brand Logo */}
+          {/* Brand Identity / Logo */}
           <Link href="/" className="brand-logo" aria-label="Mangala Enterprises Home">
-            <span className="brand-logo-mark" aria-hidden="true">
-              🌿
+            <span className="brand-logo-emblem" aria-hidden="true">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
+              </svg>
             </span>
-            <span className="brand-logo-text">
-              Mangala Enterprises
-            </span>
+            <div className="brand-logo-titles">
+              <span className="brand-logo-main">MANGALA</span>
+              <span className="brand-logo-sub">ENTERPRISES</span>
+            </div>
           </Link>
 
           {/* Primary Desktop Navigation */}
@@ -65,67 +108,91 @@ export function Header({ onCategorySelect }: HeaderProps): ReactElement {
               className="nav-link"
               onClick={() => handleNavClick('')}
             >
-              Full Menu
+              Shop All
             </Link>
-            <Link
-              href="/collection/artisanal-cakes"
-              className="nav-link"
-              onClick={() => handleNavClick('artisanal-cakes')}
+
+            {/* Dynamic Categories Menu with Dropdown */}
+            <div
+              className="nav-dropdown-wrapper"
+              onMouseEnter={() => setIsCategoriesDropdownOpen(true)}
+              onMouseLeave={() => setIsCategoriesDropdownOpen(false)}
             >
-              Artisanal Cakes
-            </Link>
-            <Link
-              href="/collection/cold-pressed-juices"
-              className="nav-link"
-              onClick={() => handleNavClick('cold-pressed-juices')}
-            >
-              Cold-Pressed Juices
-            </Link>
-            <Link
-              href="/collection/gourmet-chocolates"
-              className="nav-link"
-              onClick={() => handleNavClick('gourmet-chocolates')}
-            >
-              Gourmet Chocolates
-            </Link>
+              <button
+                type="button"
+                className={`nav-link nav-dropdown-trigger ${isCategoriesDropdownOpen ? 'active' : ''}`}
+                aria-expanded={isCategoriesDropdownOpen}
+                aria-haspopup="true"
+                onClick={() => setIsCategoriesDropdownOpen(!isCategoriesDropdownOpen)}
+              >
+                <span>Categories</span>
+                <ChevronDown size={14} className={`dropdown-chevron ${isCategoriesDropdownOpen ? 'rotate' : ''}`} />
+              </button>
+
+              {isCategoriesDropdownOpen && (
+                <div className="nav-dropdown-panel" role="menu">
+                  <div className="dropdown-panel-inner">
+                    <Link
+                      href="/#menu"
+                      className="dropdown-item"
+                      role="menuitem"
+                      onClick={() => handleNavClick('')}
+                    >
+                      <div className="dropdown-item-content">
+                        <span className="dropdown-item-title">All Categories</span>
+                        <span className="dropdown-item-desc">Explore the full in-store catalogue</span>
+                      </div>
+                      <ArrowRight size={14} className="dropdown-item-arrow" />
+                    </Link>
+
+                    {categories.map((cat) => (
+                      <Link
+                        key={cat.id || cat.slug}
+                        href={`/collection/${cat.slug}`}
+                        className="dropdown-item"
+                        role="menuitem"
+                        onClick={() => handleNavClick(cat.slug)}
+                      >
+                        <div className="dropdown-item-content">
+                          <span className="dropdown-item-title">{cat.name}</span>
+                          {cat.description && (
+                            <span className="dropdown-item-desc">{cat.description}</span>
+                          )}
+                        </div>
+                        <ArrowRight size={14} className="dropdown-item-arrow" />
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
             <Link href="/#about" className="nav-link">
               Our Story
             </Link>
+
             <Link href="/orders" className="nav-link">
               Track Order
             </Link>
+
             <Link href="/#service" className="nav-link">
-              Pickup & Policies
+              Store Pickup
             </Link>
           </nav>
 
           {/* Header Action Controls */}
           <div className="header-actions">
-            {/* Light / Dark Mode Toggle */}
+            {/* Theme Toggle */}
             <ThemeToggle />
 
-            {/* Quick Search Trigger */}
+            {/* Quick Search */}
             <button
               type="button"
               className="header-action-btn search-trigger-btn"
               onClick={handleSearchFocus}
-              aria-label="Search delicacies"
-              title="Quick Search"
+              aria-label="Search catalogue"
+              title="Search products"
             >
-              <svg
-                width="18"
-                height="18"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <circle cx="11" cy="11" r="8" />
-                <path d="m21 21-4.3-4.3" />
-              </svg>
+              <Search size={18} aria-hidden="true" />
               <span className="search-hint-text">Search</span>
             </button>
 
@@ -138,7 +205,7 @@ export function Header({ onCategorySelect }: HeaderProps): ReactElement {
                   aria-label="View My Orders"
                   title="My Orders"
                 >
-                  <span className="orders-icon">📋</span>
+                  <Clock size={15} aria-hidden="true" />
                   <span>Orders</span>
                 </Link>
 
@@ -148,11 +215,10 @@ export function Header({ onCategorySelect }: HeaderProps): ReactElement {
                   aria-label="View Customer Account Profile"
                   title={session?.user.phone}
                 >
-                  <span className="account-icon">👤</span>
+                  <User size={15} aria-hidden="true" />
                   <span>{session?.user.fullName ? session.user.fullName.split(' ')[0] : 'Account'}</span>
                 </Link>
 
-                {/* Refined subtle sign-out button (no aggressive red background) */}
                 <button
                   type="button"
                   onClick={logout}
@@ -160,21 +226,7 @@ export function Header({ onCategorySelect }: HeaderProps): ReactElement {
                   aria-label="Sign out"
                   title="Sign out of account"
                 >
-                  <svg
-                    width="14"
-                    height="14"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    aria-hidden="true"
-                  >
-                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-                    <polyline points="16 17 21 12 16 7" />
-                    <line x1="21" y1="12" x2="9" y2="12" />
-                  </svg>
+                  <LogOut size={14} aria-hidden="true" />
                   <span>Sign Out</span>
                 </button>
               </div>
@@ -186,7 +238,7 @@ export function Header({ onCategorySelect }: HeaderProps): ReactElement {
                   aria-label="Track Order"
                   title="Track your order status"
                 >
-                  <span className="orders-icon">📍</span>
+                  <Clock size={15} aria-hidden="true" />
                   <span>Track</span>
                 </Link>
 
@@ -196,34 +248,20 @@ export function Header({ onCategorySelect }: HeaderProps): ReactElement {
                   className="btn-signin"
                   aria-label="Sign in to your account"
                 >
-                  <span aria-hidden="true">👤</span>
+                  <User size={15} aria-hidden="true" />
                   <span>Sign In</span>
                 </button>
               </div>
             )}
 
-            {/* Shopping Bag CTA */}
+            {/* Shopping Bag Trigger */}
             <button
               type="button"
               className="cart-trigger-btn"
               onClick={() => setIsCartOpen(true)}
               aria-label={`View Shopping Bag (${totalQuantity} items)`}
             >
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z" />
-                <path d="M3 6h18" />
-                <path d="M16 10a4 4 0 0 1-8 0" />
-              </svg>
+              <ShoppingBag size={20} aria-hidden="true" />
               <span className={`cart-badge ${totalQuantity > 0 ? 'has-items' : ''}`} aria-hidden="true">
                 {totalQuantity}
               </span>
@@ -237,7 +275,7 @@ export function Header({ onCategorySelect }: HeaderProps): ReactElement {
               aria-label={isMobileMenuOpen ? 'Close Menu' : 'Open Menu'}
               aria-expanded={isMobileMenuOpen}
             >
-              <span className="hamburger-icon">{isMobileMenuOpen ? '✕' : '☰'}</span>
+              {isMobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
             </button>
           </div>
         </div>
@@ -255,48 +293,48 @@ export function Header({ onCategorySelect }: HeaderProps): ReactElement {
               className="mobile-nav-link"
               onClick={() => handleNavClick('')}
             >
-              <span>Full Menu Catalog</span>
-              <span className="nav-arrow">→</span>
+              <span>Explore All Products</span>
+              <ArrowRight size={16} className="nav-arrow" />
             </Link>
-            <Link
-              href="/collection/artisanal-cakes"
-              className="mobile-nav-link"
-              onClick={() => handleNavClick('artisanal-cakes')}
-            >
-              <span>Artisanal Cakes</span>
-              <span className="nav-arrow">→</span>
-            </Link>
-            <Link
-              href="/collection/cold-pressed-juices"
-              className="mobile-nav-link"
-              onClick={() => handleNavClick('cold-pressed-juices')}
-            >
-              <span>Cold-Pressed Juices</span>
-              <span className="nav-arrow">→</span>
-            </Link>
-            <Link
-              href="/collection/gourmet-chocolates"
-              className="mobile-nav-link"
-              onClick={() => handleNavClick('gourmet-chocolates')}
-            >
-              <span>Gourmet Chocolates</span>
-              <span className="nav-arrow">→</span>
-            </Link>
+
+            {/* Dynamic categories in mobile menu */}
+            {categories.map((cat) => (
+              <Link
+                key={cat.id || cat.slug}
+                href={`/collection/${cat.slug}`}
+                className="mobile-nav-link category-sublink"
+                onClick={() => handleNavClick(cat.slug)}
+              >
+                <span>{cat.name}</span>
+                <ArrowRight size={14} className="nav-arrow" />
+              </Link>
+            ))}
+
             <Link
               href="/#about"
               className="mobile-nav-link"
               onClick={() => setIsMobileMenuOpen(false)}
             >
-              <span>Our Story & Philosophy</span>
-              <span className="nav-arrow">→</span>
+              <span>Our Story & Standards</span>
+              <ArrowRight size={16} className="nav-arrow" />
             </Link>
+
             <Link
               href="/#service"
               className="mobile-nav-link"
               onClick={() => setIsMobileMenuOpen(false)}
             >
-              <span>Counter Pickup & Guarantees</span>
-              <span className="nav-arrow">→</span>
+              <span>Store Counter Pickup</span>
+              <ArrowRight size={16} className="nav-arrow" />
+            </Link>
+
+            <Link
+              href="/orders"
+              className="mobile-nav-link"
+              onClick={() => setIsMobileMenuOpen(false)}
+            >
+              <span>Track Order Status</span>
+              <ArrowRight size={16} className="nav-arrow" />
             </Link>
 
             {isAuthenticated ? (
@@ -306,14 +344,14 @@ export function Header({ onCategorySelect }: HeaderProps): ReactElement {
                   className="mobile-account-btn"
                   onClick={() => setIsMobileMenuOpen(false)}
                 >
-                  👤 Account Profile
+                  <User size={15} style={{ marginRight: '6px' }} /> Account Profile
                 </Link>
                 <Link
                   href="/orders"
                   className="mobile-orders-btn"
                   onClick={() => setIsMobileMenuOpen(false)}
                 >
-                  📋 My Orders
+                  <Clock size={15} style={{ marginRight: '6px' }} /> My Orders
                 </Link>
                 <button
                   type="button"
@@ -323,7 +361,7 @@ export function Header({ onCategorySelect }: HeaderProps): ReactElement {
                   }}
                   className="mobile-signout-btn"
                 >
-                  Sign Out
+                  <LogOut size={14} style={{ marginRight: '6px' }} /> Sign Out
                 </button>
               </div>
             ) : (
@@ -335,7 +373,7 @@ export function Header({ onCategorySelect }: HeaderProps): ReactElement {
                 }}
                 className="mobile-signin-btn"
               >
-                👤 Sign In / Account
+                <User size={16} style={{ marginRight: '8px' }} /> Sign In / Create Account
               </button>
             )}
           </div>

@@ -82,7 +82,7 @@ interface StoredMockOrder {
   items: OrderItem[];
 }
 
-import { mockStockStore, type MockStockRecord } from '../services/inventoryStore.js';
+import { mockStockStore } from '../services/inventoryStore.js';
 export { mockStockStore, type MockStockRecord } from '../services/inventoryStore.js';
 
 // In-memory order & idempotency storage for test/mock service mode

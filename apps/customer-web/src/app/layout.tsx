@@ -3,9 +3,9 @@ import './globals.css';
 import { ThemeProvider } from '../components/ThemeProvider';
 
 export const metadata = {
-  title: 'Mangala Enterprises — Boutique Artisanal Commerce',
+  title: 'Mangala Enterprises — Contemporary Premium Retail',
   description:
-    'Mangala Enterprises — Handcrafted boutique artisanal cakes, pure cold-pressed nectars, and single-origin gourmet chocolates for fresh counter pickup.',
+    'Mangala Enterprises — A curated retail destination for food, savoury snacks, chilled beverages, ice creams, and handcrafted confectionery. Ready for in-store counter pickup.',
 };
 
 export default function RootLayout({

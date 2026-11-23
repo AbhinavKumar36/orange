@@ -264,6 +264,9 @@ export default function CustomerOrdersPage(): ReactElement {
                     style={{ accentColor: 'var(--color-gold, #D7A34A)' }}
                   />
                   <span>Live Updates</span>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginLeft: '0.25rem' }}>
+                    ({lastUpdated.toLocaleTimeString()})
+                  </span>
                 </label>
               </div>
             )}

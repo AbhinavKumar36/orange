@@ -1,6 +1,7 @@
 'use client';
 
 import type { ReactElement } from 'react';
+import { AlertCircle, SearchX, PackageOpen, RotateCw } from 'lucide-react';
 import type { Product } from '@orange/api-contracts';
 import { ProductCard } from './ProductCard';
 
@@ -26,7 +27,7 @@ export function ProductGrid({
   // 1. Loading Skeleton
   if (isLoading) {
     return (
-      <div className="product-grid" aria-label="Loading menu items" aria-busy="true">
+      <div className="product-grid" aria-label="Loading products" aria-busy="true">
         {[1, 2, 3, 4, 5, 6].map((i) => (
           <div key={i} className="skeleton-card" aria-hidden="true">
             <div className="skeleton-media" />
@@ -61,27 +62,15 @@ export function ProductGrid({
     return (
       <div className="state-box" role="alert">
         <div className="state-icon-circle">
-          <svg
-            width="28"
-            height="28"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <circle cx="12" cy="12" r="10" />
-            <line x1="12" y1="8" x2="12" y2="12" />
-            <line x1="12" y1="16" x2="12.01" y2="16" />
-          </svg>
+          <AlertCircle size={26} />
         </div>
-        <h3 className="state-title">Store Server Unavailable</h3>
+        <h3 className="state-title">Catalogue Temporarily Unavailable</h3>
         <p className="state-copy">
-          {error.message || 'We are having trouble connecting to the boutique catalog. Please verify your connection or try again.'}
+          {error.message || 'We are having trouble connecting to the store inventory. Please check your connection or retry.'}
         </p>
         <button type="button" className="btn-primary" onClick={onRetry}>
-          Try Again
+          <RotateCw size={15} style={{ display: 'inline', marginRight: '6px' }} />
+          Retry Connection
         </button>
       </div>
     );
@@ -92,25 +81,11 @@ export function ProductGrid({
     return (
       <div className="state-box">
         <div className="state-icon-circle">
-          <svg
-            width="28"
-            height="28"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <circle cx="11" cy="11" r="8" />
-            <line x1="21" y1="21" x2="16.65" y2="16.65" />
-            <line x1="8" y1="11" x2="14" y2="11" />
-          </svg>
+          <SearchX size={26} />
         </div>
-        <h3 className="state-title">No Matching Treats Found</h3>
+        <h3 className="state-title">No Matching Products Found</h3>
         <p className="state-copy">
-          We could not find any items matching your current filters. Try searching for another
-          delicacy or clear active filters.
+          We could not find any products matching your current filters. Try searching with different keywords or reset your filters.
         </p>
         <button type="button" className="btn-secondary" onClick={onResetFilters}>
           Clear Filters & Show All
@@ -124,14 +99,15 @@ export function ProductGrid({
     return (
       <div className="state-box">
         <div className="state-icon-circle">
-          <span style={{ fontSize: '1.5rem' }}>🍊</span>
+          <PackageOpen size={26} />
         </div>
-        <h3 className="state-title">Catalog Currently Updating</h3>
+        <h3 className="state-title">Catalogue Currently Updating</h3>
         <p className="state-copy">
-          No menu items are currently listed. Please check back shortly or refresh the catalog.
+          No products are currently listed in this section. Please check back shortly or refresh.
         </p>
         <button type="button" className="btn-primary" onClick={onRetry}>
-          Refresh Menu
+          <RotateCw size={15} style={{ display: 'inline', marginRight: '6px' }} />
+          Refresh Catalogue
         </button>
       </div>
     );
@@ -139,7 +115,7 @@ export function ProductGrid({
 
   // 5. Active Product Grid
   return (
-    <div className="product-grid" aria-label="Product Catalog">
+    <div className="product-grid" aria-label="Product Catalogue">
       {products.map((product) => (
         <ProductCard
           key={product.id}

@@ -1,6 +1,7 @@
 'use client';
 
 import type { ReactElement } from 'react';
+import { Search, X } from 'lucide-react';
 
 interface SearchBarProps {
   query: string;
@@ -17,29 +18,17 @@ export function SearchBar({
     <div id="menu-search" className="search-bar-wrapper">
       <div className="search-input-box">
         <span className="search-icon-left" aria-hidden="true">
-          <svg
-            width="18"
-            height="18"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <circle cx="11" cy="11" r="8" />
-            <path d="m21 21-4.3-4.3" />
-          </svg>
+          <Search size={18} />
         </span>
 
         <input
           id="catalog-search-input"
           type="search"
           className="search-input"
-          placeholder="Search by delicacy, flavor, or ingredient..."
+          placeholder="Search products, beverages, snacks, treats..."
           value={query}
           onChange={(e) => onChange(e.target.value)}
-          aria-label="Search menu catalog"
+          aria-label="Search product catalogue"
         />
 
         {query.length > 0 && (
@@ -49,15 +38,15 @@ export function SearchBar({
             onClick={() => onChange('')}
             aria-label="Clear search input"
           >
-            ✕
+            <X size={15} />
           </button>
         )}
       </div>
 
       {typeof resultCount === 'number' && (
         <div className="catalog-counter">
-          <span>Catalog Results:</span>
-          <strong>{resultCount}</strong> {resultCount === 1 ? 'creation' : 'creations'}
+          <span>Products:</span>
+          <strong>{resultCount}</strong> {resultCount === 1 ? 'item' : 'items'}
         </div>
       )}
     </div>

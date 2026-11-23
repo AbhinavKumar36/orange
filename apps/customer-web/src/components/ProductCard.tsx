@@ -2,6 +2,7 @@
 
 import { useState, type ReactElement } from 'react';
 import Link from 'next/link';
+import { ShoppingBag, Check, Clock } from 'lucide-react';
 import { type Product, formatPaiseToRupees } from '@orange/api-contracts';
 import { ProductIllustration } from './ProductIllustration';
 import { FoodIndicator } from './FoodIndicator';
@@ -32,6 +33,12 @@ export function ProductCard({
       onOpenCart();
     }
   }
+
+  // Determine appropriate operational label
+  const isCustomPrep =
+    product.prepTimeMinutes &&
+    product.prepTimeMinutes > 10 &&
+    (product.categorySlug.includes('cake') || product.slug.includes('cake'));
 
   return (
     <article
@@ -93,7 +100,14 @@ export function ProductCard({
       <div className="card-body">
         <div className="card-meta-top">
           <span className="category-tag">{product.categoryName}</span>
-          <span className="card-prep-time">⏱️ {product.prepTimeMinutes}m</span>
+          {isCustomPrep ? (
+            <span className="card-prep-time">
+              <Clock size={12} style={{ display: 'inline', marginRight: '3px' }} />
+              {product.prepTimeMinutes}m
+            </span>
+          ) : (
+            <span className="card-pickup-note">Counter Ready</span>
+          )}
         </div>
 
         <h3 id={`product-title-${product.id}`} className="product-title">
@@ -102,11 +116,13 @@ export function ProductCard({
           </Link>
         </h3>
 
-        <p className="product-description">{product.description || 'Artisanal delicacy.'}</p>
+        {product.description && (
+          <p className="product-description">{product.description}</p>
+        )}
 
         {product.allergens && product.allergens.length > 0 && (
           <div className="card-allergen-row">
-            <span className="allergen-label">Contains:</span>
+            <span className="allergen-label">Allergens:</span>
             <span className="allergen-text">{product.allergens.slice(0, 2).join(', ')}</span>
           </div>
         )}
@@ -127,14 +143,22 @@ export function ProductCard({
                   aria-label={`Add ${product.name} to shopping bag`}
                   title="Quick Add to Bag"
                 >
-                  {justAdded ? '✓ Added' : '+ Add'}
+                  {justAdded ? (
+                    <>
+                      <Check size={14} /> Added
+                    </>
+                  ) : (
+                    <>
+                      <ShoppingBag size={14} /> Add
+                    </>
+                  )}
                 </button>
                 <Link
                   href={`/product/${encodeURIComponent(product.slug)}`}
                   className="btn-card-details"
                   aria-label={`View details for ${product.name}`}
                 >
-                  Details
+                  View
                 </Link>
               </>
             ) : (

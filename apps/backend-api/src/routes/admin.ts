@@ -393,8 +393,8 @@ export const adminRoutes: FastifyPluginAsync<AdminRoutesOptions> = async (app, o
           taxRatePct: typeof row.tax_rate_pct === 'string' ? parseFloat(row.tax_rate_pct) : row.tax_rate_pct,
           isVeg: row.is_veg,
           foodClassification:
-            (row as any).food_classification === 'vegetarian' || (row as any).food_classification === 'non_vegetarian'
-              ? (row as any).food_classification
+            (row as Record<string, unknown>).food_classification === 'vegetarian' || (row as Record<string, unknown>).food_classification === 'non_vegetarian'
+              ? ((row as Record<string, unknown>).food_classification as 'vegetarian' | 'non_vegetarian')
               : row.is_veg
               ? 'vegetarian'
               : 'non_vegetarian',
@@ -872,12 +872,13 @@ export const adminRoutes: FastifyPluginAsync<AdminRoutesOptions> = async (app, o
           url: publicUrl,
           fileName: uniqueFileName,
         });
-      } catch (err: any) {
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : 'Failed to upload image to storage service.';
         return reply.status(500).send({
           error: {
             statusCode: 500,
             code: 'STORAGE_ERROR',
-            message: err?.message || 'Failed to upload image to storage service.',
+            message,
           },
         });
       }

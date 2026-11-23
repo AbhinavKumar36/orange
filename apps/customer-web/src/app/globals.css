@@ -1,86 +1,116 @@
 /* ==============================================================================
-   MOODY ORANGE — Luxury Editorial Design System & Stylesheet
-   Brand Aesthetics: Premium, Modern, Bold, Immersive, Sophisticated, Warm, Futuristic
+   MANGALA ENTERPRISES — Contemporary Premium Retail Design System
+   Brand Aesthetics: Sophisticated, Approachable, Food-Focused, Modern & Memorable
+   Palette: Forest Green, Warm Ivory, Mangala Orange, Atmospheric Deep Charcoal
    ============================================================================== */
 
 @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,600;0,700;0,800;1,500&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
 
 :root {
   /* ==========================================================================
-     MOODY ORANGE — MOODY AMBER DESIGN SYSTEM
-     Palette: Burnt Amber (#C85C1A), Warm Cream (#FDF8F2), Muted Gold (#D7A34A),
-              Warm Brown (#2C1810), Soft Peach (#FDE8D6), White (#FFFFFF)
+     MANGALA ENTERPRISES DESIGN TOKENS
+     - Forest Green: Primary brand authority & anchor
+     - Warm Ivory: Welcoming, clean, natural retail surface
+     - Mangala Orange: Restrained accent, interactive cues & highlights
+     - Charcoal/Espresso: Rich atmospheric dark panels
      ========================================================================== */
 
-  /* Light Mode (Default) Surfaces */
-  --color-canvas: #FDF8F2;
+  /* Light Mode Surfaces (Warm Ivory Foundation) */
+  --color-canvas: #FAF7F2;
   --color-surface: #FFFFFF;
-  --color-surface-elevated: #FDF5EE;
-  --color-surface-hover: #F7EDE0;
-  --color-card-border: #EAD9C8;
-  --color-divider: #EDD9C4;
+  --color-surface-elevated: #F5EFE6;
+  --color-surface-hover: #EFE8DD;
+  --color-card-border: #E5DCD0;
+  --color-divider: #EAE1D5;
 
-  /* Atmospheric / Hero Sections — Warm Espresso & Roasted Cacao Palette (Replaces Black) */
-  --color-obsidian: #361D12;
-  --color-charcoal-dark: #27130B;
-  --color-charcoal: #452416;
-  --color-charcoal-elevated: #542D1C;
-  --color-charcoal-border: rgba(215, 163, 74, 0.28);
+  /* Forest Green (Primary Brand Anchor) */
+  --color-forest: #143E2B;
+  --color-forest-dark: #0D2B1E;
+  --color-forest-light: #1E573D;
+  --color-forest-surface: #EDF4F0;
+  --color-forest-border: rgba(20, 62, 43, 0.16);
 
-  /* Primary Brand Tokens (Moody Amber & Muted Gold) */
-  --color-primary: #C85C1A;
-  --color-primary-hover: #A84810;
-  --color-primary-dark: #8A3A0C;
-  --color-primary-glow: rgba(200, 92, 26, 0.22);
-  --color-primary-subtle: #FDE8D6;
+  /* Primary Token Aliases */
+  --color-primary: #143E2B;
+  --color-primary-hover: #1E573D;
+  --color-primary-dark: #0D2B1E;
+  --color-primary-glow: rgba(20, 62, 43, 0.22);
+  --color-primary-subtle: #EDF4F0;
 
-  --color-gold: #D7A34A;
-  --color-gold-hover: #C6933B;
-  --color-gold-light: #F7EBD3;
-  --color-gold-glow: rgba(215, 163, 74, 0.25);
-  --color-amber-gold: #D7A34A;
-  --color-amber-light: #F7EBD3;
-  --color-amber-glow: rgba(215, 163, 74, 0.25);
+  /* Mangala Orange (Restrained Accent & Action Highlighting) */
+  --color-accent-orange: #D8561C;
+  --color-accent-orange-hover: #BE4612;
+  --color-accent-orange-subtle: #FDF1EB;
+  --color-accent-orange-glow: rgba(216, 86, 28, 0.22);
 
-  /* Typography */
-  --color-text-main: #2C1810;
-  --color-text-body: #4A2E1E;
-  --color-text-muted: #7A5C4A;
-  --color-text-subtle: #A07A65;
-  --color-text-inverse: #FDF8F2;
-  --color-text-inverse-muted: #FDE8D6;
+  /* Heritage Gold & Warm Amber Touches */
+  --color-gold: #C99738;
+  --color-gold-hover: #B5842A;
+  --color-gold-light: #F7EEDC;
+  --color-gold-glow: rgba(201, 151, 56, 0.2);
+  --color-amber-gold: #C99738;
+  --color-amber-light: #F7EEDC;
+  --color-amber-glow: rgba(201, 151, 56, 0.2);
+
+  /* Atmospheric / Dark Stage Sections (Deep Charcoal / Green-Espresso) */
+  --color-obsidian: #111A15;
+  --color-charcoal-dark: #0C130F;
+  --color-charcoal: #17241E;
+  --color-charcoal-elevated: #22322A;
+  --color-charcoal-border: rgba(255, 255, 255, 0.12);
+
+  /* High-Contrast Typography */
+  --color-text-main: #14231A;
+  --color-text-body: #334439;
+  --color-text-muted: #617367;
+  --color-text-subtle: #8A9C91;
+  --color-text-inverse: #FAF7F2;
+  --color-text-inverse-muted: #DDE6E0;
+
+  /* Food Category Accents */
+  --color-cat-beverages: #E07D10;
+  --color-cat-beverages-bg: #FEF6EB;
+  --color-cat-snacks: #CA8A04;
+  --color-cat-snacks-bg: #FEF9C3;
+  --color-cat-cakes: #8A3B14;
+  --color-cat-cakes-bg: #FBF0EB;
+  --color-cat-confectionery: #4B2E1E;
+  --color-cat-confectionery-bg: #F5EEE9;
+  --color-cat-icecream: #0284C7;
+  --color-cat-icecream-bg: #F0F9FF;
 
   /* Status & Dietary Accents */
-  --color-veg-green: #168A45;
-  --color-veg-bg: #E8F5EC;
-  --color-nonveg-red: #D32F2F;
-  --color-nonveg-bg: #FFEBEE;
-  --color-stock-green: #168A45;
-  --color-stock-bg: #E8F5EC;
-  --color-soldout-gray: #7A5C4A;
-  --color-soldout-bg: #F0E4D8;
-  --color-allergen-tag: #F0E4D8;
+  --color-veg-green: #15803D;
+  --color-veg-bg: #ECFDF5;
+  --color-nonveg-red: #B91C1C;
+  --color-nonveg-bg: #FEF2F2;
+  --color-stock-green: #15803D;
+  --color-stock-bg: #ECFDF5;
+  --color-soldout-gray: #64748B;
+  --color-soldout-bg: #F1F5F9;
+  --color-allergen-tag: #F1EFEA;
 
   /* Typography Families */
   --font-serif: 'Playfair Display', Georgia, Cambria, 'Times New Roman', serif;
   --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 
-  /* Elevations & Radii */
-  --max-width: 1260px;
+  /* Proportions, Radii & Elevations */
+  --max-width: 1280px;
   --radius-xs: 4px;
   --radius-sm: 8px;
   --radius-md: 14px;
   --radius-lg: 20px;
+  --radius-xl: 28px;
   --radius-full: 9999px;
 
-  --shadow-subtle: 0 2px 8px rgba(44, 24, 16, 0.04);
-  --shadow-sm: 0 4px 14px rgba(44, 24, 16, 0.07);
-  --shadow-md: 0 10px 28px rgba(44, 24, 16, 0.10);
-  --shadow-lg: 0 20px 45px rgba(44, 24, 16, 0.14);
-  --shadow-glass: 0 16px 36px rgba(200, 92, 26, 0.30);
-  --shadow-glow: 0 0 35px rgba(215, 163, 74, 0.3);
+  --shadow-subtle: 0 2px 8px rgba(20, 62, 43, 0.04);
+  --shadow-sm: 0 4px 14px rgba(20, 62, 43, 0.06);
+  --shadow-md: 0 10px 28px rgba(20, 62, 43, 0.08);
+  --shadow-lg: 0 20px 45px rgba(20, 62, 43, 0.12);
+  --shadow-glass: 0 16px 36px rgba(20, 62, 43, 0.20);
+  --shadow-glow: 0 0 35px rgba(216, 86, 28, 0.25);
 
-  /* Transitions */
+  /* Refined Easing & Transitions */
   --transition-fast: 0.18s cubic-bezier(0.16, 1, 0.3, 1);
   --transition-normal: 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   --transition-smooth: 0.5s cubic-bezier(0.16, 1, 0.3, 1);
@@ -88,41 +118,52 @@
 
 /* ==============================================================================
    DARK MODE TOKEN OVERRIDES ([data-theme="dark"] or .dark)
-   Surfaces: Warm Espresso & Dark Cocoa (#0D0905, #1A1008, #251508)
-   Text: Warm cream (#FDF8F2)
-   Highlights: Vibrant Amber (#E8792A) + Muted Gold (#D7A34A)
+   Surfaces: Deep Forest Charcoal & Obsidian (#0C130F, #121A15, #17241E)
+   Text: Warm Ivory (#FAF7F2) & Crisp Mint Tint
+   Highlights: Fresh Botanical Forest Tint & Mangala Orange
    ============================================================================== */
 [data-theme="dark"],
 html.dark {
-  --color-canvas: #2A160E;
-  --color-surface: #361D12;
-  --color-surface-elevated: #452416;
-  --color-surface-hover: #542D1C;
-  --color-card-border: rgba(180, 100, 45, 0.45);
-  --color-divider: #4A2718;
+  --color-canvas: #0F1713;
+  --color-surface: #15221B;
+  --color-surface-elevated: #1B2B23;
+  --color-surface-hover: #22372D;
+  --color-card-border: rgba(255, 255, 255, 0.10);
+  --color-divider: rgba(255, 255, 255, 0.08);
 
-  --color-obsidian: #361D12;
-  --color-charcoal-dark: #27130B;
-  --color-charcoal: #452416;
-  --color-charcoal-elevated: #542D1C;
-  --color-charcoal-border: rgba(215, 163, 74, 0.28);
+  --color-forest: #225C40;
+  --color-forest-dark: #16402C;
+  --color-forest-light: #2D7552;
+  --color-forest-surface: rgba(34, 92, 64, 0.25);
+  --color-forest-border: rgba(45, 117, 82, 0.35);
 
-  --color-primary: #E8792A;
-  --color-primary-hover: #F08840;
-  --color-primary-dark: #C85C1A;
-  --color-primary-glow: rgba(232, 121, 42, 0.35);
-  --color-primary-subtle: rgba(200, 92, 26, 0.18);
+  --color-primary: #28734F;
+  --color-primary-hover: #338C61;
+  --color-primary-dark: #1C543A;
+  --color-primary-glow: rgba(45, 117, 82, 0.35);
+  --color-primary-subtle: rgba(45, 117, 82, 0.20);
 
-  --color-text-main: #F5EEE6;
-  --color-text-body: #DCCFC4;
-  --color-text-muted: #A8927E;
-  --color-text-subtle: #7A6050;
-  --color-text-inverse: #1E0C04;
-  --color-text-inverse-muted: #3D1A08;
+  --color-accent-orange: #E6662E;
+  --color-accent-orange-hover: #F27844;
+  --color-accent-orange-subtle: rgba(230, 102, 46, 0.18);
+  --color-accent-orange-glow: rgba(230, 102, 46, 0.35);
 
-  --color-soldout-gray: #A8927E;
-  --color-soldout-bg: #3D1A08;
-  --color-allergen-tag: #3D1A08;
+  --color-text-main: #F4EFE6;
+  --color-text-body: #CFDCD3;
+  --color-text-muted: #95A99D;
+  --color-text-subtle: #6D8276;
+  --color-text-inverse: #0C130F;
+  --color-text-inverse-muted: #1B2B23;
+
+  --color-obsidian: #0A0F0C;
+  --color-charcoal-dark: #070B09;
+  --color-charcoal: #101914;
+  --color-charcoal-elevated: #17241E;
+  --color-charcoal-border: rgba(255, 255, 255, 0.12);
+
+  --color-soldout-gray: #94A3B8;
+  --color-soldout-bg: #1E293B;
+  --color-allergen-tag: #1B2B23;
 }
 
 /* ==============================================================================

@@ -551,6 +551,16 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps): ReactEle
                       />
                     </div>
                   </div>
+                  <div style={{ marginTop: '0.75rem' }}>
+                    <label className="input-field-label">Special Notes / Counter Instructions (Optional)</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Please pack cold items separately"
+                      value={specialNotes}
+                      onChange={(e) => setSpecialNotes(e.target.value)}
+                      className="modal-text-input"
+                    />
+                  </div>
                 </div>
 
                 {/* 3. Payment Method */}

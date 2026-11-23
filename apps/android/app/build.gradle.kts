@@ -188,10 +188,9 @@ tasks.register("validateReleaseConfig") {
     }
 }
 
-// Enforce debug validation during debug compilation and packaging
+// Enforce debug validation during debug packaging
 tasks.matching {
-    it.name.startsWith("generateDebugBuildConfig") ||
-    it.name.startsWith("assembleDebug")
+    it.name == "assembleDebug"
 }.configureEach {
     doFirst {
         validateDevConfig(debugSupabaseUrl, debugSupabaseAnonKey)

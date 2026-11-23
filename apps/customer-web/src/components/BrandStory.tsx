@@ -1,80 +1,88 @@
 'use client';
 
 import type { ReactElement } from 'react';
-import Link from 'next/link';
+import { ArrowRight, CheckCircle2, ShieldCheck, ShoppingBag, Store } from 'lucide-react';
 
 export function BrandStory(): ReactElement {
   return (
-    <section id="about" className="brand-story-section" aria-label="Our Craft and Philosophy">
+    <section id="about" className="brand-story-section" aria-label="About Mangala Enterprises">
       <div className="container">
         <div className="brand-story-grid">
           {/* Left Column: Editorial Statement */}
           <div className="story-editorial-col">
-            <div className="section-subtitle">The Mangala Enterprises Heritage</div>
+            <div className="section-subtitle">Retail Perspective</div>
             <h2 className="story-heading">
-              Where Culinary Craft Meets Uncompromising Purity.
+              Thoughtfully Curated for Every Daily Craving.
             </h2>
             <div className="story-divider" />
             <p className="story-lead">
-              Mangala Enterprises is dedicated to elevating everyday culinary indulgence into an art form. We unite time-honored boutique baking techniques with cold-pressed natural fruit nectars and single-origin gourmet chocolates.
+              Mangala Enterprises is a contemporary food and beverage retail destination. We curate a diverse portfolio spanning celebratory bakes, savoury snacks, cold beverages, ice creams, and confectionery.
             </p>
             <p className="story-text">
-              We do not mass-produce. Every morning, our chefs begin by tempering single-origin cacao, cold-pressing sun-ripened fruits, and layering boutique sponge bases for immediate counter pickup. Every pastry, juice, and chocolate praline is crafted with pure ingredients, authentic fats, and clear dietary declarations.
+              We focus on clarity and convenience: every product in our digital catalogue reflects actual in-store stock, clearly labeled with FSSAI dietary classifications and allergen declarations. Customers can browse, select, and pick up pre-packaged items directly at our store counter.
             </p>
 
-            <div className="story-stats-row">
-              <div className="story-stat-card">
-                <div className="story-stat-val">100%</div>
-                <div className="story-stat-lbl">Pure Cold-Pressed Fruit Extracts</div>
+            <div className="story-pillars-grid">
+              <div className="story-pillar-card">
+                <Store size={20} className="pillar-icon" />
+                <div className="pillar-title">Diverse Categories</div>
+                <div className="pillar-desc">From cold drinks to savouries and sweet treats.</div>
               </div>
-              <div className="story-stat-card">
-                <div className="story-stat-val">70%</div>
-                <div className="story-stat-lbl">Single-Origin Cacao Couverture</div>
+              <div className="story-pillar-card">
+                <ShieldCheck size={20} className="pillar-icon" />
+                <div className="pillar-title">Food Transparency</div>
+                <div className="pillar-desc">Clear FSSAI vegetarian and non-vegetarian labeling.</div>
               </div>
-              <div className="story-stat-card">
-                <div className="story-stat-val">Instant</div>
-                <div className="story-stat-lbl">In-Store Ready Counter Handover</div>
+              <div className="story-pillar-card">
+                <ShoppingBag size={20} className="pillar-icon" />
+                <div className="pillar-title">Live Inventory</div>
+                <div className="pillar-desc">Stock updated in real time for counter collection.</div>
               </div>
             </div>
 
             <div className="story-cta-box">
-              <Link href="#menu" className="btn-primary">
-                Browse Live Menu Catalog
-              </Link>
+              <a href="#menu" className="btn-primary">
+                <span>Browse Entire Catalogue</span>
+                <ArrowRight size={16} />
+              </a>
             </div>
           </div>
 
           {/* Right Column: Visual Composition */}
           <div className="story-visual-col">
             <div className="story-art-card">
-              <div className="story-art-glow" />
-              <div className="story-art-badge">Boutique Kitchen Craft</div>
+              <div className="story-art-badge">Store Experience</div>
 
               <div className="story-quote-box">
-                <span className="quote-mark">“</span>
                 <p className="quote-text">
-                  True luxury in confectionery is not excessive sweetness—it is depth, texture, and uncompromising freshness.
+                  “Our goal is simple: offer a genuine variety of quality food and beverages with transparent information and prompt in-store service.”
                 </p>
-                <div className="quote-author">— Mangala Enterprises Culinary Standards</div>
+                <div className="quote-author">— Mangala Enterprises Retail Standards</div>
               </div>
 
               <div className="story-feature-list">
                 <div className="story-feature-item">
-                  <div className="feature-bullet">🌿</div>
+                  <div className="feature-icon-wrapper">
+                    <CheckCircle2 size={18} />
+                  </div>
                   <div>
-                    <strong>Purity & Transparency:</strong> Recognized food indicators with clear vegetarian and non-vegetarian declarations.
+                    <strong>Standardized Food Declarations:</strong> Official green and red dietary marks and listed allergens on every product.
                   </div>
                 </div>
                 <div className="story-feature-item">
-                  <div className="feature-bullet">🍫</div>
+                  <div className="feature-icon-wrapper">
+                    <CheckCircle2 size={18} />
+                  </div>
                   <div>
-                    <strong>Single-Origin Couverture:</strong> Slow-conched Belgian dark chocolate with deep roasted notes and silky melting curves.
+                    <strong>Verified In-Store Stock:</strong> Real-time database checks prevent reservations on unavailable inventory.
                   </div>
                 </div>
                 <div className="story-feature-item">
-                  <div className="feature-bullet">🛍️</div>
+                  <div className="feature-icon-wrapper">
+                    <CheckCircle2 size={18} />
+                  </div>
                   <div>
-                    <strong>Ready to Sell Stock:</strong> Curated and pre-packed delicacies in store display vitrines for zero-wait immediate handover.
+                    <strong>Counter Pickup Workflow:</strong> Pre-packed orders ready for direct handover at the retail counter.
                   </div>
                 </div>
               </div>

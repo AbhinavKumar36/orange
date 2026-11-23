@@ -85,8 +85,14 @@ jobs:
 
       - name: Run Android Lint
         working-directory: apps/android
+        env:
+          DEV_SUPABASE_URL: "https://pdosvzdkuulstvzqfnkl.supabase.co"
+          DEV_SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkb3N2emRrdXVsc3R2enFmbmtsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM1MjgzODIsImV4cCI6MjEwOTEwNDM4Mn0.MPVNcaabsiMtH7S3WiKncr_yRQxKiIxxv9cXWsbDXXQ"
         run: ./gradlew lint
 
       - name: Run Android Unit Tests
         working-directory: apps/android
+        env:
+          DEV_SUPABASE_URL: "https://pdosvzdkuulstvzqfnkl.supabase.co"
+          DEV_SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkb3N2emRrdXVsc3R2enFmbmtsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM1MjgzODIsImV4cCI6MjEwOTEwNDM4Mn0.MPVNcaabsiMtH7S3WiKncr_yRQxKiIxxv9cXWsbDXXQ"
         run: ./gradlew testDebugUnitTest

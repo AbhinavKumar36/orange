@@ -110,13 +110,16 @@ export default function HomePage(): ReactElement {
 
   return (
     <>
-      <Header onCategorySelect={(slug) => setSelectedCategorySlug(slug)} />
+      <Header
+        categories={categories}
+        onCategorySelect={(slug) => setSelectedCategorySlug(slug)}
+      />
 
       <main id="main-content">
-        {/* 1. Cinematic 3D Hero */}
+        {/* 1. Contemporary Premium Retail Hero */}
         <Hero />
 
-        {/* 2. Featured Editorial Collections */}
+        {/* 2. Category Discovery */}
         <div id="collections">
           <FeaturedCollections
             categories={categories}
@@ -129,19 +132,19 @@ export default function HomePage(): ReactElement {
           />
         </div>
 
-        {/* 3. Interactive 3D Product Showcase */}
+        {/* 3. Featured Products Showcase */}
         <ProductShowcase
           products={products}
           onOpenCart={() => setIsCartOpen(true)}
         />
 
-        {/* 4. Live Store Menu & Catalog Section */}
-        <section id="menu" className="category-nav-section" aria-label="Menu Catalog">
+        {/* 4. Complete Store Catalogue & Filter Section */}
+        <section id="menu" className="category-nav-section" aria-label="Store Catalogue">
           <div className="container">
             <div className="menu-header-bar">
               <div>
-                <div className="section-subtitle">Store Menu</div>
-                <h2 className="section-title">Explore Our Catalog</h2>
+                <div className="section-subtitle">Store Catalogue</div>
+                <h2 className="section-title">Browse All Products</h2>
               </div>
 
               {/* Sorting & Filter Controls */}
@@ -152,7 +155,8 @@ export default function HomePage(): ReactElement {
                     checked={isVegOnly}
                     onChange={(e) => setIsVegOnly(e.target.checked)}
                   />
-                  <span>🌱 Veg Only</span>
+                  <span className="filter-dot veg-dot" />
+                  <span>Veg Only</span>
                 </label>
 
                 <label className="filter-checkbox-label">
@@ -161,7 +165,8 @@ export default function HomePage(): ReactElement {
                     checked={isInStockOnly}
                     onChange={(e) => setIsInStockOnly(e.target.checked)}
                   />
-                  <span>🟢 In Stock</span>
+                  <span className="filter-dot stock-dot" />
+                  <span>In Stock</span>
                 </label>
 
                 <div className="sort-dropdown-box">
@@ -170,12 +175,12 @@ export default function HomePage(): ReactElement {
                     value={sortBy}
                     onChange={(e) => setSortBy(e.target.value as 'featured' | 'price-asc' | 'price-desc' | 'prep-asc')}
                     className="sort-select"
-                    aria-label="Sort delicacies"
+                    aria-label="Sort products"
                   >
-                    <option value="featured">Featured Curations</option>
+                    <option value="featured">Featured</option>
                     <option value="price-asc">Price: Low to High</option>
                     <option value="price-desc">Price: High to Low</option>
-                    <option value="prep-asc">Prep Time: Fastest</option>
+                    <option value="prep-asc">Fastest Prep</option>
                   </select>
                 </div>
               </div>

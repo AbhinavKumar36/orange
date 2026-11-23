@@ -191,7 +191,7 @@ export async function requestPhoneOtp(phone: string): Promise<{ success: boolean
       let msg = rawMsg || `Failed to send SMS verification code (status ${res.status}).`;
       if (isProviderDisabled) {
         msg = devModeActive
-          ? 'SMS provider not configured on local development environment.'
+          ? 'SMS provider not configured on local development environment. Please use dev test number 9876543210 (OTP: 123456).'
           : 'SMS authentication service is currently unavailable. Please contact support.';
       }
       return {

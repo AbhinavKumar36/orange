@@ -97,18 +97,41 @@ export async function loginStaffWithCredentials(
     return { success: false, error: 'Please enter both staff email and password.' };
   }
 
+  let emailToTry = cleanEmail;
+  if (emailToTry.endsWith('.local')) {
+    emailToTry = emailToTry.replace(/\.local$/, '.com');
+  }
+
   try {
-    const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+    let res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         apikey: SUPABASE_ANON_KEY,
       },
       body: JSON.stringify({
-        email: cleanEmail,
+        email: emailToTry,
         password,
       }),
     });
+
+    if (!res.ok && emailToTry !== cleanEmail) {
+      // If .com failed, attempt original email
+      const fallbackRes = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          apikey: SUPABASE_ANON_KEY,
+        },
+        body: JSON.stringify({
+          email: cleanEmail,
+          password,
+        }),
+      });
+      if (fallbackRes.ok) {
+        res = fallbackRes;
+      }
+    }
 
     if (!res.ok) {
       const errJson = (await res.json().catch(() => null)) as {
@@ -162,15 +185,29 @@ export async function loginStaffWithCredentials(
           error: 'Access denied: Your account is authenticated, but is not authorized as store staff. Customers cannot access the staff portal.',
         };
       }
+      const isFetchErr =
+        apiErr instanceof Error &&
+        (apiErr.message.toLowerCase().includes('fetch') || apiErr.message.toLowerCase().includes('network'));
       return {
         success: false,
-        error: apiErr instanceof Error ? apiErr.message : 'Failed to verify staff permissions.',
+        error: isFetchErr
+          ? 'Unable to connect to backend server at http://localhost:4000. Please ensure the backend API server is running.'
+          : apiErr instanceof Error
+          ? apiErr.message
+          : 'Failed to verify staff permissions.',
       };
     }
   } catch (err: unknown) {
+    const isFetchErr =
+      err instanceof Error &&
+      (err.message.toLowerCase().includes('fetch') || err.message.toLowerCase().includes('network'));
     return {
       success: false,
-      error: err instanceof Error ? err.message : 'Network error connecting to authentication service.',
+      error: isFetchErr
+        ? 'Network error connecting to Supabase Auth service. Please check your network connection.'
+        : err instanceof Error
+        ? err.message
+        : 'Network error connecting to authentication service.',
     };
   }
 }

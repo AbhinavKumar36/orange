@@ -1,7 +1,7 @@
 'use client';
 
 import type { ReactElement } from 'react';
-import Link from 'next/link';
+import { ArrowRight, CheckCircle2, Store } from 'lucide-react';
 
 export function Hero(): ReactElement {
   const handleScrollToMenu = (e: React.MouseEvent) => {
@@ -12,33 +12,31 @@ export function Hero(): ReactElement {
     }
   };
 
-  return (
-    <section className="hero-section" aria-label="Mangala Enterprises Showcase">
-      {/* Background Ambient Radiance & Vignette */}
-      <div className="hero-atmosphere" aria-hidden="true">
-        <div className="hero-radial-glow" />
-        <div className="hero-mesh-overlay" />
-      </div>
+  const handleScrollToCategories = (e: React.MouseEvent) => {
+    e.preventDefault();
+    const catEl = document.getElementById('categories');
+    if (catEl) {
+      catEl.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
 
+  return (
+    <section className="hero-section" aria-label="Mangala Enterprises Retail Showcase">
       <div className="container hero-container">
         <div className="hero-grid">
-          {/* Left Column: Typography, Value Proposition & Actions */}
+          {/* Left Column: Editorial Headline & Value Proposition */}
           <div className="hero-content">
             <div className="hero-pill">
               <span className="pill-dot" aria-hidden="true" />
-              <span className="pill-text">Ready-to-Collect In-Store Stock • Instant Pickup</span>
-            </div>
-
-            <div className="hero-brand-marquee" aria-hidden="true">
-              MANGALA ENTERPRISES
+              <span className="pill-text">Contemporary Food, Beverages & Confectionery</span>
             </div>
 
             <h1 className="hero-title">
-              Exquisite Patisserie & <span className="hero-title-highlight">Fine Confections</span>
+              A curated destination for <span className="hero-title-highlight">food, drinks & treats.</span>
             </h1>
 
             <p className="hero-copy">
-              Curated daily in our boutique display vitrines using single-origin Belgian cacao, pure cold-pressed fruit extracts, and farm-fresh ingredients. Every delicacy is in stock and ready for immediate in-store counter collection.
+              Mangala Enterprises brings together everyday refreshments, chilled beverages, savoury snacks, celebratory bakes, and handcrafted confectionery under one roof. Pre-packed and organized in store for seamless counter collection.
             </p>
 
             <div className="hero-cta-group">
@@ -47,74 +45,107 @@ export function Hero(): ReactElement {
                 onClick={handleScrollToMenu}
                 className="btn-primary hero-btn-main"
               >
-                <span>Shop In-Stock Menu</span>
-                <span className="btn-arrow" aria-hidden="true">→</span>
+                <span>Explore Products</span>
+                <ArrowRight size={17} aria-hidden="true" />
               </a>
-              <Link href="#collections" className="btn-secondary hero-btn-secondary">
-                <span>Explore Collections</span>
-              </Link>
+
+              <a
+                href="#categories"
+                onClick={handleScrollToCategories}
+                className="btn-secondary hero-btn-secondary"
+              >
+                <span>Browse Categories</span>
+              </a>
             </div>
 
-            {/* Quality Standard Badges */}
+            {/* Quality & Retail Attributes */}
             <div className="hero-features">
               <div className="hero-feature-item">
-                <span className="hero-feature-icon" aria-hidden="true">
-                  ✓
-                </span>
-                <span>Ready to Sell In-Store Stock</span>
+                <CheckCircle2 size={16} className="feature-check-icon" aria-hidden="true" />
+                <span>Multi-Category Selection</span>
               </div>
               <div className="hero-feature-item">
-                <span className="hero-feature-icon" aria-hidden="true">
-                  ✓
-                </span>
-                <span>Immediate Counter Collection</span>
+                <CheckCircle2 size={16} className="feature-check-icon" aria-hidden="true" />
+                <span>Verified In-Store Stock</span>
               </div>
               <div className="hero-feature-item">
-                <span className="hero-feature-icon" aria-hidden="true">
-                  ✓
-                </span>
-                <span>FSSAI Certified Transparency</span>
+                <CheckCircle2 size={16} className="feature-check-icon" aria-hidden="true" />
+                <span>Zero-Wait Counter Handover</span>
               </div>
             </div>
           </div>
 
-          {/* Right Column: In-Store Display Counter Showcase */}
-          <div className="hero-3d-wrapper">
-            <div className="hero-display-counter-card">
-              <div className="counter-image-frame">
+          {/* Right Column: Multi-Category Visual Mosaic */}
+          <div className="hero-visual-wrapper">
+            <div className="hero-mosaic-grid">
+              {/* Card 1: Beverages & Cold Drinks */}
+              <div className="mosaic-card mosaic-beverages">
                 <img
-                  src="https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=1200&q=80"
-                  alt="Mangala Enterprises In-Store Display Counter with Artisanal Delicacies"
-                  className="counter-showcase-img"
+                  src="https://images.unsplash.com/photo-1613478223719-2ab802602423?auto=format&fit=crop&w=700&q=80"
+                  alt="Chilled cold-pressed juices and cold beverages"
+                  className="mosaic-img"
                   loading="eager"
                 />
-                <div className="counter-overlay-gradient" />
-                <div className="counter-badge-top-left">
-                  <span className="live-counter-pill">
-                    <span className="live-dot-pulse" />
-                    IN-STORE DISPLAY VITRINE
-                  </span>
+                <div className="mosaic-overlay" />
+                <div className="mosaic-caption">
+                  <span className="mosaic-tag">Beverages & Drinks</span>
+                  <span className="mosaic-title">Juices & Refreshments</span>
                 </div>
               </div>
 
-              {/* Floating Editorial Badge */}
-              <div className="hero-stage-badge">
-                <div className="badge-flair">STORE DISPLAY COUNTER</div>
-                <div className="badge-name">Artisanal Patisserie Showcase</div>
-                <div className="badge-sub">Pre-packed & ready for immediate collection</div>
+              {/* Card 2: Cakes & Bakes */}
+              <div className="mosaic-card mosaic-cakes">
+                <img
+                  src="https://images.unsplash.com/photo-1578985545062-69928b1d9587?auto=format&fit=crop&w=700&q=80"
+                  alt="Artisanal cakes and gourmet bakes"
+                  className="mosaic-img"
+                  loading="eager"
+                />
+                <div className="mosaic-overlay" />
+                <div className="mosaic-caption">
+                  <span className="mosaic-tag">Cakes & Bakes</span>
+                  <span className="mosaic-title">Layered Confections</span>
+                </div>
+              </div>
+
+              {/* Card 3: Snacks & Savouries */}
+              <div className="mosaic-card mosaic-snacks">
+                <img
+                  src="https://images.unsplash.com/photo-1599490659213-e2b9527bd087?auto=format&fit=crop&w=700&q=80"
+                  alt="Savoury snacks and retail treats"
+                  className="mosaic-img"
+                  loading="eager"
+                />
+                <div className="mosaic-overlay" />
+                <div className="mosaic-caption">
+                  <span className="mosaic-tag">Savoury Snacks</span>
+                  <span className="mosaic-title">Crisps & Bites</span>
+                </div>
+              </div>
+
+              {/* Card 4: Chocolates & Confectionery */}
+              <div className="mosaic-card mosaic-chocolates">
+                <img
+                  src="https://images.unsplash.com/photo-1549007994-cb92caebd54b?auto=format&fit=crop&w=700&q=80"
+                  alt="Fine chocolates and confections"
+                  className="mosaic-img"
+                  loading="eager"
+                />
+                <div className="mosaic-overlay" />
+                <div className="mosaic-caption">
+                  <span className="mosaic-tag">Confectionery</span>
+                  <span className="mosaic-title">Chocolates & Sweets</span>
+                </div>
+              </div>
+
+              {/* Center Floating Retail Crest */}
+              <div className="hero-center-badge">
+                <div className="center-badge-pulse" />
+                <Store size={18} className="center-badge-icon" />
+                <span className="center-badge-text">In-Store Ready Counter</span>
               </div>
             </div>
           </div>
-        </div>
-
-        {/* Scroll Indicator */}
-        <div className="hero-scroll-cue">
-          <a href="#menu" onClick={handleScrollToMenu} aria-label="Scroll down to menu catalog">
-            <span className="scroll-cue-text">DISCOVER CATALOG</span>
-            <div className="scroll-cue-mouse">
-              <div className="scroll-cue-wheel" />
-            </div>
-          </a>
         </div>
       </div>
     </section>
