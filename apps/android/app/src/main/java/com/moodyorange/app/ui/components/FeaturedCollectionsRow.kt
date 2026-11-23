@@ -55,7 +55,7 @@ fun FeaturedCollectionsRow(
                 )
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
-                    text = "Boutique Flavours",
+                    text = "Explore Categories",
                     fontFamily = EditorialSerif,
                     fontSize = 19.sp,
                     fontWeight = FontWeight.Bold,
@@ -89,12 +89,13 @@ private fun CollectionPanelCard(
     onClick: () -> Unit
 ) {
     val colors = MangalaTheme.colors
-    val isCake = category.slug.contains("cake")
-    val isJuice = category.slug.contains("juice")
+    val isCake = category.slug.contains("cake") || category.slug.contains("bake")
 
     val iconText = when {
         isCake -> "🍰"
-        isJuice -> "🍊"
+        category.slug.contains("juice") || category.slug.contains("drink") || category.slug.contains("beverage") -> "🍊"
+        category.slug.contains("snack") || category.slug.contains("savour") || category.slug.contains("crisp") -> "🥨"
+        category.slug.contains("ice") || category.slug.contains("cream") -> "🍨"
         else -> "🍫"
     }
 

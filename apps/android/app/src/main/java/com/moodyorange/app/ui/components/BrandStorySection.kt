@@ -52,7 +52,7 @@ fun BrandStorySection(modifier: Modifier = Modifier) {
                         .background(ForestGreen)
                 )
                 Text(
-                    text = "THE MANGALA ENTERPRISES HERITAGE",
+                    text = "RETAIL PERSPECTIVE",
                     fontSize = 10.sp,
                     fontWeight = FontWeight.Bold,
                     color = colors.primary,
@@ -63,7 +63,7 @@ fun BrandStorySection(modifier: Modifier = Modifier) {
             Spacer(modifier = Modifier.height(10.dp))
 
             Text(
-                text = "Where Culinary Craft Meets Uncompromising Purity",
+                text = "Thoughtfully Curated for Every Daily Craving",
                 fontFamily = EditorialSerif,
                 fontSize = 20.sp,
                 fontWeight = FontWeight.Bold,
@@ -74,7 +74,7 @@ fun BrandStorySection(modifier: Modifier = Modifier) {
             Spacer(modifier = Modifier.height(8.dp))
 
             Text(
-                text = "Mangala Enterprises is dedicated to elevating everyday culinary indulgence into an art form. We unite time-honored boutique baking techniques with cold-pressed natural fruit nectars and single-origin gourmet chocolates. Every pastry, elixir, and chocolate praline is handcrafted in small daily batches with clear dietary declarations.",
+                text = "Mangala Enterprises is a contemporary food and beverage retail destination. We curate a diverse portfolio spanning savoury snacks, chilled beverages, celebratory bakes, ice creams, and gourmet confectionery. Organized for seamless counter collection with clear FSSAI dietary labels.",
                 fontSize = 12.5.sp,
                 lineHeight = 19.sp,
                 color = colors.textSecondary
@@ -87,9 +87,9 @@ fun BrandStorySection(modifier: Modifier = Modifier) {
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                MetricItem(number = "100%", label = "Pure Extracts")
-                MetricItem(number = "70%", label = "Origin Cacao")
-                MetricItem(number = "~15m", label = "Fresh Pickup")
+                MetricItem(number = "Multi", label = "Categories")
+                MetricItem(number = "100%", label = "Live Stock")
+                MetricItem(number = "Prompt", label = "Counter Ready")
             }
         }
     }

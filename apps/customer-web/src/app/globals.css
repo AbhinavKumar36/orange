@@ -569,6 +569,17 @@ html.dark .nav-dropdown-trigger.active {
   animation: dropdownFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
+/* Invisible hover bridge to prevent premature closure when moving mouse across the gap */
+.nav-dropdown-panel::before {
+  content: '';
+  position: absolute;
+  top: -14px;
+  left: 0;
+  right: 0;
+  height: 14px;
+  background: transparent;
+}
+
 @keyframes dropdownFadeIn {
   from {
     opacity: 0;

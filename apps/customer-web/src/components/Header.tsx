@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, type ReactElement } from 'react';
+import { useState, useEffect, useRef, type ReactElement } from 'react';
 import Link from 'next/link';
 import {
   Search,
@@ -32,6 +32,38 @@ export function Header({ categories: propCategories, onCategorySelect }: HeaderP
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isCategoriesDropdownOpen, setIsCategoriesDropdownOpen] = useState(false);
   const [categories, setCategories] = useState<Category[]>(propCategories || []);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const dropdownTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const handleDropdownMouseEnter = () => {
+    if (dropdownTimeoutRef.current) {
+      clearTimeout(dropdownTimeoutRef.current);
+      dropdownTimeoutRef.current = null;
+    }
+    setIsCategoriesDropdownOpen(true);
+  };
+
+  const handleDropdownMouseLeave = () => {
+    dropdownTimeoutRef.current = setTimeout(() => {
+      setIsCategoriesDropdownOpen(false);
+    }, 220);
+  };
+
+  // Close dropdown on click outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsCategoriesDropdownOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      if (dropdownTimeoutRef.current) {
+        clearTimeout(dropdownTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const { totalQuantity } = useCart();
   const { session, isAuthenticated, logout } = useCustomerAuth();
@@ -113,16 +145,23 @@ export function Header({ categories: propCategories, onCategorySelect }: HeaderP
 
             {/* Dynamic Categories Menu with Dropdown */}
             <div
+              ref={dropdownRef}
               className="nav-dropdown-wrapper"
-              onMouseEnter={() => setIsCategoriesDropdownOpen(true)}
-              onMouseLeave={() => setIsCategoriesDropdownOpen(false)}
+              onMouseEnter={handleDropdownMouseEnter}
+              onMouseLeave={handleDropdownMouseLeave}
             >
               <button
                 type="button"
                 className={`nav-link nav-dropdown-trigger ${isCategoriesDropdownOpen ? 'active' : ''}`}
                 aria-expanded={isCategoriesDropdownOpen}
                 aria-haspopup="true"
-                onClick={() => setIsCategoriesDropdownOpen(!isCategoriesDropdownOpen)}
+                onClick={() => {
+                  if (dropdownTimeoutRef.current) {
+                    clearTimeout(dropdownTimeoutRef.current);
+                    dropdownTimeoutRef.current = null;
+                  }
+                  setIsCategoriesDropdownOpen((prev) => !prev);
+                }}
               >
                 <span>Categories</span>
                 <ChevronDown size={14} className={`dropdown-chevron ${isCategoriesDropdownOpen ? 'rotate' : ''}`} />

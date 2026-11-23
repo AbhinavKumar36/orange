@@ -112,7 +112,7 @@ fun HeaderBar(
                     text = if (isLoggedIn && !customerName.isNullOrBlank()) {
                         "Welcome, $customerName"
                     } else {
-                        "Artisanal Delicacies & Fresh Confections"
+                        "Food, Drinks & Gourmet Treats"
                     },
                     fontSize = 10.5.sp,
                     color = textSecondary,

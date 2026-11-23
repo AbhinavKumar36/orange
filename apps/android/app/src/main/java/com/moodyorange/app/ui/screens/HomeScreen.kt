@@ -277,7 +277,7 @@ private fun HeroSection(
                     .padding(horizontal = 12.dp, vertical = 4.5.dp)
             ) {
                 Text(
-                    text = "MANGALA ENTERPRISES • ARTISANAL DELICACIES",
+                    text = "MANGALA ENTERPRISES • FOOD, DRINKS & TREATS",
                     fontSize = 9.5.sp,
                     fontWeight = FontWeight.Bold,
                     color = colors.primary,
@@ -289,7 +289,7 @@ private fun HeroSection(
 
             // Main Editorial Headline
             Text(
-                text = "Exquisite Patisserie &\nFine Confections",
+                text = "A Curated Destination for\nFood, Drinks & Treats",
                 fontFamily = EditorialSerif,
                 fontSize = 26.sp,
                 lineHeight = 32.sp,
@@ -301,7 +301,7 @@ private fun HeroSection(
             Spacer(modifier = Modifier.height(8.dp))
 
             Text(
-                text = "Curated daily in our boutique vitrines using single-origin cacao, pure cold-pressed fruit extracts, and farm-fresh ingredients. In-store ready to sell for instant counter pickup.",
+                text = "Everyday refreshments, chilled beverages, savoury snacks, celebratory bakes, and gourmet confectionery under one roof. Pre-packed and organized in store for seamless counter collection.",
                 fontSize = 12.5.sp,
                 lineHeight = 18.sp,
                 textAlign = TextAlign.Center,
@@ -421,7 +421,7 @@ private fun FeaturedConfectionsHeader(onViewAll: () -> Unit) {
     ) {
         Column {
             Text(
-                text = "DAILY CREATIONS",
+                text = "STORE HIGHLIGHTS",
                 fontSize = 10.5.sp,
                 fontWeight = FontWeight.Bold,
                 color = colors.primary,
@@ -429,7 +429,7 @@ private fun FeaturedConfectionsHeader(onViewAll: () -> Unit) {
             )
             Spacer(modifier = Modifier.height(2.dp))
             Text(
-                text = "Chef's Featured Treats",
+                text = "Featured Selections",
                 fontFamily = EditorialSerif,
                 fontSize = 19.sp,
                 fontWeight = FontWeight.Bold,
