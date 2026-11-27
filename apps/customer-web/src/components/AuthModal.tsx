@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, type ReactElement } from 'react';
-import { requestPhoneOtp, verifyPhoneOtp, formatIndianPhoneNumber } from '../lib/auth';
+import { requestPhoneOtp, verifyPhoneOtp, formatIndianPhoneNumber, getStoredCustomerSession, saveCustomerSession, isDevOtpEnabled } from '../lib/auth';
 import { updateProfileApi } from '../lib/api';
 
 interface AuthModalProps {
@@ -100,7 +100,11 @@ export function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps): React
     setError(null);
     try {
       if (token) {
-        await updateProfileApi(name.trim(), token);
+        const profile = await updateProfileApi(name.trim(), token);
+        const session = getStoredCustomerSession();
+        if (session?.accessToken === token) {
+          saveCustomerSession({ ...session, user: { ...session.user, fullName: profile.fullName } });
+        }
       }
       setIsLoading(false);
       if (onSuccess) {
@@ -108,13 +112,9 @@ export function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps): React
       } else {
         onClose();
       }
-    } catch {
+    } catch (error: unknown) {
       setIsLoading(false);
-      if (onSuccess) {
-        onSuccess();
-      } else {
-        onClose();
-      }
+      setError(error instanceof Error ? error.message : 'Unable to save your name. Please try again.');
     }
   }
 
@@ -237,10 +237,10 @@ export function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps): React
                 {isLoading ? 'Sending Code...' : 'Get One-Time Code'}
               </button>
 
-              {(process.env.NEXT_PUBLIC_ENABLE_DEV_LOGIN === 'true' || process.env.NODE_ENV === 'development') && (
+              {isDevOtpEnabled() && (
                 <div style={{ marginTop: '1rem', paddingTop: '0.75rem', borderTop: '1px solid #EEE' }}>
                   <p style={{ fontSize: '0.75rem', color: '#666', marginBottom: '0.35rem', fontWeight: 600 }}>
-                    Dev test numbers (OTP: 123456):
+                    Dev test numbers:
                   </p>
                   <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                     <button
@@ -256,7 +256,7 @@ export function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps): React
                         color: '#444',
                       }}
                     >
-                      9876543210
+                      9876543210 (123456)
                     </button>
                     <button
                       type="button"
@@ -271,7 +271,7 @@ export function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps): React
                         color: '#444',
                       }}
                     >
-                      9876500001
+                      9876500001 (111111)
                     </button>
                   </div>
                 </div>

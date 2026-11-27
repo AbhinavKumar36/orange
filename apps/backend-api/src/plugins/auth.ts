@@ -59,7 +59,7 @@ export async function verifySupabaseToken(
   config: AppConfig
 ): Promise<AuthenticatedUser | null> {
   // Development OTP token support (when SMS provider is unconfigured in development)
-  if (config.NODE_ENV !== 'production' && token.startsWith('dev_customer_token:')) {
+  if (config.NODE_ENV !== 'production' && config.ALLOW_MOCK_SERVICES && token.startsWith('dev_customer_token:')) {
     const parts = token.split(':');
     let id = parts[1] || '00000000-0000-0000-0000-000000000001';
     let phone = parts[2] || '+919876543210';

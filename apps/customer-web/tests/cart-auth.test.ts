@@ -297,6 +297,19 @@ describe('Phase 5 Web: Cart & Customer Authentication', () => {
   });
 
   describe('2. Shopping Cart Operations', () => {
+    it.each(['null', '{}', '[null]', '[{"quantity":1,"product":{}}]'])('recovers from malformed saved cart data: %s', (raw) => {
+      localStorage.setItem('moody_orange_cart_v1', raw);
+      expect(getStoredCart()).toEqual([]);
+      addToCart(sampleProduct);
+      expect(getStoredCart()).toHaveLength(1);
+    });
+
+    it('ignores invalid quantities while preserving a valid saved item', () => {
+      addToCart(sampleProduct);
+      addToCart(sampleProduct, -5);
+      updateCartQuantity(sampleProduct.id, Number.NaN);
+      expect(getStoredCart()[0].quantity).toBe(1);
+    });
     it('adds item to cart and preserves item details', () => {
       addToCart(sampleProduct, 1);
       const cart = getStoredCart();

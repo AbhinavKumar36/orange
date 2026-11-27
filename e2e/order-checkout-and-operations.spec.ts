@@ -2,9 +2,8 @@ import { test, expect } from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
 
-const SUPABASE_URL = 'https://pdosvzdkuulstvzqfnkl.supabase.co';
-const SUPABASE_SERVICE_ROLE_KEY =
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkb3N2emRrdXVsc3R2enFmbmtsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc5MzUyODM4MiwiZXhwIjoyMTA5MTA0MzgyfQ.zQeqzGhSs0gCBCCqUiCwNL8CQRMqSXf-Q2urNwdLbxs';
+const SUPABASE_URL = process.env.TEST_SUPABASE_URL || '';
+const SUPABASE_SERVICE_ROLE_KEY = process.env.TEST_SUPABASE_SERVICE_ROLE_KEY || '';
 
 async function fetchSupabaseOrder(orderNumber: string) {
   const res = await fetch(
@@ -31,6 +30,7 @@ test.describe('Moody Orange / Mangala Enterprises: Order Placement & Operations 
   });
 
   test('Customer Web: Place Cash on Delivery order and verify persistent creation in remote Supabase', async ({ page }) => {
+    test.skip(!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY, 'Requires an explicitly configured hosted test database.');
     // 1. Visit Customer Storefront
     await page.goto('http://localhost:3000');
     await expect(page.locator('h1, .hero-headline, .hero-title').first()).toBeVisible({ timeout: 15000 });

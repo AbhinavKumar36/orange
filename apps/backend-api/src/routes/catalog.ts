@@ -209,7 +209,7 @@ async function loadProducts(config: AppConfig): Promise<Product[] | null> {
   const [productRows, availabilityRows] = await Promise.all([
     fetchFromSupabase<SupabaseProductRow[]>(
       config,
-      'products?select=id,category_id,name,slug,description,base_price,tax_rate_pct,is_veg,allergens,prep_time_minutes,image_url,is_active,categories(id,name,slug)&is_active=eq.true&order=created_at.asc'
+      'products?select=*,categories(id,name,slug)&is_active=eq.true&order=created_at.asc'
     ),
     fetchFromSupabase<SupabaseAvailabilityRow[]>(config, 'product_availability'),
   ]);

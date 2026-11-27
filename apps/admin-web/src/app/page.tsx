@@ -102,6 +102,7 @@ export default function AdminDashboardPage(): ReactElement {
   const [products, setProducts] = useState<AdminProductItem[]>([]);
   const [categories, setCategories] = useState<AdminCategoryItem[]>([]);
   const [inventory, setInventory] = useState<AdminInventoryItem[]>([]);
+  const [dataLoadError, setDataLoadError] = useState<string | null>(null);
 
   // Modals & form state
   const [handoverOrder, setHandoverOrder] = useState<Order | null>(null);
@@ -191,6 +192,7 @@ export default function AdminDashboardPage(): ReactElement {
 
   const loadData = useCallback(async () => {
     if (!token) return;
+    setDataLoadError(null);
     try {
       if (activeTab === 'overview') {
         const d = await fetchDashboardMetrics(token);
@@ -223,6 +225,7 @@ export default function AdminDashboardPage(): ReactElement {
       }
     } catch (e: unknown) {
       console.error('Failed to load tab data:', e);
+      setDataLoadError('Unable to load this section. Please retry.');
       setIsOrdersLoading(false);
     }
   }, [token, activeTab, orderFilter, orderPaymentFilter, orderFulfillmentFilter, orderSortBy, orderSortOrder, searchQuery]);
@@ -314,12 +317,16 @@ export default function AdminDashboardPage(): ReactElement {
   if (!isAuthenticated) {
     const displayError = loginErrorMessage || authError;
     return (
-      <main style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.5rem' }}>
-        <div style={{ maxWidth: '440px', width: '100%', background: '#FFF', borderRadius: '12px', padding: '2rem', border: '1px solid #E8E2D9', boxShadow: 'var(--shadow-md)' }}>
-          <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
-            <span style={{ fontSize: '2.5rem' }}>🌿</span>
-            <h1 style={{ fontSize: '1.4rem', fontWeight: 700, margin: '0.5rem 0', color: 'var(--color-brand-primary)' }}>Mangala Enterprises</h1>
-            <p style={{ fontSize: '0.9rem', color: 'var(--color-text-muted)' }}>Staff & Counter Administration Portal</p>
+      <main className="admin-login-shell">
+        <div className="admin-login-card">
+          <div style={{ textAlign: 'center', marginBottom: '1.75rem' }}>
+            <div className="admin-brand-emblem" aria-hidden="true">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
+              </svg>
+            </div>
+            <h1 className="admin-login-title">Mangala Enterprises</h1>
+            <p className="admin-login-subtitle">Operations &amp; Counter Control Center</p>
           </div>
 
           {displayError && (
@@ -531,106 +538,86 @@ export default function AdminDashboardPage(): ReactElement {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
+    <div className="admin-shell">
       {/* Header */}
-      <header style={{ background: '#FFF', borderBottom: '1px solid var(--color-border)', padding: '0.8rem 1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
-          <span style={{ fontSize: '1.6rem' }}>🌿</span>
+      <header className="admin-topbar">
+        <div className="admin-topbar-brand">
+          <div className="admin-topbar-emblem" aria-hidden="true">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
+            </svg>
+          </div>
           <div>
-            <h1 style={{ fontSize: '1.1rem', fontWeight: 700, margin: 0, color: 'var(--color-brand-primary)' }}>Mangala Enterprises</h1>
-            <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>Staff Operations & Dispatch</span>
+            <h1 className="admin-topbar-title">Mangala Enterprises</h1>
+            <span className="admin-topbar-sub">Operations &amp; Counter Control Center</span>
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'var(--color-bg-cream)', padding: '0.35rem 0.75rem', borderRadius: '8px', border: '1px solid var(--color-border)' }}>
-            <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>{staff?.fullName || staff?.phone || staff?.email}</span>
+        <div className="admin-topbar-actions">
+          <div className="admin-staff-pill">
+            <span>{staff?.fullName || staff?.phone || staff?.email}</span>
             <span className={`badge badge-role-${staff?.role === 'admin' ? 'admin' : staff?.role === 'manager' ? 'manager' : 'staff'}`}>
               {staff?.role}
             </span>
           </div>
 
-          <button type="button" onClick={handleLogout} className="btn-secondary" style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem' }}>
+          <button type="button" onClick={handleLogout} className="admin-signout-btn">
             Sign Out
           </button>
         </div>
       </header>
 
       {/* Navigation Bar */}
-      <nav style={{ background: '#FFF', borderBottom: '1px solid var(--color-border)', padding: '0 1.5rem', display: 'flex', gap: '1.5rem' }}>
+      <nav className="admin-nav" aria-label="Admin sections">
         <button
           type="button"
           onClick={() => setActiveTab('queue')}
-          style={{
-            padding: '0.9rem 0',
-            fontWeight: 600,
-            fontSize: '0.9rem',
-            borderBottom: activeTab === 'queue' ? '3px solid var(--color-brand-primary)' : '3px solid transparent',
-            color: activeTab === 'queue' ? 'var(--color-brand-primary)' : 'var(--color-text-muted)',
-          }}
+          className={`admin-nav-tab ${activeTab === 'queue' ? 'active' : ''}`}
         >
-          📋 Live Dispatch Queue
+          <span>Live Dispatch Queue</span>
         </button>
 
         <button
           type="button"
           onClick={() => setActiveTab('overview')}
-          style={{
-            padding: '0.9rem 0',
-            fontWeight: 600,
-            fontSize: '0.9rem',
-            borderBottom: activeTab === 'overview' ? '3px solid var(--color-brand-primary)' : '3px solid transparent',
-            color: activeTab === 'overview' ? 'var(--color-brand-primary)' : 'var(--color-text-muted)',
-          }}
+          className={`admin-nav-tab ${activeTab === 'overview' ? 'active' : ''}`}
         >
-          📊 Overview (KPIs)
+          <span>Overview (KPIs)</span>
         </button>
 
         <button
           type="button"
           onClick={() => setActiveTab('products')}
-          style={{
-            padding: '0.9rem 0',
-            fontWeight: 600,
-            fontSize: '0.9rem',
-            borderBottom: activeTab === 'products' ? '3px solid var(--color-brand-primary)' : '3px solid transparent',
-            color: activeTab === 'products' ? 'var(--color-brand-primary)' : 'var(--color-text-muted)',
-          }}
+          className={`admin-nav-tab ${activeTab === 'products' ? 'active' : ''}`}
         >
-          🎂 Products
+          <span>Products</span>
         </button>
 
         <button
           type="button"
           onClick={() => setActiveTab('categories')}
-          style={{
-            padding: '0.9rem 0',
-            fontWeight: 600,
-            fontSize: '0.9rem',
-            borderBottom: activeTab === 'categories' ? '3px solid var(--color-brand-primary)' : '3px solid transparent',
-            color: activeTab === 'categories' ? 'var(--color-brand-primary)' : 'var(--color-text-muted)',
-          }}
+          className={`admin-nav-tab ${activeTab === 'categories' ? 'active' : ''}`}
         >
-          📁 Categories
+          <span>Categories</span>
         </button>
 
         <button
           type="button"
           onClick={() => setActiveTab('inventory')}
-          style={{
-            padding: '0.9rem 0',
-            fontWeight: 600,
-            fontSize: '0.9rem',
-            borderBottom: activeTab === 'inventory' ? '3px solid var(--color-brand-primary)' : '3px solid transparent',
-            color: activeTab === 'inventory' ? 'var(--color-brand-primary)' : 'var(--color-text-muted)',
-          }}
+          className={`admin-nav-tab ${activeTab === 'inventory' ? 'active' : ''}`}
         >
-          📦 Inventory & Stock
+          <span>Inventory &amp; Stock</span>
         </button>
       </nav>
 
       {/* Main Body */}
-      <main style={{ padding: '1.5rem', flex: 1, maxWidth: '1200px', width: '100%', margin: '0 auto' }}>
+      <main className="admin-main">
+          {dataLoadError && (
+            <div role="alert" style={{ padding: '0.75rem 1rem', background: '#FEECEB', color: '#B42318', borderRadius: '8px', marginBottom: '1rem' }}>
+              {dataLoadError}{' '}
+              <button type="button" onClick={loadData}>Retry loading</button>
+            </div>
+          )}
         {statusMessage && (
           <div style={{ padding: '0.75rem 1rem', background: '#EBF8EE', color: '#198754', borderRadius: '8px', marginBottom: '1.5rem', border: '1px solid #BADBCC', display: 'flex', justifyContent: 'space-between' }}>
             <span>{statusMessage}</span>
@@ -1903,7 +1890,7 @@ export default function AdminDashboardPage(): ReactElement {
                   <input
                     type="number"
                     value={productForm.prepTime}
-                    onChange={(e) => setProductForm({ ...productForm, prepTime: parseInt(e.target.value, 10) || 15 })}
+                    onChange={(e) => setProductForm({ ...productForm, prepTime: parseInt(e.target.value, 10) || 0 })}
                   />
                 </div>
               </div>
@@ -1915,7 +1902,7 @@ export default function AdminDashboardPage(): ReactElement {
                     <input
                       type="number"
                       value={productForm.initialStock}
-                      onChange={(e) => setProductForm({ ...productForm, initialStock: parseInt(e.target.value, 10) || 10 })}
+                      onChange={(e) => setProductForm({ ...productForm, initialStock: parseInt(e.target.value, 10) || 0 })}
                     />
                   </div>
                   <div>
@@ -1923,7 +1910,7 @@ export default function AdminDashboardPage(): ReactElement {
                     <input
                       type="number"
                       value={productForm.lowStockThreshold}
-                      onChange={(e) => setProductForm({ ...productForm, lowStockThreshold: parseInt(e.target.value, 10) || 5 })}
+                      onChange={(e) => setProductForm({ ...productForm, lowStockThreshold: parseInt(e.target.value, 10) || 0 })}
                     />
                   </div>
                 </div>

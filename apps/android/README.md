@@ -7,6 +7,14 @@
 - JDK 17
 - Android SDK 35 (compileSdk), minSdk 26
 
+Use JDK 17 for command line builds, even if Android Studio ships with a newer runtime. Java 25 caused Android lint to crash during project verification. In PowerShell, set `JAVA_HOME` to your JDK 17 installation and run:
+
+```powershell
+.\gradlew.bat testDebugUnitTest lintDebug assembleDebug --console=plain
+```
+
+The debug APK is written to `app/build/outputs/apk/debug/app-debug.apk`. Online payment uses the Razorpay checkout SDK and requires valid gateway credentials on the backend. Phone sign-in requires a configured SMS provider or a hosted Supabase test phone number.
+
 ## Setup & Configuration
 1. **SDK Path**:
    Android Studio automatically populates `sdk.dir` in `local.properties` based on your machine's installation. Do not commit machine-specific SDK paths to Git.

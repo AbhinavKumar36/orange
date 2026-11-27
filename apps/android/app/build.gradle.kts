@@ -283,6 +283,7 @@ dependencies {
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
     implementation(libs.coil.compose)
+    implementation(libs.razorpay.checkout)
     debugImplementation(libs.androidx.ui.tooling)
 
     testImplementation(libs.junit)

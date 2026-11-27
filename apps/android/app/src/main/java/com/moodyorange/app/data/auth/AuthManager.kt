@@ -82,6 +82,8 @@ class AuthManager(
     }
 
     private val secureStore = SecureSessionStore(context)
+    private val sessionLock = Any()
+    @Volatile private var sessionGeneration = 0L
 
     private val _sessionState = MutableStateFlow<CustomerSession?>(null)
     val sessionState: StateFlow<CustomerSession?> = _sessionState.asStateFlow()
@@ -136,7 +138,8 @@ class AuthManager(
         }
     }
 
-    private fun persistSession(session: CustomerSession) {
+    private fun persistSession(session: CustomerSession, expectedGeneration: Long? = null, expectedToken: String? = null) = synchronized(sessionLock) {
+        if (expectedGeneration != null && (sessionGeneration != expectedGeneration || _sessionState.value?.accessToken != expectedToken)) return@synchronized
         secureStore.saveSession(
             token = session.accessToken,
             customerId = session.customerId,
@@ -147,7 +150,8 @@ class AuthManager(
         _sessionState.value = session
     }
 
-    fun logout() {
+    fun logout() = synchronized(sessionLock) {
+        sessionGeneration++
         secureStore.clear()
         _sessionState.value = null
     }
@@ -299,31 +303,35 @@ class AuthManager(
     suspend fun updateFullName(name: String): Result<CustomerProfile> = updateProfile(name, null)
 
     suspend fun updateProfile(fullName: String, email: String? = null): Result<CustomerProfile> = withContext(Dispatchers.IO) {
+        val generation = sessionGeneration
         val currentSession = _sessionState.value
             ?: return@withContext Result.failure(IllegalStateException("No customer session found"))
 
         val result = apiClient.updateProfile(fullName, email, currentSession.accessToken)
         result.onSuccess { profile ->
+            if (generation != sessionGeneration || _sessionState.value?.accessToken != currentSession.accessToken) return@onSuccess
             val updatedSession = currentSession.copy(
                 fullName = profile.fullName,
                 email = profile.email
             )
-            persistSession(updatedSession)
+            persistSession(updatedSession, generation, currentSession.accessToken)
         }
         result
     }
 
     suspend fun fetchProfile(): Result<CustomerProfile> = withContext(Dispatchers.IO) {
+        val generation = sessionGeneration
         val currentSession = _sessionState.value
             ?: return@withContext Result.failure(IllegalStateException("No customer session found"))
         val result = apiClient.getProfile(currentSession.accessToken)
         result.onSuccess { profile ->
+            if (generation != sessionGeneration || _sessionState.value?.accessToken != currentSession.accessToken) return@onSuccess
             if (profile.fullName != currentSession.fullName || profile.email != currentSession.email) {
                 val updatedSession = currentSession.copy(
                     fullName = profile.fullName,
                     email = profile.email
                 )
-                persistSession(updatedSession)
+                persistSession(updatedSession, generation, currentSession.accessToken)
             }
         }
         result

@@ -103,7 +103,7 @@ fun ProductDetailScreen(
             ) {
                 DetailTopBar(
                     title = "Confection Not Found",
-                    subtitle = "Boutique Catalog",
+                    subtitle = "Store Catalogue",
                     onBackClick = onBackClick
                 )
                 ErrorStateView(
@@ -121,7 +121,7 @@ fun ProductDetailScreen(
             ) {
                 DetailTopBar(
                     title = "Unable to Load",
-                    subtitle = "Boutique Catalog",
+                    subtitle = "Store Catalogue",
                     onBackClick = onBackClick
                 )
                 ErrorStateView(

@@ -28,7 +28,7 @@ export default function CustomerOrdersPage(): ReactElement {
       setOrders(data);
       setLastUpdated(new Date());
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Unable to load your boutique orders.';
+      const msg = err instanceof Error ? err.message : 'Unable to load your store orders.';
       if (!silent) setError(msg);
     } finally {
       if (!silent) setIsLoading(false);
@@ -219,7 +219,7 @@ export default function CustomerOrdersPage(): ReactElement {
                 fontWeight: 600,
               }}
             >
-              ← Back to Boutique Storefront
+              ← Back to Mangala Storefront
             </Link>
 
             {isAuthenticated && (
@@ -283,7 +283,7 @@ export default function CustomerOrdersPage(): ReactElement {
                 marginBottom: '0.4rem',
               }}
             >
-              Order Tracking & Boutique History
+              Order Tracking & Store History
             </h1>
             <p style={{ color: 'var(--color-text-muted, #94A3B8)', fontSize: '0.95rem' }}>
               Real-time tracker for in-store display reservations, packaging updates, and counter collection.
@@ -315,7 +315,7 @@ export default function CustomerOrdersPage(): ReactElement {
                   margin: '0 auto 1.75rem auto',
                 }}
               >
-                Enter your mobile number to view your active order timeline, receipt records, and receive instant handover at our boutique display counter.
+                Enter your mobile number to view your active order timeline, receipt records, and receive instant handover at our store counter.
               </p>
               <button
                 type="button"
@@ -341,7 +341,7 @@ export default function CustomerOrdersPage(): ReactElement {
             <div style={{ textAlign: 'center', padding: '4rem 1rem' }}>
               <div style={{ fontSize: '2.5rem', marginBottom: '0.75rem', animation: 'spin 2s infinite linear' }}>🌿</div>
               <p style={{ color: 'var(--color-text-muted, #94A3B8)', fontSize: '1rem' }}>
-                Synchronizing boutique counter orders...
+                Synchronizing store counter orders...
               </p>
             </div>
           )}
@@ -602,7 +602,7 @@ export default function CustomerOrdersPage(): ReactElement {
                             <span className="handover-callout-icon">🎉</span>
                             <div>
                               <div className="handover-callout-title">
-                                PACKED & WAITING AT BOUTIQUE COUNTER
+                                PACKED & WAITING AT STORE COUNTER
                               </div>
                               <div className="handover-callout-copy">
                                 Your order is pre-packed and ready in our display vitrine. Please present Order Reference{' '}

@@ -1,8 +1,11 @@
-import fetch from 'node-fetch';
+import 'dotenv/config';
 
-const SUPABASE_URL = 'https://pdosvzdkuulstvzqfnkl.supabase.co';
-const SUPABASE_SERVICE_ROLE_KEY =
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkb3N2emRrdXVsc3R2enFmbmtsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc5MzUyODM4MiwiZXhwIjoyMTA5MTA0MzgyfQ.zQeqzGhSs0gCBCCqUiCwNL8CQRMqSXf-Q2urNwdLbxs';
+const SUPABASE_URL = process.env.SUPABASE_URL || '';
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+
+if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+  throw new Error('SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required.');
+}
 
 const updates = [
   {

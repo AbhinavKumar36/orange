@@ -401,12 +401,12 @@ class MoodyOrangeApiClient(
             items.add(
                 ValidatedLineItem(
                     productId = it.getString("productId"),
-                    title = it.getString("title"),
-                    unitPricePaise = it.getLong("unitPricePaise"),
-                    requestedQuantity = it.getInt("requestedQuantity"),
-                    availableQuantity = it.getInt("availableQuantity"),
-                    lineTotalPaise = it.getLong("lineTotalPaise"),
-                    isAvailable = it.getBoolean("isAvailable")
+                    title = if (it.has("productName")) it.getString("productName") else it.getString("title"),
+                    unitPricePaise = if (it.has("basePrice")) it.getLong("basePrice") else it.getLong("unitPricePaise"),
+                    requestedQuantity = if (it.has("quantity")) it.getInt("quantity") else it.getInt("requestedQuantity"),
+                    availableQuantity = if (it.has("availableStock")) it.getInt("availableStock") else it.getInt("availableQuantity"),
+                    lineTotalPaise = if (it.has("lineTotal")) it.getLong("lineTotal") else it.getLong("lineTotalPaise"),
+                    isAvailable = if (it.has("isInStock")) it.getBoolean("isInStock") else it.getBoolean("isAvailable")
                 )
             )
         }
@@ -418,13 +418,18 @@ class MoodyOrangeApiClient(
                 errors.add(errorsArray.getString(i))
             }
         }
+        if (!isValid && errors.isEmpty()) {
+            items.filter { !it.isAvailable || it.requestedQuantity > it.availableQuantity }.forEach {
+                errors.add("${it.title}: requested quantity is unavailable.")
+            }
+        }
 
         return CartValidationResponse(
             isValid = isValid,
             items = items,
-            subtotalPaise = root.getLong("subtotalPaise"),
-            taxPaise = root.getLong("taxPaise"),
-            totalPaise = root.getLong("totalPaise"),
+            subtotalPaise = if (root.has("subtotalAmount")) root.getLong("subtotalAmount") else root.getLong("subtotalPaise"),
+            taxPaise = if (root.has("taxAmount")) root.getLong("taxAmount") else root.getLong("taxPaise"),
+            totalPaise = if (root.has("totalAmount")) root.getLong("totalAmount") else root.getLong("totalPaise"),
             currency = root.optString("currency", "INR"),
             errors = errors
         )

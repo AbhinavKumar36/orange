@@ -64,6 +64,13 @@ describe('Environment Configuration Validation', () => {
     }).toThrowError(ConfigValidationError);
   });
 
+  it('rejects mock services in production even with a configured database key', () => {
+    expect(() => validateConfig({
+      NODE_ENV: 'production', SUPABASE_URL: 'https://prod-project.supabase.co',
+      SUPABASE_SERVICE_ROLE_KEY: 'real_secret_token_12345', ALLOW_MOCK_SERVICES: true,
+    })).toThrow('Mock services must be disabled in production');
+  });
+
   it('should reject production configuration if SUPABASE_SERVICE_ROLE_KEY contains mock/placeholder text', () => {
     expect(() => {
       validateConfig({

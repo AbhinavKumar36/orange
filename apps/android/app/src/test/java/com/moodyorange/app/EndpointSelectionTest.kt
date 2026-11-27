@@ -9,6 +9,12 @@ import org.junit.Assert.fail
 import org.junit.Test
 
 class EndpointSelectionTest {
+    private fun testJwt(role: String): String {
+        val payload = java.util.Base64.getUrlEncoder().withoutPadding()
+            .encodeToString("""{"role":"$role"}""".toByteArray())
+        return "test.$payload.test"
+    }
+
 
     @Test
     fun testDebugDefaultCandidateEndpointsIncludeEmulatorAndLocalhost() {
@@ -108,8 +114,8 @@ class EndpointSelectionTest {
 
     @Test
     fun testServiceRoleKeyDetection() {
-        val rawServiceRole = "eyJhbGciOiJIUzI1NiJ9.eyJyb2xlIjoic2VydmljZV9yb2xlIn0.signature"
-        val anonToken = "eyJhbGciOiJIUzI1NiJ9.eyJyb2xlIjoiYW5vbiJ9.signature"
+        val rawServiceRole = testJwt("service_role")
+        val anonToken = testJwt("anon")
 
         assertTrue("Must detect service_role in JWT payload", AuthManager.isServiceRoleKey(rawServiceRole))
         assertTrue("Must detect plain service_role substring", AuthManager.isServiceRoleKey("supabase_service_role_key_secret"))
@@ -162,7 +168,7 @@ class EndpointSelectionTest {
             "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.example_anon_key",
             "dummy_anon_key",
             "placeholder_key",
-            "eyJhbGciOiJIUzI1NiJ9.eyJyb2xlIjoic2VydmljZV9yb2xlIn0.signature"
+            testJwt("service_role")
         )
         for (key in prohibitedKeys) {
             try {
@@ -178,7 +184,7 @@ class EndpointSelectionTest {
 
     @Test
     fun testAnonKeyAcceptsValidKey() {
-        val validKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJvbGUiOiJhbm9uIn0.valid_signature"
+        val validKey = testJwt("anon")
         AuthManager.validateAnonKey(validKey)
     }
 }

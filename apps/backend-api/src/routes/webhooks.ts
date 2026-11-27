@@ -8,7 +8,7 @@ import {
   mockRefundsStore,
   mockWebhookEvents,
 } from '../services/paymentStore.js';
-import { verifyWebhookSignature } from '../services/razorpay.js';
+import { verifyWebhookSignature, isMockPaymentMode } from '../services/razorpay.js';
 
 interface WebhooksPluginOptions {
   config: AppConfig;
@@ -44,7 +44,7 @@ export const webhooksRoutes: FastifyPluginAsync<WebhooksPluginOptions> = async (
 
     let isSignatureValid = false;
     if (
-      (config.ALLOW_MOCK_SERVICES || config.NODE_ENV === 'test') &&
+      isMockPaymentMode(config) &&
       rawSignature.startsWith('mock_sig_')
     ) {
       isSignatureValid = true;

@@ -68,11 +68,11 @@ describe('Phase 5: Auth, Profile, Cart Validation & Orders Engine', () => {
       expect(body.error.code).toBe('INVALID_TOKEN');
     });
 
-    it('rejects mock tokens when ALLOW_MOCK_SERVICES is disabled', async () => {
+    it.each(['test', 'development'] as const)('rejects forged development and mock tokens without mock mode in %s', async (nodeEnv) => {
       const strictConfig = ConfigSchema.parse({
         PORT: 4003,
         HOST: '127.0.0.1',
-        NODE_ENV: 'test',
+        NODE_ENV: nodeEnv,
         ALLOW_MOCK_SERVICES: false,
         SUPABASE_URL: 'http://localhost:54321',
       });
@@ -89,6 +89,13 @@ describe('Phase 5: Auth, Profile, Cart Validation & Orders Engine', () => {
         expect(res.statusCode).toBe(401);
         const body = JSON.parse(res.payload);
         expect(body.error.code).toBe('INVALID_TOKEN');
+        const forged = await strictApp.inject({
+          method: 'GET',
+          url: '/api/v1/orders',
+          headers: { authorization: `Bearer dev_customer_token:${customerA.id}:${customerA.phone}:123456` },
+        });
+        expect(forged.statusCode).toBe(401);
+        expect(forged.json().error.code).toBe('INVALID_TOKEN');
       } finally {
         await strictApp.close();
       }

@@ -53,28 +53,28 @@ private val SHOWCASE_ITEMS = listOf(
     ShowcaseItem(
         categoryKey = "cake",
         title = "Dark Chocolate Truffle Cake",
-        subtitle = "Boutique Patisserie Vitrine",
+        subtitle = "Cakes & Celebratory Bakes",
         price = "₹450",
         imageUrl = "https://images.unsplash.com/photo-1578985545062-69928b1d9587?auto=format&fit=crop&w=800&q=80",
-        tastingNote = "Layered 70% dark Belgian ganache with cold-pressed natural fruit extract glaze. Prepared and chilled in vitrine.",
+        tastingNote = "Layered dark chocolate ganache cake, pre-packed and ready for counter pickup.",
         isVeg = true
     ),
     ShowcaseItem(
         categoryKey = "juice",
         title = "Valencia Orange Cold-Pressed (300ml)",
-        subtitle = "Chilled Nectar Vitrine",
+        subtitle = "Chilled Beverages & Juices",
         price = "₹180",
         imageUrl = "https://images.unsplash.com/photo-1613478223719-2ab802602423?auto=format&fit=crop&w=800&q=80",
-        tastingNote = "Pure sun-ripened cold-pressed fruit extract with natural floral notes. Sealed and ready in display counter.",
+        tastingNote = "Chilled cold-pressed fruit beverage, sealed and ready in our display cooler.",
         isVeg = true
     ),
     ShowcaseItem(
         categoryKey = "chocolates",
         title = "Artisanal Praline Box (6 pcs)",
-        subtitle = "Gourmet Chocolatier Collection",
+        subtitle = "Chocolates & Confectionery",
         price = "₹350",
         imageUrl = "https://images.unsplash.com/photo-1549007994-cb92caebd54b?auto=format&fit=crop&w=800&q=80",
-        tastingNote = "Single-origin cacao truffles dusted in roasted nibs and pure cocoa butter. Boxed for instant takeaway.",
+        tastingNote = "Assorted chocolate pralines boxed for convenient counter collection.",
         isVeg = true
     )
 )
@@ -101,15 +101,15 @@ fun ProductShowcaseSection(
         ) {
             Column {
                 Text(
-                    text = "IN-STORE VITRINE SHOWCASE",
+                    text = "RETAIL HIGHLIGHTS",
                     fontSize = 10.5.sp,
                     fontWeight = FontWeight.Bold,
-                    color = ForestGreen,
+                    color = colors.primary,
                     letterSpacing = 1.sp
                 )
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
-                    text = "Curated Boutique Confections",
+                    text = "Featured Selections",
                     fontFamily = EditorialSerif,
                     fontSize = 19.sp,
                     fontWeight = FontWeight.Bold,
@@ -126,19 +126,19 @@ fun ProductShowcaseSection(
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             ShowcaseTab(
-                label = "Boutique Cake",
+                label = "Cakes",
                 isSelected = selectedIndex == 0,
                 onClick = { selectedIndex = 0 },
                 modifier = Modifier.weight(1f)
             )
             ShowcaseTab(
-                label = "Cold Nectar",
+                label = "Beverages",
                 isSelected = selectedIndex == 1,
                 onClick = { selectedIndex = 1 },
                 modifier = Modifier.weight(1f)
             )
             ShowcaseTab(
-                label = "Fine Truffles",
+                label = "Chocolates",
                 isSelected = selectedIndex == 2,
                 onClick = { selectedIndex = 2 },
                 modifier = Modifier.weight(1f)

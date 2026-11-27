@@ -270,7 +270,7 @@ export function Header({ categories: propCategories, onCategorySelect }: HeaderP
                 </button>
               </div>
             ) : (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <div className="user-session-group">
                 <Link
                   href="/orders"
                   className="orders-link-pill"

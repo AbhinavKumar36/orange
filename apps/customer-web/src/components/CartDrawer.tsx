@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, type ReactElement } from 'react';
+import { ShoppingBag, X } from 'lucide-react';
 import { formatPaiseToRupees } from '@orange/api-contracts';
 import { useCart } from '../lib/cart';
 import { ProductIllustration } from './ProductIllustration';
@@ -49,11 +50,13 @@ export function CartDrawer({ isOpen, onClose }: CartDrawerProps): ReactElement |
           {/* Header */}
           <div className="drawer-header">
             <div className="drawer-brand-badge">
-              <span className="brand-logo-mark" aria-hidden="true">🌿</span>
+              <span className="brand-logo-emblem" aria-hidden="true">
+                <ShoppingBag size={18} />
+              </span>
               <div>
                 <h2 className="drawer-title">Shopping Bag</h2>
                 <span className="drawer-count-subtitle">
-                  {items.length} {items.length === 1 ? 'creation' : 'creations'} selected
+                  {items.length} {items.length === 1 ? 'item' : 'items'} selected
                 </span>
               </div>
             </div>
@@ -63,7 +66,7 @@ export function CartDrawer({ isOpen, onClose }: CartDrawerProps): ReactElement |
               onClick={onClose}
               aria-label="Close Shopping Bag"
             >
-              ✕
+              <X size={18} aria-hidden="true" />
             </button>
           </div>
 
@@ -89,7 +92,7 @@ export function CartDrawer({ isOpen, onClose }: CartDrawerProps): ReactElement |
                 </div>
                 <h3 className="empty-cart-title">Your Bag is Empty</h3>
                 <p className="empty-cart-copy">
-                  Explore our artisanal cakes, cold-pressed citrus, and single-origin chocolates to curate your selection.
+                  Explore our multi-category retail catalogue—from savoury snacks and chilled beverages to cakes, ice creams, and confectionery.
                 </p>
                 <button
                   type="button"
@@ -97,7 +100,7 @@ export function CartDrawer({ isOpen, onClose }: CartDrawerProps): ReactElement |
                   onClick={onClose}
                   style={{ width: '100%', marginTop: '0.5rem' }}
                 >
-                  Browse Menu Catalog
+                  Browse Store Catalogue
                 </button>
               </div>
             ) : (

@@ -33,7 +33,7 @@ fun SearchBar(
     query: String,
     onQueryChange: (String) -> Unit,
     modifier: Modifier = Modifier,
-    placeholderText: String = "Search artisanal delicacies, juices, confections..."
+    placeholderText: String = "Search snacks, cold drinks, cakes, treats..."
 ) {
     val colors = MangalaTheme.colors
     val focusManager = LocalFocusManager.current

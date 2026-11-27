@@ -103,6 +103,42 @@ class CartAndAuthTest {
     }
 
     @Test
+    fun testParseAuthoritativeBackendCartResponse() {
+        val parsed = apiClient.parseCartValidation("""
+            {
+                "isValid": true,
+                "items": [{"productId":"prod_01","productName":"Truffle Cake",
+                    "basePrice":65000,"taxRatePct":5,"quantity":2,"lineTotal":130000,
+                    "isInStock":true,"availableStock":4}],
+                "subtotalAmount":130000,"taxAmount":6500,"packagingAmount":0,
+                "totalAmount":136500,"hasOutOfStockItems":false
+            }
+        """.trimIndent())
+        assertTrue(parsed.isValid)
+        assertEquals("Truffle Cake", parsed.items.single().title)
+        assertEquals(2, parsed.items.single().requestedQuantity)
+        assertEquals(130000L, parsed.subtotalPaise)
+        assertEquals(6500L, parsed.taxPaise)
+        assertEquals(136500L, parsed.totalPaise)
+    }
+
+    @Test
+    fun testBackendUnavailableCartProvidesError() {
+        val parsed = apiClient.parseCartValidation("""
+            {
+                "isValid":false,
+                "items":[{"productId":"prod_01","productName":"Truffle Cake",
+                    "basePrice":65000,"quantity":2,"lineTotal":130000,
+                    "isInStock":false,"availableStock":0}],
+                "subtotalAmount":130000,"taxAmount":6500,"packagingAmount":0,
+                "totalAmount":136500,"hasOutOfStockItems":true
+            }
+        """.trimIndent())
+        assertFalse(parsed.isValid)
+        assertTrue(parsed.errors.single().contains("Truffle Cake"))
+    }
+
+    @Test
     fun testParseOrdersResponse() {
         val json = """
         {

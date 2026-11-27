@@ -36,6 +36,13 @@ export const ConfigSchema = z
   })
   .superRefine((data, ctx) => {
     if (data.NODE_ENV === 'production') {
+      if (data.ALLOW_MOCK_SERVICES) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Mock services must be disabled in production',
+          path: ['ALLOW_MOCK_SERVICES'],
+        });
+      }
       // 1. SUPABASE_URL must use https and not localhost in production
       if (!data.SUPABASE_URL.startsWith('https://')) {
         ctx.addIssue({

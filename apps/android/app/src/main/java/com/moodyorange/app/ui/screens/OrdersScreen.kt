@@ -224,7 +224,7 @@ fun OrdersScreen(
                     ),
                     shape = RoundedCornerShape(10.dp)
                 ) {
-                    Text("Browse Boutique Menu", fontWeight = FontWeight.Bold, fontSize = 13.5.sp)
+                    Text("Browse Store Catalogue", fontWeight = FontWeight.Bold, fontSize = 13.5.sp)
                 }
             }
         } else {
@@ -335,7 +335,7 @@ private fun OrderCard(order: Order) {
                     Text("🛍️", fontSize = 16.sp)
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "ORDER PACKED: Your delicacies are packed in our boutique packaging and ready at the Mangala Enterprises counter. Present order #${order.orderNumber} for instant handover.",
+                        text = "ORDER PACKED: Your order is packed and ready at the Mangala Enterprises counter. Present order #${order.orderNumber} for instant handover.",
                         fontSize = 11.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = if (colors.isDark) Color(0xFF28A745) else colors.inStockGreen,

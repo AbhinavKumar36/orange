@@ -13,6 +13,7 @@ const allFiles = [...tracked, ...untracked]
     if (f === 'orange.zip' || f === '.orange_temp.zip' || f === '.temp_zip_list.txt') return false;
     if (f.startsWith('node_modules/') || f.includes('/node_modules/')) return false;
     if (f.startsWith('.next/') || f.includes('/.next/')) return false;
+    if (f.startsWith('.next-dev/') || f.includes('/.next-dev/')) return false;
     if (f.startsWith('.turbo/') || f.includes('/.turbo/')) return false;
     if (f.startsWith('.gradle/') || f.includes('/.gradle/')) return false;
     if (f.startsWith('test-results') || f.includes('/test-results') || f.startsWith('e2e-screenshots') || f.includes('/e2e-screenshots')) return false;

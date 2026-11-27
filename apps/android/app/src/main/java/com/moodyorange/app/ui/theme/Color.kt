@@ -3,60 +3,62 @@ package com.moodyorange.app.ui.theme
 import androidx.compose.ui.graphics.Color
 
 // ==============================================================================
-// MOODY ORANGE — MOODY AMBER & WARM ROAST CACAO DESIGN SYSTEM
-// Replaces stark flat black with warm roasted cacao & espresso tones
+// MANGALA ENTERPRISES — CONTEMPORARY PREMIUM RETAIL DESIGN SYSTEM
 // Palette:
-// Moody Amber:    #C85C1A
-// Warm Cream:     #FDF8F2
-// Muted Gold:     #D7A34A
-// Warm Espresso:  #2C1810
-// Soft Peach:     #FDE8D6
-// Roasted Cacao:  #361D12 (Replaces pitch black)
+// Forest Green:   #143E2B (Primary brand authority)
+// Warm Ivory:     #FAF7F2 (Primary light canvas)
+// Mangala Orange: #D8561C (Restrained accent & interactive highlight)
+// Deep Obsidian:  #111A15 (Dark canvas & atmospheric contrast)
+// Charcoal Green: #17241E (Dark elevated surface)
 // White:          #FFFFFF
 // ==============================================================================
 
-// Primary Brand Anchors (Moody Amber)
-val MoodyAmber = Color(0xFFC85C1A)
-val MoodyAmberHover = Color(0xFFA84810)
-val MoodyAmberDark = Color(0xFF8A3A0C)
-val MoodyAmberGlow = Color(0x38C85C1A)
-val MoodyAmberSubtle = Color(0xFFFDE8D6)
+// Primary Brand Anchors (Forest Green)
+val ForestGreen = Color(0xFF143E2B)
+val ForestGreenHover = Color(0xFF1E573D)
+val ForestGreenDark = Color(0xFF0D2B1E)
+val ForestGreenGlow = Color(0x38143E2B)
+val ForestGreenSubtle = Color(0xFFEDF4F0)
+val ForestGreenDarkModePrimary = Color(0xFF3CA374)
 
-// Compatibility aliases for existing references
-val ForestGreen = MoodyAmber
-val ForestGreenHover = MoodyAmberHover
-val ForestGreenDark = MoodyAmberDark
-val ForestGreenGlow = MoodyAmberGlow
+// Restrained Accent (Mangala Orange)
+val MangalaOrange = Color(0xFFD8561C)
+val MangalaOrangeHover = Color(0xFFBE4612)
+val MangalaOrangeSubtle = Color(0xFFFDF1EB)
+val MangalaOrangeGlow = Color(0x38D8561C)
 
-val MutedGold = Color(0xFFD7A34A)
-val MutedGoldHover = Color(0xFFC6933B)
-val MutedGoldLight = Color(0xFFF7EBD3)
-val MutedGoldGlow = Color(0x40D7A34A)
+// Compatibility aliases
+val MoodyAmber = MangalaOrange
+val MoodyAmberHover = MangalaOrangeHover
+val MoodyAmberDark = Color(0xFF9A380E)
+val MoodyAmberGlow = MangalaOrangeGlow
+val MoodyAmberSubtle = MangalaOrangeSubtle
 
-val SoftSage = Color(0xFFFDE8D6) // Soft peach warm subtle
-val SoftSageSubtle = Color(0xFFFDF5EE)
+val MutedGold = Color(0xFFC99738)
+val MutedGoldHover = Color(0xFFB5842A)
+val MutedGoldLight = Color(0xFFF7EEDC)
+val MutedGoldGlow = Color(0x33C99738)
 
-// Light Mode Surfaces (Warm Cream & Pure White)
-val WarmIvoryCanvas = Color(0xFFFDF8F2)
+val SoftSage = Color(0xFFEDF4F0)
+val SoftSageSubtle = Color(0xFFEDF4F0)
+
+// Light Mode Surfaces (Warm Ivory & Pure White)
+val WarmIvoryCanvas = Color(0xFFFAF7F2)
 val WhiteSurface = Color(0xFFFFFFFF)
-val SurfaceElevatedLight = Color(0xFFFDF5EE)
-val SurfaceHoverLight = Color(0xFFF7EDE0)
-val CardBorderLight = Color(0xFFEAD9C8)
-val DividerLight = Color(0xFFEDD9C4)
+val SurfaceElevatedLight = Color(0xFFF5EFE6)
+val SurfaceHoverLight = Color(0xFFEFE8DD)
+val CardBorderLight = Color(0xFFE5DCD0)
+val DividerLight = Color(0xFFEAE1D5)
 
-// ==============================================================================
-// WARM CACAO ATMOSPHERE PALETTE (Replaces Stark Black / Abyss)
-// Sumptuous warm dark roasted chocolate & espresso tones
-// ==============================================================================
-val AbyssCanvas = Color(0xFF361D12)          // Warm Roast Cacao canvas (#361D12) - NO BLACK
-val AbyssSurface = Color(0xFF452416)         // Rich Espresso surface (#452416)
-val AbyssSurfaceElevated = Color(0xFF542D1C) // Elevated Cacao card (#542D1C)
-val AbyssSurfaceHover = Color(0xFF633722)    // Warm interactive hover (#633722)
-val AbyssCardBorder = Color(0xFF6B3923)      // Warm Cacao border (#6B3923)
-val AbyssCardBorderGold = Color(0x40D7A34A)  // Gold accent border
-val AbyssDivider = Color(0xFF4A2718)         // Warm separator line (#4A2718)
+// Dark Mode Surfaces (Deep Charcoal / Obsidian-Forest)
+val AbyssCanvas = Color(0xFF111A15)
+val AbyssSurface = Color(0xFF17241E)
+val AbyssSurfaceElevated = Color(0xFF22322A)
+val AbyssSurfaceHover = Color(0xFF2B3F35)
+val AbyssCardBorder = Color(0xFF2E4338)
+val AbyssCardBorderGold = Color(0x33C99738)
+val AbyssDivider = Color(0xFF23342B)
 
-// Dark Mode Surfaces Mapped to Warm Cacao Color System
 val DeepCharcoalCanvas = AbyssCanvas
 val DeepForestSurface = AbyssSurface
 val SurfaceElevatedDark = AbyssSurfaceElevated
@@ -66,42 +68,38 @@ val CardBorderGoldDark = AbyssCardBorderGold
 val DividerDark = AbyssDivider
 
 // Typography Hierarchies
-// Light Mode:
-val CharcoalTextPrimary = Color(0xFF2C1810)   // Warm dark espresso
-val CharcoalTextSecondary = Color(0xFF4A2E1E) // Rich coffee
-val CharcoalTextMuted = Color(0xFF7A5C4A)     // Soft cacao
-val CharcoalTextSubtle = Color(0xFFA07A65)    // Muted biscuit
+val CharcoalTextPrimary = Color(0xFF14231A)
+val CharcoalTextSecondary = Color(0xFF334439)
+val CharcoalTextMuted = Color(0xFF617367)
+val CharcoalTextSubtle = Color(0xFF8A9C91)
 
-// Dark Mode:
-val WarmIvoryTextPrimary = Color(0xFFFFF9F2)  // Warm cream
-val SoftSageTextSecondary = Color(0xFFE5D5C5) // Soft almond
-val MutedTextDark = Color(0xFFB8A294)         // Warm beige
+val WarmIvoryTextPrimary = Color(0xFFFAF7F2)
+val SoftSageTextSecondary = Color(0xFFDDE6E0)
+val MutedTextDark = Color(0xFF9CB0A3)
 
-// FSSAI Food Classification & Stock Status Accents (Indian Statutory Standards)
-val FssaiVegGreen = Color(0xFF168A45)
-val FssaiVegBgLight = Color(0xFFE8F5EC)
-val FssaiVegBgDark = Color(0x26168A45)
+// FSSAI Food Classification & Stock Status Accents
+val FssaiVegGreen = Color(0xFF15803D)
+val FssaiVegBgLight = Color(0xFFECFDF5)
+val FssaiVegBgDark = Color(0x2615803D)
 
-val FssaiNonVegRed = Color(0xFFD32F2F)
-val FssaiNonVegBgLight = Color(0xFFFFEBEE)
-val FssaiNonVegBgDark = Color(0x26D32F2F)
+val FssaiNonVegRed = Color(0xFFB91C1C)
+val FssaiNonVegBgLight = Color(0xFFFEF2F2)
+val FssaiNonVegBgDark = Color(0x26B91C1C)
 
-val InStockGreen = Color(0xFF168A45)
-val InStockBg = Color(0xFFE8F5EC)
-val InStockBgDark = Color(0x26168A45)
+val InStockGreen = Color(0xFF15803D)
+val InStockBg = Color(0xFFECFDF5)
+val InStockBgDark = Color(0x2615803D)
 
-val OutOfStockRed = Color(0xFFD32F2F)
-val OutOfStockBg = Color(0xFFFFEBEE)
-val OutOfStockBgDark = Color(0x26D32F2F)
+val OutOfStockRed = Color(0xFFB91C1C)
+val OutOfStockBg = Color(0xFFFEF2F2)
+val OutOfStockBgDark = Color(0x26B91C1C)
 
-// ==============================================================================
-// Legacy Compatibility Mappings (Mapped directly to Option B Elegant Minimal)
-// ==============================================================================
-val OrangePrimary = ForestGreen
+// Legacy Compatibility Mappings
+val OrangePrimary = MangalaOrange
 val OrangeSecondary = MutedGold
-val OrangeLight = SoftSageSubtle
-val OrangeDark = ForestGreenDark
-val OrangeGlow = ForestGreenGlow
+val OrangeLight = MangalaOrangeSubtle
+val OrangeDark = MoodyAmberDark
+val OrangeGlow = MangalaOrangeGlow
 val AmberGold = MutedGold
 val GourmetGold = MutedGold
 val GoldGlow = MutedGoldGlow

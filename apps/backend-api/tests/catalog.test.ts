@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { buildApp } from '../src/app.js';
 import { ConfigSchema, type AppConfig } from '../src/config/env.js';
@@ -144,6 +144,38 @@ describe('Catalog Routes (GET /api/v1/categories & /api/v1/products)', () => {
     const body = JSON.parse(res.payload);
     expect(body.error.code).toBe('PRODUCT_NOT_FOUND');
     expect(body.error.statusCode).toBe(404);
+  });
+
+  it.each([true, false])('reads declared food classification and supports older databases (column present: %s)', async (hasClassification) => {
+    vi.stubGlobal('fetch', vi.fn(async (input: string) => {
+      const url = new URL(input);
+      if (url.pathname.endsWith('/product_availability')) {
+        return Response.json([{ product_id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', is_in_stock: true }]);
+      }
+      const select = url.searchParams.get('select') || '';
+      if (!hasClassification && select.split(',').includes('food_classification')) {
+        return Response.json({ code: '42703' }, { status: 400 });
+      }
+      const row = {
+        id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+        category_id: '11111111-1111-1111-1111-111111111111',
+        name: 'Declared non-vegetarian product', slug: 'declared-product',
+        description: null, base_price: 10000, tax_rate_pct: 5,
+        is_veg: true, allergens: [], prep_time_minutes: 0, image_url: null,
+        is_active: true,
+        ...(hasClassification && (select.startsWith('*') || select.split(',').includes('food_classification'))
+          ? { food_classification: 'non_vegetarian' } : {}),
+      };
+      return Response.json([row]);
+    }));
+    try {
+      const res = await app.inject({ method: 'GET', url: '/api/v1/products' });
+      expect(res.statusCode).toBe(200);
+      expect(res.json().products[0].foodClassification).toBe(hasClassification ? 'non_vegetarian' : 'vegetarian');
+      expect(res.json().products[0].isInStock).toBe(true);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it('Production mode: rejects sample fallback and returns 503 DATABASE_UNAVAILABLE when database is down', async () => {

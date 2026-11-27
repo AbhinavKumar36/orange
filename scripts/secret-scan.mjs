@@ -5,6 +5,7 @@ const IGNORED_DIRS = new Set([
   '.git',
   'node_modules',
   '.next',
+  '.next-dev',
   'dist',
   'build',
   '.turbo',
@@ -39,7 +40,7 @@ const SECRET_PATTERNS = [
   { name: 'Slack Token', regex: /xox[baprs]-[0-9]{10,13}-[0-9]{10,13}[a-zA-Z0-9-]*/ },
   {
     name: 'Production Supabase Service Key',
-    regex: /SUPABASE_SERVICE_ROLE_KEY\s*=\s*eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9\.(?!example_service_role_key)[0-9a-zA-Z_-]{20,}/,
+    regex: /\bsb_secret_[A-Za-z0-9_-]{20,}/,
   },
   {
     name: 'Database URI with Password',
@@ -116,6 +117,23 @@ function scanFile(filePath) {
   const content = buffer.toString('utf-8');
   const lines = content.split('\n');
 
+  // Decode JWT payloads instead of depending on assignment names, quotes or
+  // line breaks. Public anon keys are safe; service-role JWTs bypass RLS.
+  for (const match of content.matchAll(/eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g)) {
+    try {
+      const payload = JSON.parse(Buffer.from(match[0].split('.')[1], 'base64url').toString('utf8'));
+      if (payload.role === 'service_role') {
+        findings.push({
+          file: relative(process.cwd(), filePath),
+          line: content.slice(0, match.index).split('\n').length,
+          type: 'Supabase Service Role JWT',
+        });
+      }
+    } catch {
+      // Non-JWT examples are handled by the other patterns.
+    }
+  }
+
   lines.forEach((line, index) => {
     for (const pattern of SECRET_PATTERNS) {
       if (pattern.regex.test(line)) {
@@ -123,7 +141,6 @@ function scanFile(filePath) {
           file: relative(process.cwd(), filePath),
           line: index + 1,
           type: pattern.name,
-          content: line.trim().slice(0, 80),
         });
       }
     }
@@ -140,7 +157,7 @@ if (unreadableFiles.length > 0) {
 if (findings.length > 0) {
   console.error(`\n❌ Secret scan failed: ${findings.length} potential secret(s) detected across ${scannedFilesCount} files:`);
   findings.forEach((f) => {
-    console.error(`  - [${f.type}] ${f.file}:${f.line} -> ${f.content}`);
+    console.error(`  - [${f.type}] ${f.file}:${f.line}`);
   });
   process.exit(1);
 } else {

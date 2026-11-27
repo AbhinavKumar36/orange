@@ -3,7 +3,7 @@
 import React, { useState, useEffect, type ReactElement } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useCustomerAuth } from '../../lib/auth';
+import { useCustomerAuth, saveCustomerSession } from '../../lib/auth';
 import { fetchProfileApi, updateProfileApi, ApiError } from '../../lib/api';
 import { Header } from '../../components/Header';
 import { Footer } from '../../components/Footer';
@@ -143,12 +143,33 @@ export default function AccountPage(): ReactElement {
       );
 
       setProfile(updated);
+      saveCustomerSession({ ...session, user: { ...session.user, fullName: updated.fullName } });
       setFullName(updated.fullName || '');
       setEmail(updated.email || '');
       setIsEditing(false);
       setSaveSuccessMessage('Your profile information has been successfully updated.');
     } catch (err: unknown) {
-      setProfileError(err instanceof Error ? err.message : 'Failed to update profile.');
+      if (
+        err instanceof ApiError &&
+        err.statusCode === 401 &&
+        session.accessToken.startsWith('dev_customer_token:')
+      ) {
+        const localUpdated: CustomerProfile = {
+          id: session.user.id,
+          phone: session.user.phone,
+          fullName: fullName.trim(),
+          email: email.trim() || null,
+          createdAt: profile?.createdAt,
+        };
+        setProfile(localUpdated);
+        saveCustomerSession({ ...session, user: { ...session.user, fullName: localUpdated.fullName } });
+        setFullName(localUpdated.fullName || '');
+        setEmail(localUpdated.email || '');
+        setIsEditing(false);
+        setSaveSuccessMessage('Profile updated locally for this dev test session.');
+      } else {
+        setProfileError(err instanceof Error ? err.message : 'Failed to update profile.');
+      }
     } finally {
       setIsSaving(false);
     }
@@ -242,7 +263,7 @@ export default function AccountPage(): ReactElement {
                   </Link>
                   <Link href="/#menu" className="account-nav-item">
                     <span className="nav-item-icon">🛍️</span>
-                    <span>Browse Delicacies</span>
+                    <span>Browse Catalogue</span>
                   </Link>
                 </nav>
 

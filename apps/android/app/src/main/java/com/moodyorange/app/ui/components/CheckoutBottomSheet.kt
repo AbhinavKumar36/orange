@@ -44,6 +44,7 @@ import com.moodyorange.app.ui.theme.EditorialSerif
 import com.moodyorange.app.ui.theme.MangalaTheme
 import com.moodyorange.app.ui.viewmodel.CheckoutUiState
 import com.moodyorange.app.ui.viewmodel.ShopViewModel
+import com.moodyorange.app.data.model.InitiatePaymentResponse
 import com.moodyorange.app.util.CurrencyFormatter
 import java.time.Instant
 import java.time.temporal.ChronoUnit
@@ -52,6 +53,7 @@ import java.time.temporal.ChronoUnit
 @Composable
 fun CheckoutBottomSheet(
     shopViewModel: ShopViewModel,
+    onPayRequested: (InitiatePaymentResponse) -> Unit,
     onDismiss: () -> Unit
 ) {
     val colors = MangalaTheme.colors
@@ -61,6 +63,7 @@ fun CheckoutBottomSheet(
     val checkoutState by shopViewModel.checkoutState.collectAsState()
 
     var isScheduled by remember { mutableStateOf(false) }
+    var scheduledPickupAt by remember { mutableStateOf<String?>(null) }
     var paymentMethod by remember { mutableStateOf("cash_at_pickup") } // "cash_at_pickup" or "online_razorpay"
 
     val scrollState = rememberScrollState()
@@ -129,7 +132,7 @@ fun CheckoutBottomSheet(
                             RoundedCornerShape(12.dp)
                         )
                         .background(if (!isScheduled) colors.primaryContainer else colors.canvas)
-                        .clickable { isScheduled = false }
+                        .clickable { isScheduled = false; scheduledPickupAt = null }
                         .padding(14.dp)
                 ) {
                     Column {
@@ -158,7 +161,10 @@ fun CheckoutBottomSheet(
                             RoundedCornerShape(12.dp)
                         )
                         .background(if (isScheduled) colors.primaryContainer else colors.canvas)
-                        .clickable { isScheduled = true }
+                        .clickable {
+                            if (!isScheduled) scheduledPickupAt = Instant.now().plus(2, ChronoUnit.HOURS).toString()
+                            isScheduled = true
+                        }
                         .padding(14.dp)
                 ) {
                     Column {
@@ -414,12 +420,7 @@ fun CheckoutBottomSheet(
                         Spacer(modifier = Modifier.height(10.dp))
                         Button(
                             onClick = {
-                                shopViewModel.verifyOnlinePayment(
-                                    order = state.order,
-                                    razorpayOrderId = state.paymentInit.razorpayOrderId,
-                                    razorpayPaymentId = "pay_mock_${System.currentTimeMillis()}",
-                                    razorpaySignature = "mock_sig_${state.paymentInit.razorpayOrderId}"
-                                )
+                                onPayRequested(state.paymentInit)
                             },
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = colors.primary,
@@ -434,21 +435,26 @@ fun CheckoutBottomSheet(
                 }
             }
 
+            if (checkoutState is CheckoutUiState.PaymentFailed) {
+                val state = checkoutState as CheckoutUiState.PaymentFailed
+                Spacer(modifier = Modifier.height(14.dp))
+                Text(state.message, color = colors.outOfStockRed, fontSize = 13.sp)
+                Button(onClick = { shopViewModel.retryOnlinePayment(state.order) }, modifier = Modifier.fillMaxWidth()) {
+                    Text("Retry payment for #${state.order.orderNumber}")
+                }
+            }
+
             Spacer(modifier = Modifier.height(24.dp))
 
             // Action Button
             val isSubmitting = checkoutState is CheckoutUiState.Submitting || checkoutState is CheckoutUiState.Validating || checkoutState is CheckoutUiState.VerifyingPayment
-            val canSubmit = valRes?.isValid == true && !isSubmitting && checkoutState !is CheckoutUiState.AwaitingPayment
+            val canSubmit = valRes?.isValid == true && !isSubmitting && checkoutState !is CheckoutUiState.AwaitingPayment && checkoutState !is CheckoutUiState.PaymentFailed
 
             Button(
                 onClick = {
-                    val scheduledTime = if (isScheduled) {
-                        Instant.now().plus(2, ChronoUnit.HOURS).toString()
-                    } else null
-
                     shopViewModel.submitCheckout(
-                        fulfillment = "counter_pickup",
-                        scheduledPickupAt = scheduledTime,
+                        fulfillment = if (isScheduled) "scheduled" else "immediate",
+                        scheduledPickupAt = scheduledPickupAt,
                         paymentMethod = paymentMethod,
                         specialNotes = null
                     )

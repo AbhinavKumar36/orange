@@ -113,7 +113,7 @@ fun HomeScreen(
                             letterSpacing = 0.5.sp
                         )
                         Text(
-                            text = "Your delicacies are packed in our boutique packaging waiting at the counter.",
+                            text = "Your order is packed and waiting at the Mangala Enterprises counter.",
                             fontSize = 11.5.sp,
                             color = colors.textPrimary,
                             lineHeight = 15.sp
@@ -495,7 +495,7 @@ private fun HomeFooter() {
         Spacer(modifier = Modifier.height(4.dp))
 
         Text(
-            text = "Boutique Counter Pickup • Open 10:00 AM – 10:00 PM",
+            text = "Store Counter Pickup • Open 10:00 AM – 10:00 PM",
             fontSize = 11.5.sp,
             color = colors.textSecondary,
             textAlign = TextAlign.Center

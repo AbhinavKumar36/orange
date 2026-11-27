@@ -45,6 +45,17 @@ export interface RazorpayRefundResult {
   status: string;
 }
 
+export function isMockPaymentMode(config: AppConfig): boolean {
+  return config.NODE_ENV !== 'production' && (config.ALLOW_MOCK_SERVICES || config.NODE_ENV === 'test');
+}
+
+function requireGatewayCredentials(config: AppConfig): void {
+  if (!config.RAZORPAY_KEY_ID?.trim() || !config.RAZORPAY_KEY_SECRET?.trim() ||
+      /(example|mock|placeholder|dummy)/i.test(config.RAZORPAY_KEY_ID + config.RAZORPAY_KEY_SECRET)) {
+    throw new Error('Razorpay is not configured. Valid gateway credentials are required for payments and refunds.');
+  }
+}
+
 /**
  * Creates a Razorpay order from the backend.
  * Uses official Razorpay API or deterministic mock in test/offline environment.
@@ -64,13 +75,7 @@ export async function createRazorpayOrder(params: CreateOrderParams): Promise<Ra
   const keySecret = config.RAZORPAY_KEY_SECRET;
 
   // Use mock mode if explicitly allowed or in test environment without real credentials
-  const isMockMode =
-    config.ALLOW_MOCK_SERVICES ||
-    config.NODE_ENV === 'test' ||
-    !keyId ||
-    !keySecret ||
-    keyId.includes('example') ||
-    keySecret.includes('example');
+  const isMockMode = isMockPaymentMode(config);
 
   if (isMockMode) {
     // Generate deterministic mock Razorpay order ID
@@ -83,6 +88,8 @@ export async function createRazorpayOrder(params: CreateOrderParams): Promise<Ra
       status: 'created',
     };
   }
+
+  requireGatewayCredentials(config);
 
   // Real Razorpay API call using HTTP Basic Auth
   const authHeader = 'Basic ' + Buffer.from(`${keyId}:${keySecret}`).toString('base64');
@@ -179,13 +186,7 @@ export async function createRazorpayRefund(
   const keyId = config.RAZORPAY_KEY_ID;
   const keySecret = config.RAZORPAY_KEY_SECRET;
 
-  const isMockMode =
-    config.ALLOW_MOCK_SERVICES ||
-    config.NODE_ENV === 'test' ||
-    !keyId ||
-    !keySecret ||
-    keyId.includes('example') ||
-    keySecret.includes('example');
+  const isMockMode = isMockPaymentMode(config);
 
   if (isMockMode) {
     const mockRefundId = `rfnd_mock_${randomUUID().replace(/-/g, '').slice(0, 14)}`;
@@ -197,6 +198,8 @@ export async function createRazorpayRefund(
       status: 'processed',
     };
   }
+
+  requireGatewayCredentials(config);
 
   const authHeader = 'Basic ' + Buffer.from(`${keyId}:${keySecret}`).toString('base64');
   const response = await fetch(`https://api.razorpay.com/v1/payments/${paymentId}/refund`, {

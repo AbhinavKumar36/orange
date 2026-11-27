@@ -93,7 +93,7 @@ export default function ProductDetailPage(): ReactElement {
           <nav aria-label="Breadcrumb" className="breadcrumbs">
             <Link href="/">Home</Link>
             <span aria-hidden="true">/</span>
-            <Link href="/#menu">Menu</Link>
+            <Link href="/#menu">Catalogue</Link>
             {product && (
               <>
                 <span aria-hidden="true">/</span>
@@ -153,10 +153,10 @@ export default function ProductDetailPage(): ReactElement {
               </div>
               <h2 className="state-title">Product Not Found</h2>
               <p className="state-copy">
-                The delicacy you are looking for is currently unavailable or may have been retired from our seasonal menu.
+                The product you are looking for is currently unavailable or may not be listed in our store catalogue.
               </p>
               <Link href="/#menu" className="btn-primary">
-                Explore Full Menu
+                Explore Full Catalogue
               </Link>
             </div>
           )}
@@ -233,13 +233,22 @@ export default function ProductDetailPage(): ReactElement {
                     type="button"
                     className={`thumb-btn ${galleryMode === 'studio' ? 'active' : ''}`}
                     onClick={() => setGalleryMode('studio')}
-                    aria-label="View Studio Illustration"
+                    aria-label="View Product Photo"
                   >
-                    <ProductIllustration
-                      categorySlug={product.categorySlug}
-                      name={product.name}
-                      className="thumb-artwork"
-                    />
+                    {product.imageUrl ? (
+                      <img
+                        src={product.imageUrl}
+                        alt={product.name}
+                        className="thumb-artwork"
+                        style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 'inherit' }}
+                      />
+                    ) : (
+                      <ProductIllustration
+                        categorySlug={product.categorySlug}
+                        name={product.name}
+                        className="thumb-artwork"
+                      />
+                    )}
                   </button>
                   <button
                     type="button"
@@ -285,20 +294,20 @@ export default function ProductDetailPage(): ReactElement {
                 <div className="detail-price-box">
                   <span className="detail-price">{formatPaiseToRupees(product.basePrice)}</span>
                   <span className="detail-price-tax">
-                    (Inclusive of {product.taxRatePct}% GST • Counter Pickup)
+                    (+ {product.taxRatePct}% GST • Counter Pickup)
                   </span>
                 </div>
 
                 <p className="detail-description">
                   {product.description ||
-                    'Handcrafted artisanal confectionery prepared with quality ingredients and single-origin cacao.'}
+                    'Quality food and beverage retail item available for in-store counter pickup at Mangala Enterprises.'}
                 </p>
 
                 {/* Counter Pickup Lead Time Advisory */}
                 <div className="pickup-lead-banner">
                   <div className="pickup-banner-icon">🛍️</div>
                   <div className="pickup-banner-text">
-                    <strong>In-Store Display Confection:</strong> Pre-crafted batch displayed in boutique vitrine. Zero wait time counter collection.
+                    <strong>In-Store Counter Pickup:</strong> Available from live store inventory for prompt counter collection.
                   </div>
                 </div>
 
@@ -332,7 +341,11 @@ export default function ProductDetailPage(): ReactElement {
                   </div>
                   <div className="spec-row">
                     <span className="spec-label">Counter Handover</span>
-                    <span className="spec-value">Immediate (Ready-to-Collect Vitrine Stock)</span>
+                    <span className="spec-value">
+                      {product.prepTimeMinutes > 10 && (product.categorySlug.includes('cake') || product.slug.includes('cake'))
+                        ? `Approx. ${product.prepTimeMinutes} mins`
+                        : 'Immediate (In-Store Ready)'}
+                    </span>
                   </div>
                   <div className="spec-row">
                     <span className="spec-label">Allergens Declared</span>

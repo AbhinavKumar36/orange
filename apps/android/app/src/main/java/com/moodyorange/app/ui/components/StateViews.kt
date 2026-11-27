@@ -29,7 +29,7 @@ import com.moodyorange.app.ui.theme.WhiteSurface
 
 @Composable
 fun LoadingStateView(
-    message: String = "Loading artisanal delicacies...",
+    message: String = "Loading store catalogue...",
     modifier: Modifier = Modifier
 ) {
     val colors = MangalaTheme.colors
@@ -125,7 +125,7 @@ fun ErrorStateView(
 @Composable
 fun EmptyStateView(
     title: String = "No Confections Found",
-    message: String = "Try adjusting your search or explore other boutique categories.",
+    message: String = "Try adjusting your search or explore other store categories.",
     onClear: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {

@@ -265,7 +265,7 @@ export async function fetchProfileApi(token: string): Promise<CustomerProfile> {
 
   if (!res.ok) {
     const err = (await res.json().catch(() => null)) as ErrorPayload | null;
-    throw new ApiError(res.status, err?.error?.code || 'FETCH_FAILED', 'Failed to fetch profile');
+    throw new ApiError(res.status, err?.error?.code || 'FETCH_FAILED', err?.error?.message || 'Failed to fetch profile');
   }
 
   const data = await res.json();
@@ -290,7 +290,7 @@ export async function updateProfileApi(
 
   if (!res.ok) {
     const err = (await res.json().catch(() => null)) as ErrorPayload | null;
-    throw new ApiError(res.status, err?.error?.code || 'UPDATE_FAILED', 'Failed to update profile');
+    throw new ApiError(res.status, err?.error?.code || 'UPDATE_FAILED', err?.error?.message || 'Failed to update profile');
   }
 
   const data = await res.json();

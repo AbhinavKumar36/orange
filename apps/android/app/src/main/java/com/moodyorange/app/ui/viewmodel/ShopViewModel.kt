@@ -22,12 +22,14 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import java.util.UUID
+import java.time.Instant
 
 sealed interface CheckoutUiState {
     object Idle : CheckoutUiState
     object Validating : CheckoutUiState
     object Submitting : CheckoutUiState
     data class AwaitingPayment(val order: CheckoutResponse, val paymentInit: InitiatePaymentResponse) : CheckoutUiState
+    data class PaymentFailed(val order: CheckoutResponse, val message: String) : CheckoutUiState
     object VerifyingPayment : CheckoutUiState
     data class Success(val order: CheckoutResponse) : CheckoutUiState
     data class Error(val message: String) : CheckoutUiState
@@ -67,9 +69,11 @@ class ShopViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun updateProfile(fullName: String, email: String?) {
+        val session = sessionState.value ?: return
         viewModelScope.launch {
             _profileUpdateState.value = ProfileUpdateUiState.Loading
             val res = authManager.updateProfile(fullName.trim(), email?.trim()?.takeIf { it.isNotBlank() })
+            if (sessionState.value?.accessToken != session.accessToken) return@launch
             res.onSuccess { profile ->
                 _profileUpdateState.value = ProfileUpdateUiState.Success(profile)
             }.onFailure { err ->
@@ -102,6 +106,9 @@ class ShopViewModel(application: Application) : AndroidViewModel(application) {
     val cartValidation: StateFlow<CartValidationResponse?> = _cartValidation.asStateFlow()
 
     private var currentCheckoutAttemptKey: String? = null
+    private var currentCheckoutRequest: CheckoutRequest? = null
+    private var pendingOnlineOrder: CheckoutResponse? = null
+    private var pendingPaymentInit: InitiatePaymentResponse? = null
 
     private val _orders = MutableStateFlow<List<Order>>(emptyList())
     val orders: StateFlow<List<Order>> = _orders.asStateFlow()
@@ -111,6 +118,7 @@ class ShopViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _ordersError = MutableStateFlow<String?>(null)
     val ordersError: StateFlow<String?> = _ordersError.asStateFlow()
+    private var ordersLoadGeneration = 0L
 
     fun openCart() { _isCartOpen.value = true }
     fun closeCart() { _isCartOpen.value = false }
@@ -121,8 +129,13 @@ class ShopViewModel(application: Application) : AndroidViewModel(application) {
     fun openCheckout() {
         _isCartOpen.value = false
         _isCheckoutOpen.value = true
-        currentCheckoutAttemptKey = null
-        validateCurrentCart()
+        clearExpiredReservation()
+        val pending = pendingOnlineOrder
+        if (pending != null) {
+            _checkoutState.value = CheckoutUiState.PaymentFailed(pending, "Complete payment for your reserved order.")
+        } else {
+            validateCurrentCart()
+        }
     }
     fun closeCheckout() {
         _isCheckoutOpen.value = false
@@ -131,10 +144,12 @@ class ShopViewModel(application: Application) : AndroidViewModel(application) {
 
     fun loadOrders() {
         val session = sessionState.value ?: return
+        val generation = ++ordersLoadGeneration
         viewModelScope.launch {
             _isOrdersLoading.value = true
             _ordersError.value = null
             val res = apiClient.getOrders(session.accessToken)
+            if (generation != ordersLoadGeneration || sessionState.value?.accessToken != session.accessToken) return@launch
             res.onSuccess {
                 _orders.value = it
                 _isOrdersLoading.value = false
@@ -184,9 +199,20 @@ class ShopViewModel(application: Application) : AndroidViewModel(application) {
 
     fun logout() {
         authManager.logout()
+        ordersLoadGeneration++
+        _isOrdersLoading.value = false
+        _orders.value = emptyList()
+        _ordersError.value = null
+        _profileUpdateState.value = ProfileUpdateUiState.Idle
+        pendingOnlineOrder = null
+        pendingPaymentInit = null
+        currentCheckoutAttemptKey = null
+        currentCheckoutRequest = null
+        closeCheckout()
     }
 
     fun validateCurrentCart() {
+        _cartValidation.value = null
         viewModelScope.launch {
             val items = cartItems.value.map { CartValidationItem(it.productId, it.quantity) }
             if (items.isEmpty()) {
@@ -210,9 +236,14 @@ class ShopViewModel(application: Application) : AndroidViewModel(application) {
         paymentMethod: String,
         specialNotes: String?
     ) {
+        if (_checkoutState.value is CheckoutUiState.Submitting || _checkoutState.value is CheckoutUiState.VerifyingPayment) return
         val session = sessionState.value
         if (session == null) {
             _isAuthOpen.value = true
+            return
+        }
+        pendingOnlineOrder?.let {
+            retryOnlinePayment(it)
             return
         }
 
@@ -222,35 +253,45 @@ class ShopViewModel(application: Application) : AndroidViewModel(application) {
             return
         }
 
-        val idempotencyKey = currentCheckoutAttemptKey ?: UUID.randomUUID().toString().also {
-            currentCheckoutAttemptKey = it
-        }
-
         val req = CheckoutRequest(
-            items = items,
+            items = items.sortedBy { it.productId },
             fulfillment = fulfillment,
             scheduledPickupAt = scheduledPickupAt,
             paymentMethod = paymentMethod,
-            customerName = session.fullName ?: "Boutique Guest",
+            customerName = session.fullName ?: "Mangala Guest",
             customerPhone = session.phone,
             specialNotes = specialNotes
         )
+        val idempotencyKey = if (currentCheckoutRequest == req && currentCheckoutAttemptKey != null) {
+            currentCheckoutAttemptKey!!
+        } else {
+            UUID.randomUUID().toString().also {
+                currentCheckoutAttemptKey = it
+                currentCheckoutRequest = req
+            }
+        }
 
+        _checkoutState.value = CheckoutUiState.Submitting
         viewModelScope.launch {
-            _checkoutState.value = CheckoutUiState.Submitting
             val res = apiClient.checkout(req, session.accessToken, idempotencyKey)
+            if (sessionState.value?.accessToken != session.accessToken) return@launch
             res.onSuccess { order ->
-                currentCheckoutAttemptKey = null
                 if (paymentMethod == "online_razorpay") {
+                    pendingOnlineOrder = order
                     val initRes = apiClient.initiatePayment(order.orderId, session.accessToken)
+                    if (sessionState.value?.accessToken != session.accessToken) return@launch
                     initRes.onSuccess { initData ->
+                        pendingPaymentInit = initData
                         _checkoutState.value = CheckoutUiState.AwaitingPayment(order, initData)
                     }.onFailure { pErr ->
-                        _checkoutState.value = CheckoutUiState.Error("Stock reserved, but failed to launch payment: ${pErr.message}")
+                        _checkoutState.value = CheckoutUiState.PaymentFailed(order, "Stock reserved, but failed to launch payment: ${pErr.message}")
                     }
                 } else {
+                    currentCheckoutAttemptKey = null
+                    currentCheckoutRequest = null
                     _checkoutState.value = CheckoutUiState.Success(order)
                     cartManager.clearCart()
+                    loadOrders()
                 }
             }.onFailure { err ->
                 _checkoutState.value = CheckoutUiState.Error(err.message ?: "Checkout failed. Please try again.")
@@ -265,8 +306,8 @@ class ShopViewModel(application: Application) : AndroidViewModel(application) {
         razorpaySignature: String
     ) {
         val session = sessionState.value ?: return
+        _checkoutState.value = CheckoutUiState.VerifyingPayment
         viewModelScope.launch {
-            _checkoutState.value = CheckoutUiState.VerifyingPayment
             val res = apiClient.verifyPayment(
                 orderId = order.orderId,
                 razorpayOrderId = razorpayOrderId,
@@ -274,7 +315,12 @@ class ShopViewModel(application: Application) : AndroidViewModel(application) {
                 razorpaySignature = razorpaySignature,
                 token = session.accessToken
             )
+            if (sessionState.value?.accessToken != session.accessToken) return@launch
             res.onSuccess { verifyData ->
+                currentCheckoutAttemptKey = null
+                currentCheckoutRequest = null
+                pendingOnlineOrder = null
+                pendingPaymentInit = null
                 cartManager.clearCart()
                 _checkoutState.value = CheckoutUiState.Success(
                     order.copy(
@@ -282,23 +328,59 @@ class ShopViewModel(application: Application) : AndroidViewModel(application) {
                         paymentStatus = verifyData.paymentStatus
                     )
                 )
+                loadOrders()
             }.onFailure { err ->
-                _checkoutState.value = CheckoutUiState.Error("Payment verification failed on server: ${err.message}")
+                _checkoutState.value = CheckoutUiState.PaymentFailed(order, "Payment verification failed on server: ${err.message}")
             }
         }
     }
 
     fun retryOnlinePayment(order: CheckoutResponse) {
+        if (_checkoutState.value is CheckoutUiState.Submitting || _checkoutState.value is CheckoutUiState.VerifyingPayment) return
+        if (clearExpiredReservation()) {
+            validateCurrentCart()
+            return
+        }
         val session = sessionState.value ?: return
+        _checkoutState.value = CheckoutUiState.Submitting
         viewModelScope.launch {
-            _checkoutState.value = CheckoutUiState.Submitting
             val initRes = apiClient.initiatePayment(order.orderId, session.accessToken)
+            if (sessionState.value?.accessToken != session.accessToken) return@launch
             initRes.onSuccess { initData ->
+                pendingPaymentInit = initData
                 _checkoutState.value = CheckoutUiState.AwaitingPayment(order, initData)
             }.onFailure { pErr ->
-                _checkoutState.value = CheckoutUiState.Error("Failed to initiate payment retry: ${pErr.message}")
+                _checkoutState.value = CheckoutUiState.PaymentFailed(order, "Failed to initiate payment retry: ${pErr.message}")
             }
         }
+    }
+
+    private fun clearExpiredReservation(): Boolean {
+        val order = pendingOnlineOrder ?: return false
+        val expired = order.orderStatus == "cancelled_expired" || order.expiresAt?.let {
+            runCatching { !Instant.parse(it).isAfter(Instant.now()) }.getOrDefault(false)
+        } == true
+        if (!expired) return false
+        pendingOnlineOrder = null
+        pendingPaymentInit = null
+        currentCheckoutAttemptKey = null
+        currentCheckoutRequest = null
+        return true
+    }
+
+    fun paymentGatewayFailed(message: String) {
+        val order = pendingOnlineOrder ?: return
+        _checkoutState.value = CheckoutUiState.PaymentFailed(order, message)
+    }
+
+    fun completeGatewayPayment(orderId: String?, paymentId: String?, signature: String?) {
+        val order = pendingOnlineOrder ?: return
+        if (_checkoutState.value is CheckoutUiState.VerifyingPayment) return
+        if (orderId.isNullOrBlank() || orderId != pendingPaymentInit?.razorpayOrderId || paymentId.isNullOrBlank() || signature.isNullOrBlank()) {
+            paymentGatewayFailed("Invalid response from payment gateway. Please retry payment.")
+            return
+        }
+        verifyOnlinePayment(order, orderId, paymentId, signature)
     }
 }
 

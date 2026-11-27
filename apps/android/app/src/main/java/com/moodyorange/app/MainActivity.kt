@@ -33,13 +33,18 @@ import com.moodyorange.app.ui.theme.MoodyOrangeTheme
 import com.moodyorange.app.ui.viewmodel.CatalogViewModel
 import com.moodyorange.app.ui.viewmodel.CheckoutUiState
 import com.moodyorange.app.ui.viewmodel.ShopViewModel
+import com.moodyorange.app.data.model.InitiatePaymentResponse
+import com.razorpay.Checkout
+import com.razorpay.PaymentData
+import com.razorpay.PaymentResultWithDataListener
+import org.json.JSONObject
 
 sealed class AppDestination {
     object Main : AppDestination()
     data class ProductDetail(val productIdOrSlug: String) : AppDestination()
 }
 
-class MainActivity : ComponentActivity() {
+class MainActivity : ComponentActivity(), PaymentResultWithDataListener {
 
     private val catalogViewModel: CatalogViewModel by viewModels()
     private val shopViewModel: ShopViewModel by viewModels()
@@ -55,18 +60,49 @@ class MainActivity : ComponentActivity() {
                 ) {
                     MoodyOrangeApp(
                         catalogViewModel = catalogViewModel,
-                        shopViewModel = shopViewModel
+                        shopViewModel = shopViewModel,
+                        onPayRequested = ::launchPayment
                     )
                 }
             }
         }
+    }
+
+    private fun launchPayment(payment: InitiatePaymentResponse) {
+        try {
+            val options = JSONObject().apply {
+                put("name", "Mangala Enterprises")
+                put("order_id", payment.razorpayOrderId)
+                put("amount", payment.amount)
+                put("currency", payment.currency)
+                put("prefill", JSONObject().apply {
+                    put("name", payment.customerName)
+                    put("contact", payment.customerPhone)
+                })
+            }
+            Checkout().apply {
+                setKeyID(payment.keyId)
+                open(this@MainActivity, options)
+            }
+        } catch (error: Exception) {
+            shopViewModel.paymentGatewayFailed(error.message ?: "Unable to open payment gateway")
+        }
+    }
+
+    override fun onPaymentSuccess(paymentId: String?, data: PaymentData?) {
+        shopViewModel.completeGatewayPayment(data?.orderId, paymentId, data?.signature)
+    }
+
+    override fun onPaymentError(code: Int, response: String?, data: PaymentData?) {
+        shopViewModel.paymentGatewayFailed("Payment was cancelled or failed. You can retry payment for the reserved order.")
     }
 }
 
 @Composable
 fun MoodyOrangeApp(
     catalogViewModel: CatalogViewModel,
-    shopViewModel: ShopViewModel
+    shopViewModel: ShopViewModel,
+    onPayRequested: (InitiatePaymentResponse) -> Unit
 ) {
     var currentDestination by remember { mutableStateOf<AppDestination>(AppDestination.Main) }
     var selectedTab by remember { mutableStateOf(NavTab.HOME) }
@@ -229,6 +265,7 @@ fun MoodyOrangeApp(
     if (isCheckoutOpen) {
         CheckoutBottomSheet(
             shopViewModel = shopViewModel,
+            onPayRequested = onPayRequested,
             onDismiss = { shopViewModel.closeCheckout() }
         )
     }

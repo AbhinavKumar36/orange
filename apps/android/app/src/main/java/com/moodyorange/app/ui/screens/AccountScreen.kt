@@ -184,7 +184,7 @@ private fun AccountMainView(
                     Spacer(modifier = Modifier.height(10.dp))
 
                     Text(
-                        text = session?.fullName ?: "Boutique Guest",
+                        text = session?.fullName ?: "Mangala Guest",
                         fontFamily = EditorialSerif,
                         fontSize = 17.sp,
                         fontWeight = FontWeight.Bold,

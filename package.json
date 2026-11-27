@@ -16,6 +16,7 @@
     "dev:admin": "turbo run dev --filter=@orange/admin-web",
     "lint": "turbo run lint",
     "test": "vitest run --globals --environment node apps/",
+    "test:e2e": "playwright test e2e/runtime-smoke.spec.ts --workers=1",
     "typecheck": "turbo run typecheck",
     "contracts:lint": "turbo run lint --filter=@orange/api-contracts",
     "adb:reverse": "adb reverse tcp:4000 tcp:4000",

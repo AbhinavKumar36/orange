@@ -85,9 +85,9 @@ val DarkMangalaColors = MangalaColors(
     border = CardBorderDark,
     borderSubtle = CardBorderGoldDark,
     divider = DividerDark,
-    primary = ForestGreen,
+    primary = ForestGreenDarkModePrimary,
     primaryHover = ForestGreenHover,
-    primaryContainer = Color(0xFF542D1C),
+    primaryContainer = Color(0xFF1E3A2D),
     onPrimary = WhiteSurface,
     gold = MutedGold,
     goldLight = MutedGoldLight,
@@ -136,9 +136,9 @@ private val LightMaterialColorScheme: ColorScheme = lightColorScheme(
 )
 
 private val DarkMaterialColorScheme: ColorScheme = darkColorScheme(
-    primary = ForestGreen,
+    primary = ForestGreenDarkModePrimary,
     onPrimary = WhiteSurface,
-    primaryContainer = Color(0xFF542D1C),
+    primaryContainer = Color(0xFF1E3A2D),
     onPrimaryContainer = WhiteSurface,
     secondary = MutedGold,
     onSecondary = DeepCharcoalCanvas,

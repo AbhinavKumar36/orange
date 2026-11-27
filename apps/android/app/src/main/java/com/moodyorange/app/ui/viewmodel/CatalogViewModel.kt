@@ -91,7 +91,7 @@ class CatalogViewModel(
                 }
                 .onFailure { error ->
                     _categoriesState.value = UiState.Error(
-                        error.message ?: "Failed to load boutique categories."
+                        error.message ?: "Failed to load store categories."
                     )
                 }
         }
@@ -154,7 +154,7 @@ class CatalogViewModel(
                 }
                 .onFailure { error ->
                     _productsState.value = UiState.Error(
-                        error.message ?: "Failed to retrieve products from boutique catalog."
+                        error.message ?: "Failed to retrieve products from store catalogue."
                     )
                 }
         }

@@ -130,7 +130,7 @@ export function ProductCard({
         <div className="card-footer">
           <div className="product-price-box">
             <span className="product-price">{formattedPrice}</span>
-            <span className="product-tax-sub">Incl. {product.taxRatePct}% GST</span>
+            <span className="product-tax-sub">+ {product.taxRatePct}% GST</span>
           </div>
 
           <div className="card-actions-group">

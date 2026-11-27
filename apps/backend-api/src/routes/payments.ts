@@ -13,6 +13,7 @@ import { mockOrdersStore } from './orders.js';
 import { mockPaymentsStore } from '../services/paymentStore.js';
 import {
   createRazorpayOrder,
+  isMockPaymentMode,
   verifyPaymentSignature,
 } from '../services/razorpay.js';
 
@@ -320,7 +321,7 @@ export const paymentsRoutes: FastifyPluginAsync<PaymentsPluginOptions> = async (
       let isSignatureValid = false;
 
       if (
-        (config.ALLOW_MOCK_SERVICES || config.NODE_ENV === 'test') &&
+        isMockPaymentMode(config) &&
         razorpaySignature.startsWith('mock_sig_')
       ) {
         // Deterministic mock test signature

@@ -2,8 +2,8 @@ import type { ReactNode } from 'react';
 import './globals.css';
 
 export const metadata = {
-  title: 'Mangala Enterprises — Admin & Counter Portal',
-  description: 'Live dispatch queue, inventory tracking, and counter handover verification for Mangala Enterprises',
+  title: 'Mangala Enterprises — Operations & Control Center',
+  description: 'Live dispatch queue, inventory control, catalogue management, and counter handover verification for Mangala Enterprises',
 };
 
 export default function RootLayout({
@@ -13,6 +13,14 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
+          rel="stylesheet"
+        />
+      </head>
       <body>{children}</body>
     </html>
   );

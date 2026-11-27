@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import type { Product } from '@orange/api-contracts';
+import { ProductSchema, type Product } from '@orange/api-contracts';
 
 const CART_STORAGE_KEY = 'moody_orange_cart_v1';
 
@@ -15,7 +15,13 @@ export function getStoredCart(): CartItemWithProduct[] {
   try {
     const raw = localStorage.getItem(CART_STORAGE_KEY);
     if (!raw) return [];
-    return JSON.parse(raw) as CartItemWithProduct[];
+    const stored: unknown = JSON.parse(raw);
+    if (!Array.isArray(stored)) return [];
+    return stored.flatMap((item) => {
+      if (!item || typeof item !== 'object' || !Number.isInteger(item.quantity) || item.quantity < 1 || item.quantity > 100) return [];
+      const product = ProductSchema.safeParse(item.product);
+      return product.success ? [{ product: product.data, quantity: item.quantity }] : [];
+    });
   } catch {
     return [];
   }
@@ -32,7 +38,7 @@ export function saveCart(items: CartItemWithProduct[]): void {
 }
 
 export function addToCart(product: Product, quantity = 1): void {
-  if (!product.isInStock) return;
+  if (!product.isInStock || !Number.isInteger(quantity) || quantity <= 0) return;
   const current = getStoredCart();
   const existingIndex = current.findIndex((item) => item.product.id === product.id);
 
@@ -47,6 +53,7 @@ export function addToCart(product: Product, quantity = 1): void {
 }
 
 export function updateCartQuantity(productId: string, quantity: number): void {
+  if (!Number.isInteger(quantity)) return;
   const current = getStoredCart();
   if (quantity <= 0) {
     removeFromCart(productId);

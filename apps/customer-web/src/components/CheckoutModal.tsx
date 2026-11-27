@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { formatPaiseToRupees, type ValidateCartResponse, type CheckoutResponse } from '@orange/api-contracts';
 import { useCart } from '../lib/cart';
 import { useCustomerAuth } from '../lib/auth';
-import { validateCartApi, checkoutOrderApi, initiatePaymentApi, verifyPaymentApi } from '../lib/api';
+import { validateCartApi, checkoutOrderApi, initiatePaymentApi, verifyPaymentApi, ApiError } from '../lib/api';
 import { loadRazorpayScript } from '../lib/razorpay';
 import { AuthModal } from './AuthModal';
 
@@ -46,11 +46,7 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps): ReactEle
   >('idle');
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const idempotencyKeyRef = useRef<string | null>(null);
-
-  // Reset idempotency key when cart contents change
-  useEffect(() => {
-    idempotencyKeyRef.current = null;
-  }, [items]);
+  const checkoutPayloadRef = useRef<string | null>(null);
 
   // Sync customer details from authenticated session
   useEffect(() => {
@@ -102,6 +98,9 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps): ReactEle
     setPaymentStep('initiating');
 
     try {
+      if (targetOrder.orderStatus === 'cancelled_expired' || (targetOrder.expiresAt && Date.parse(targetOrder.expiresAt) <= Date.now())) {
+        throw new ApiError(400, 'ORDER_EXPIRED', 'Your reservation has expired. Please review your bag and reserve again.');
+      }
       const isLoaded = await loadRazorpayScript();
       if (!isLoaded || !window.Razorpay) {
         throw new Error('Unable to load payment gateway SDK. Please verify internet connection.');
@@ -114,8 +113,8 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps): ReactEle
         key: initData.keyId,
         amount: initData.amount,
         currency: initData.currency,
-        name: 'Moody Orange',
-        description: `Boutique Order #${targetOrder.orderNumber}`,
+        name: 'Mangala Enterprises',
+        description: `Store Order #${targetOrder.orderNumber}`,
         order_id: initData.razorpayOrderId,
         prefill: {
           name: initData.customerName,
@@ -147,6 +146,7 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps): ReactEle
               paymentStatus: verifyRes.paymentStatus,
             });
             setPendingOnlineOrder(null);
+            idempotencyKeyRef.current = null;
             setPaymentStep('idle');
             clearCart();
             setIsSubmitting(false);
@@ -160,7 +160,7 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps): ReactEle
         modal: {
           ondismiss: function () {
             setError(
-              'Payment window was closed. Your boutique reservation is held. You can retry payment below.'
+              'Payment window was closed. Your order reservation is held. You can retry payment below.'
             );
             setPaymentStep('failed');
             setIsSubmitting(false);
@@ -179,6 +179,11 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps): ReactEle
     } catch (err: unknown) {
       setIsSubmitting(false);
       setPaymentStep('failed');
+      if (err instanceof ApiError && err.code === 'ORDER_EXPIRED') {
+        setPendingOnlineOrder(null);
+        idempotencyKeyRef.current = null;
+        setPaymentStep('idle');
+      }
       const msg = err instanceof Error ? err.message : 'Failed to launch payment checkout.';
       setError(msg);
     }
@@ -186,6 +191,7 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps): ReactEle
 
   async function handleSubmitOrder(e: React.FormEvent) {
     e.preventDefault();
+    if (isSubmitting) return;
     if (!session) {
       setIsAuthModalOpen(true);
       return;
@@ -216,28 +222,31 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps): ReactEle
     setError(null);
 
     try {
-      if (!idempotencyKeyRef.current) {
-        idempotencyKeyRef.current =
-          typeof crypto !== 'undefined' && crypto.randomUUID
-            ? crypto.randomUUID()
-            : `idemp_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-      }
-      const idempotencyKey = idempotencyKeyRef.current;
       const scheduledIso =
         fulfillment === 'scheduled' && scheduledTime
           ? new Date(scheduledTime).toISOString()
           : null;
+      const payload = {
+        items: items.map((i) => ({ productId: i.product.id, quantity: i.quantity })).sort((a, b) => a.productId.localeCompare(b.productId)),
+        fulfillment,
+        scheduledPickupAt: scheduledIso,
+        paymentMethod,
+        customerName: customerName.trim(),
+        customerPhone: cleanPhone,
+        specialNotes: specialNotes.trim() || undefined,
+      };
+      const fingerprint = JSON.stringify({ customerId: session.user.id, payload });
+      if (!idempotencyKeyRef.current || checkoutPayloadRef.current !== fingerprint) {
+        idempotencyKeyRef.current =
+          typeof crypto !== 'undefined' && crypto.randomUUID
+            ? crypto.randomUUID()
+            : `idemp_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+        checkoutPayloadRef.current = fingerprint;
+      }
+      const idempotencyKey = idempotencyKeyRef.current;
 
       const orderResult = await checkoutOrderApi(
-        {
-          items: items.map((i) => ({ productId: i.product.id, quantity: i.quantity })),
-          fulfillment,
-          scheduledPickupAt: scheduledIso,
-          paymentMethod,
-          customerName: customerName.trim(),
-          customerPhone: cleanPhone,
-          specialNotes: specialNotes.trim() || undefined,
-        },
+        payload,
         session.accessToken,
         idempotencyKey
       );
@@ -260,7 +269,6 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps): ReactEle
 
   function handleCloseAll() {
     setConfirmedOrder(null);
-    setPendingOnlineOrder(null);
     setPaymentStep('idle');
     onClose();
   }
@@ -321,7 +329,7 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps): ReactEle
                 </h3>
 
                 <p className="confirmed-subtitle">
-                  Your boutique order has been confirmed and reserved from our in-store display counter.
+                  Your order has been confirmed and reserved from our in-store inventory.
                 </p>
 
                 <div className="receipt-card">
@@ -356,7 +364,7 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps): ReactEle
                   </div>
 
                   <div className="receipt-pickup-note">
-                    📍 <strong>Boutique Counter Collection:</strong> Please show order reference{' '}
+                    📍 <strong>Store Counter Collection:</strong> Please show order reference{' '}
                     <strong>#{confirmedOrder.orderNumber}</strong> to the counter team upon arrival.
                   </div>
                 </div>
@@ -610,7 +618,7 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps): ReactEle
                     <span>{validation ? formatPaiseToRupees(validation.taxAmount) : 'Validating...'}</span>
                   </div>
                   <div className="breakdown-line">
-                    <span>Boutique In-Store Packaging</span>
+                    <span>Secure In-Store Packaging</span>
                     <span className="green-text">Free</span>
                   </div>
                   <div className="breakdown-divider" />

@@ -137,7 +137,7 @@ fun CartBottomSheet(
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "Browse our handcrafted delicacies and cold extracts for pickup.",
+                        text = "Browse our snacks, cold drinks, cakes, ice creams, and confectionery for counter pickup.",
                         fontSize = 12.5.sp,
                         color = colors.textSecondary,
                         modifier = Modifier.padding(horizontal = 24.dp),
@@ -152,7 +152,7 @@ fun CartBottomSheet(
                         ),
                         shape = RoundedCornerShape(10.dp)
                     ) {
-                        Text("Explore Boutique Menu", fontWeight = FontWeight.Bold, fontSize = 13.5.sp)
+                        Text("Browse Store Catalogue", fontWeight = FontWeight.Bold, fontSize = 13.5.sp)
                     }
                 }
             } else {

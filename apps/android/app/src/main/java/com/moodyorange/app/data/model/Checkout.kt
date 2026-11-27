@@ -7,7 +7,7 @@ data class CheckoutItemPayload(
 
 data class CheckoutRequest(
     val items: List<CheckoutItemPayload>,
-    val fulfillment: String = "counter_pickup",
+    val fulfillment: String = "immediate",
     val scheduledPickupAt: String? = null,
     val paymentMethod: String = "cash_at_pickup",
     val customerName: String? = null,

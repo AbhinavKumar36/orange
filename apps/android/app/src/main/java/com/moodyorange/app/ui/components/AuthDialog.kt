@@ -118,7 +118,7 @@ fun AuthDialog(
                     text = when (step) {
                         1 -> "Enter your mobile number to checkout and track orders with Mangala Enterprises."
                         2 -> "We sent a 6-digit verification code to +91 $phoneInput"
-                        else -> "Tell us your name for orders and boutique counter pickup."
+                        else -> "Tell us your name for orders and store counter pickup."
                     },
                     fontSize = 13.sp,
                     color = colors.textSecondary,
