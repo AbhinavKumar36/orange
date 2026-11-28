@@ -19,7 +19,7 @@ val ForestGreenHover = Color(0xFF1E573D)
 val ForestGreenDark = Color(0xFF0D2B1E)
 val ForestGreenGlow = Color(0x38143E2B)
 val ForestGreenSubtle = Color(0xFFEDF4F0)
-val ForestGreenDarkModePrimary = Color(0xFF3CA374)
+val ForestGreenDarkModePrimary = Color(0xFF1F6A4A)
 
 // Restrained Accent (Mangala Orange)
 val MangalaOrange = Color(0xFFD8561C)

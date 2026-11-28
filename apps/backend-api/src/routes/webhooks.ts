@@ -93,7 +93,7 @@ export const webhooksRoutes: FastifyPluginAsync<WebhooksPluginOptions> = async (
       try {
         // Check if event already exists in payment_webhook_events
         const checkRes = await fetch(
-          `${baseUrl}/rest/v1/payment_webhook_events?event_id=eq.${encodeURIComponent(eventId)}&select=id`,
+          `${baseUrl}/rest/v1/payment_webhook_events?event_id=eq.${encodeURIComponent(eventId)}&select=id,status`,
           {
             headers: {
               apikey: apiKey,
@@ -103,33 +103,60 @@ export const webhooksRoutes: FastifyPluginAsync<WebhooksPluginOptions> = async (
           }
         );
 
-        if (checkRes.ok) {
-          const rows = (await checkRes.json()) as Array<{ id: string }>;
-          if (rows && rows.length > 0) {
+        if (!checkRes.ok) {
+          throw new Error(`Failed to query payment_webhook_events (${checkRes.status})`);
+        }
+
+        const rows = (await checkRes.json()) as Array<{ id: string; status?: string }>;
+        if (rows && rows.length > 0) {
+          if (rows[0].status === 'processed') {
             // Already processed: return 200 idempotently
             return reply.status(200).send({ received: true, deduplicated: true });
           }
+          // Previously failed or interrupted: re-claim as processing for retry
+          await fetch(
+            `${baseUrl}/rest/v1/payment_webhook_events?event_id=eq.${encodeURIComponent(eventId)}`,
+            {
+              method: 'PATCH',
+              headers: {
+                apikey: apiKey,
+                Authorization: `Bearer ${apiKey}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ status: 'processing' }),
+            }
+          );
+        } else {
+          // Record incoming event
+          const insertRes = await fetch(`${baseUrl}/rest/v1/payment_webhook_events`, {
+            method: 'POST',
+            headers: {
+              apikey: apiKey,
+              Authorization: `Bearer ${apiKey}`,
+              'Content-Type': 'application/json',
+              Prefer: 'resolution=ignore-duplicates',
+            },
+            body: JSON.stringify({
+              event_id: eventId,
+              event_type: eventType,
+              provider: 'razorpay',
+              payload,
+              status: 'processing',
+            }),
+          });
+          if (!insertRes.ok) {
+            throw new Error(`Failed to record webhook event (${insertRes.status})`);
+          }
         }
-
-        // Record incoming event
-        await fetch(`${baseUrl}/rest/v1/payment_webhook_events`, {
-          method: 'POST',
-          headers: {
-            apikey: apiKey,
-            Authorization: `Bearer ${apiKey}`,
-            'Content-Type': 'application/json',
-            Prefer: 'resolution=ignore-duplicates',
-          },
-          body: JSON.stringify({
-            event_id: eventId,
-            event_type: eventType,
-            provider: 'razorpay',
-            payload,
-            status: 'processing',
-          }),
-        });
       } catch (err) {
         app.log.error(err, 'Failed to interact with payment_webhook_events');
+        return reply.status(503).send({
+          error: {
+            statusCode: 503,
+            code: 'WEBHOOK_STATE_UNAVAILABLE',
+            message: 'Unable to claim webhook processing state; retry later.',
+          },
+        });
       }
     }
 
@@ -182,7 +209,7 @@ export const webhooksRoutes: FastifyPluginAsync<WebhooksPluginOptions> = async (
 
           if (orderId) {
             if (apiKey && !config.ALLOW_MOCK_SERVICES) {
-              await fetch(`${baseUrl}/rest/v1/rpc/rpc_reconcile_late_payment`, {
+              const rpcRes = await fetch(`${baseUrl}/rest/v1/rpc/rpc_reconcile_late_payment`, {
                 method: 'POST',
                 headers: {
                   apikey: apiKey,
@@ -198,6 +225,9 @@ export const webhooksRoutes: FastifyPluginAsync<WebhooksPluginOptions> = async (
                   p_raw_payload: payload,
                 }),
               });
+              if (!rpcRes.ok) {
+                throw new Error(`rpc_reconcile_late_payment failed (${rpcRes.status})`);
+              }
             }
 
             if (config.ALLOW_MOCK_SERVICES) {
@@ -266,6 +296,74 @@ export const webhooksRoutes: FastifyPluginAsync<WebhooksPluginOptions> = async (
         const amount = refundEntity?.amount ?? 0;
 
         if (providerRefundId && paymentId) {
+          if (apiKey && !config.ALLOW_MOCK_SERVICES) {
+            // Reconcile production refund record in Supabase
+            const refRes = await fetch(
+              `${baseUrl}/rest/v1/refunds?provider_refund_id=eq.${encodeURIComponent(providerRefundId)}&select=id,order_id,amount,status`,
+              {
+                headers: {
+                  apikey: apiKey,
+                  Authorization: `Bearer ${apiKey}`,
+                  Accept: 'application/json',
+                },
+              }
+            );
+            if (!refRes.ok) {
+              throw new Error(`Failed to query refunds (${refRes.status})`);
+            }
+            const refRows = (await refRes.json()) as Array<{
+              id: string;
+              order_id: string;
+              amount: number | string;
+              status: string;
+            }>;
+            if (refRows.length > 0) {
+              const target = refRows[0];
+              await fetch(`${baseUrl}/rest/v1/refunds?id=eq.${encodeURIComponent(target.id)}`, {
+                method: 'PATCH',
+                headers: {
+                  apikey: apiKey,
+                  Authorization: `Bearer ${apiKey}`,
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  status: 'refunded',
+                  updated_at: new Date().toISOString(),
+                }),
+              });
+
+              // Recalculate order payment_status based on all confirmed refunds
+              const [ordRes, allRefRes] = await Promise.all([
+                fetch(`${baseUrl}/rest/v1/orders?id=eq.${encodeURIComponent(target.order_id)}&select=total_amount`, {
+                  headers: { apikey: apiKey, Authorization: `Bearer ${apiKey}`, Accept: 'application/json' },
+                }),
+                fetch(
+                  `${baseUrl}/rest/v1/refunds?order_id=eq.${encodeURIComponent(target.order_id)}&status=eq.refunded&select=amount`,
+                  { headers: { apikey: apiKey, Authorization: `Bearer ${apiKey}`, Accept: 'application/json' } }
+                ),
+              ]);
+              if (ordRes.ok && allRefRes.ok) {
+                const ordRows = (await ordRes.json()) as Array<{ total_amount: number | string }>;
+                const allRefs = (await allRefRes.json()) as Array<{ amount: number | string }>;
+                const orderTotal = Number(ordRows[0]?.total_amount ?? 0);
+                const totalRefunded = allRefs.reduce((s, r) => s + Number(r.amount), 0);
+                if (orderTotal > 0) {
+                  await fetch(`${baseUrl}/rest/v1/orders?id=eq.${encodeURIComponent(target.order_id)}`, {
+                    method: 'PATCH',
+                    headers: {
+                      apikey: apiKey,
+                      Authorization: `Bearer ${apiKey}`,
+                      'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                      payment_status: totalRefunded >= orderTotal ? 'refunded' : 'partially_refunded',
+                      updated_at: new Date().toISOString(),
+                    }),
+                  });
+                }
+              }
+            }
+          }
           if (config.ALLOW_MOCK_SERVICES) {
             for (const refund of mockRefundsStore.values()) {
               if (
@@ -293,6 +391,23 @@ export const webhooksRoutes: FastifyPluginAsync<WebhooksPluginOptions> = async (
       } else if (eventType === 'refund.failed') {
         const refundEntity = payload.payload?.refund?.entity;
         const providerRefundId = refundEntity?.id;
+        if (providerRefundId && apiKey && !config.ALLOW_MOCK_SERVICES) {
+          await fetch(
+            `${baseUrl}/rest/v1/refunds?provider_refund_id=eq.${encodeURIComponent(providerRefundId)}`,
+            {
+              method: 'PATCH',
+              headers: {
+                apikey: apiKey,
+                Authorization: `Bearer ${apiKey}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                status: 'refund_failed',
+                updated_at: new Date().toISOString(),
+              }),
+            }
+          );
+        }
         if (providerRefundId && config.ALLOW_MOCK_SERVICES) {
           for (const refund of mockRefundsStore.values()) {
             if (refund.providerRefundId === providerRefundId) {
@@ -305,7 +420,7 @@ export const webhooksRoutes: FastifyPluginAsync<WebhooksPluginOptions> = async (
 
       // Update event status to processed in DB
       if (apiKey && !config.ALLOW_MOCK_SERVICES) {
-        await fetch(
+        const patchRes = await fetch(
           `${baseUrl}/rest/v1/payment_webhook_events?event_id=eq.${encodeURIComponent(eventId)}`,
           {
             method: 'PATCH',
@@ -320,9 +435,35 @@ export const webhooksRoutes: FastifyPluginAsync<WebhooksPluginOptions> = async (
             }),
           }
         );
+        if (!patchRes.ok) {
+          throw new Error(`Failed to mark webhook event processed (${patchRes.status})`);
+        }
       }
     } catch (err) {
       app.log.error(err, 'Error while processing webhook event');
+      if (apiKey && !config.ALLOW_MOCK_SERVICES) {
+        await fetch(
+          `${baseUrl}/rest/v1/payment_webhook_events?event_id=eq.${encodeURIComponent(eventId)}`,
+          {
+            method: 'PATCH',
+            headers: {
+              apikey: apiKey,
+              Authorization: `Bearer ${apiKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              status: 'failed',
+            }),
+          }
+        ).catch(() => {});
+      }
+      return reply.status(503).send({
+        error: {
+          statusCode: 503,
+          code: 'WEBHOOK_PROCESSING_FAILED',
+          message: 'Webhook reconciliation failed; please retry.',
+        },
+      });
     }
 
     return reply.status(200).send({ received: true });

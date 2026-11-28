@@ -1677,8 +1677,18 @@ export const adminRoutes: FastifyPluginAsync<AdminRoutesOptions> = async (app, o
         ),
       ]);
 
-      const products = productsData || [];
-      const invMap = new Map((inventoryData || []).map((i) => [i.product_id, i]));
+      if (productsData === null || inventoryData === null) {
+        return reply.status(503).send({
+          error: {
+            statusCode: 503,
+            code: 'DATABASE_UNAVAILABLE',
+            message: 'Unable to load inventory records from the database.',
+          },
+        });
+      }
+
+      const products = productsData;
+      const invMap = new Map(inventoryData.map((i) => [i.product_id, i]));
 
       const inventory = products.map((p) => {
         const inv = invMap.get(p.id) || {
@@ -2082,16 +2092,16 @@ export const adminRoutes: FastifyPluginAsync<AdminRoutesOptions> = async (app, o
       }
 
       // Live Supabase path
-      // 1. Fetch captured payment
+      // 1. Fetch captured or refund_pending payment
       const pRows = await supabaseRest<DbPaymentRow[]>(
-        `payments?order_id=eq.${encodeURIComponent(id)}&status=eq.captured&order=created_at.desc&limit=1`
+        `payments?order_id=eq.${encodeURIComponent(id)}&status=in.(captured,refund_pending)&order=created_at.desc&limit=1`
       );
       if (!pRows || pRows.length === 0) {
         return reply.status(400).send({
           error: {
             statusCode: 400,
             code: 'NO_CAPTURED_PAYMENT',
-            message: `No captured payment found for order ${id}.`,
+            message: `No refundable payment found for order ${id}.`,
           },
         });
       }
@@ -2138,39 +2148,75 @@ export const adminRoutes: FastifyPluginAsync<AdminRoutesOptions> = async (app, o
       const refundId = rpcResult?.out_refund_id || randomUUID();
       const remainingRefundable = Number(rpcResult?.out_remaining_refundable ?? 0);
 
-      // 3. Trigger Gateway Refund API
-      let providerRefundId: string | null = null;
-      try {
-        const rzpRefund = await createRazorpayRefund({
-          paymentId: payment.provider_payment_id || payment.id,
-          amount: refundAmount,
-          notes: { reason, orderId: id },
-          config,
-        });
-        providerRefundId = rzpRefund.id;
+      // Check if this refund record already has a provider_refund_id (idempotent replay)
+      const existingRows = await supabaseRest<Array<{
+        id: string;
+        status: string;
+        provider_refund_id: string | null;
+      }>>(`refunds?id=eq.${encodeURIComponent(refundId)}&select=id,status,provider_refund_id`);
+      const existingRecord = existingRows && existingRows.length > 0 ? existingRows[0] : null;
 
-        // Update refund record in DB with provider_refund_id and set status to refunded
-        await supabaseRest(`refunds?id=eq.${encodeURIComponent(refundId)}`, {
-          method: 'PATCH',
-          body: JSON.stringify({
-            provider_refund_id: providerRefundId,
-            status: 'refunded',
-            updated_at: new Date().toISOString(),
-          }),
-        });
+      let providerRefundId: string | null = existingRecord?.provider_refund_id ?? null;
+      let finalRefundStatus: AdminRefundResponse['status'] =
+        (existingRecord?.status as AdminRefundResponse['status']) ||
+        (rpcResult?.out_status as AdminRefundResponse['status']) ||
+        'refund_processing';
 
-        // Update order status if fully refunded
-        if (remainingRefundable === 0) {
-          await supabaseRest(`orders?id=eq.${encodeURIComponent(id)}`, {
+      // 3. Trigger Gateway Refund API only if not already submitted to provider
+      if (!providerRefundId) {
+        try {
+          const rzpRefund = await createRazorpayRefund({
+            paymentId: payment.provider_payment_id || payment.id,
+            amount: refundAmount,
+            notes: { reason, orderId: id, refundId },
+            config,
+          });
+          providerRefundId = rzpRefund.id;
+          finalRefundStatus =
+            rzpRefund.status === 'processed'
+              ? 'refunded'
+              : rzpRefund.status === 'failed'
+              ? 'refund_failed'
+              : 'refund_processing';
+
+          // Update refund record in DB with provider_refund_id and real provider status
+          await supabaseRest(`refunds?id=eq.${encodeURIComponent(refundId)}`, {
             method: 'PATCH',
             body: JSON.stringify({
-              payment_status: 'refunded',
+              provider_refund_id: providerRefundId,
+              status: finalRefundStatus,
               updated_at: new Date().toISOString(),
             }),
           });
+
+          // Update order payment_status only when confirmed refunded
+          if (finalRefundStatus === 'refunded') {
+            await supabaseRest(`orders?id=eq.${encodeURIComponent(id)}`, {
+              method: 'PATCH',
+              body: JSON.stringify({
+                payment_status: remainingRefundable === 0 ? 'refunded' : 'partially_refunded',
+                updated_at: new Date().toISOString(),
+              }),
+            });
+          }
+        } catch (gwErr) {
+          app.log.error(gwErr, 'Razorpay refund API call failed');
+          finalRefundStatus = 'refund_failed';
+          await supabaseRest(`refunds?id=eq.${encodeURIComponent(refundId)}`, {
+            method: 'PATCH',
+            body: JSON.stringify({
+              status: 'refund_failed',
+              updated_at: new Date().toISOString(),
+            }),
+          });
+          return reply.status(502).send({
+            error: {
+              statusCode: 502,
+              code: 'GATEWAY_REFUND_FAILED',
+              message: gwErr instanceof Error ? gwErr.message : 'Payment gateway refund request failed.',
+            },
+          });
         }
-      } catch (gwErr) {
-        app.log.error(gwErr, 'Razorpay refund API call failed');
       }
 
       // Audit log entry
@@ -2188,6 +2234,7 @@ export const adminRoutes: FastifyPluginAsync<AdminRoutesOptions> = async (app, o
               amount: refundAmount,
               reason,
               providerRefundId,
+              status: finalRefundStatus,
             },
           }),
         });
@@ -2195,16 +2242,23 @@ export const adminRoutes: FastifyPluginAsync<AdminRoutesOptions> = async (app, o
         app.log.error(logErr, 'Failed to insert audit log');
       }
 
+      const derivedPaymentStatus: AdminRefundResponse['paymentStatus'] =
+        finalRefundStatus === 'refunded'
+          ? remainingRefundable === 0
+            ? 'refunded'
+            : 'partially_refunded'
+          : ((order.payment_status || order.paymentStatus || 'refund_pending') as AdminRefundResponse['paymentStatus']);
+
       const refundResponse: AdminRefundResponse = {
         refundId,
         orderId: id,
         paymentId: payment.id,
         providerRefundId,
         amount: refundAmount,
-        status: (rpcResult?.out_status as AdminRefundResponse['status']) || 'refunded',
+        status: finalRefundStatus,
         remainingRefundable,
         orderStatus: (order.order_status || order.orderStatus || 'confirmed') as AdminRefundResponse['orderStatus'],
-        paymentStatus: remainingRefundable === 0 ? 'refunded' : 'partially_refunded',
+        paymentStatus: derivedPaymentStatus,
       };
       return reply.send(refundResponse);
     }

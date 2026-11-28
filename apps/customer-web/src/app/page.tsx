@@ -116,8 +116,8 @@ export default function HomePage(): ReactElement {
       />
 
       <main id="main-content">
-        {/* 1. Contemporary Premium Retail Hero */}
-        <Hero />
+        {/* 1. Contemporary Premium Retail Hero with Dynamic Auto-Carousel */}
+        <Hero products={products} />
 
         {/* 2. Category Discovery */}
         <div id="collections">

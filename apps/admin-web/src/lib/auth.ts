@@ -38,28 +38,29 @@ export interface AdminStaffSession {
 
 let inMemorySession: AdminStaffSession | null = null;
 
-export function getStoredAdminSession(): AdminStaffSession | null {
+function readRawStoredAdminSession(): AdminStaffSession | null {
   if (inMemorySession) {
-    if (inMemorySession.expiresAt && inMemorySession.expiresAt < Date.now()) {
-      clearAdminSession();
-      return null;
-    }
     return inMemorySession;
   }
   if (typeof window === 'undefined') return null;
   try {
     const raw = sessionStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
-    const session = JSON.parse(raw) as AdminStaffSession;
-    if (session.expiresAt && session.expiresAt < Date.now()) {
-      clearAdminSession();
-      return null;
-    }
-    inMemorySession = session;
-    return session;
+    return JSON.parse(raw) as AdminStaffSession;
   } catch {
     return null;
   }
+}
+
+export function getStoredAdminSession(): AdminStaffSession | null {
+  const session = readRawStoredAdminSession();
+  if (!session) return null;
+  if (session.expiresAt && session.expiresAt < Date.now()) {
+    clearAdminSession();
+    return null;
+  }
+  inMemorySession = session;
+  return session;
 }
 
 export function saveAdminSession(session: AdminStaffSession): void {
@@ -216,7 +217,7 @@ export async function loginStaffWithCredentials(
  * Attempts to refresh an existing staff session using the refresh token.
  */
 export async function refreshStaffSession(): Promise<AdminStaffSession | null> {
-  const current = getStoredAdminSession();
+  const current = readRawStoredAdminSession();
   if (!current?.refreshToken) {
     clearAdminSession();
     return null;

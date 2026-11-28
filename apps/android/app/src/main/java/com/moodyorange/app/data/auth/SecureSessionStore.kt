@@ -63,12 +63,10 @@ class SecureSessionStore(private val context: Context) {
         }
     }
 
-    private fun encrypt(plainText: String): String {
-        val secretKey = getSecretKey()
-        if (secretKey == null) {
-            // Safe fallback when KeyStore provider is absent (JVM tests)
-            return Base64.getEncoder().encodeToString(plainText.toByteArray(Charsets.UTF_8))
-        }
+    private var inMemoryFallbackToken: String? = null
+
+    private fun encrypt(plainText: String): String? {
+        val secretKey = getSecretKey() ?: return null
 
         val cipher = Cipher.getInstance(transformation)
         cipher.init(Cipher.ENCRYPT_MODE, secretKey)
@@ -81,14 +79,7 @@ class SecureSessionStore(private val context: Context) {
     }
 
     private fun decrypt(cipherText: String): String? {
-        val secretKey = getSecretKey()
-        if (secretKey == null) {
-            return try {
-                String(Base64.getDecoder().decode(cipherText), Charsets.UTF_8)
-            } catch (_: Throwable) {
-                null
-            }
-        }
+        val secretKey = getSecretKey() ?: return null
 
         return try {
             val combined = Base64.getDecoder().decode(cipherText)
@@ -107,6 +98,12 @@ class SecureSessionStore(private val context: Context) {
 
     fun saveSession(token: String, customerId: String, phone: String, fullName: String?, expiresAt: Long) {
         val encryptedToken = encrypt(token)
+        if (encryptedToken == null) {
+            // Never persist unencrypted credentials to disk if KeyStore is unavailable
+            inMemoryFallbackToken = token
+        } else {
+            inMemoryFallbackToken = null
+        }
         prefs.edit()
             .putString(KEY_ENC_TOKEN, encryptedToken)
             .putString(KEY_CUSTOMER_ID, customerId)
@@ -117,7 +114,8 @@ class SecureSessionStore(private val context: Context) {
     }
 
     fun getAccessToken(): String? {
-        val enc = prefs.getString(KEY_ENC_TOKEN, null) ?: return null
+        val enc = prefs.getString(KEY_ENC_TOKEN, null)
+        if (enc == null) return inMemoryFallbackToken
         return decrypt(enc)
     }
 
@@ -131,6 +129,7 @@ class SecureSessionStore(private val context: Context) {
     }
 
     fun clear() {
+        inMemoryFallbackToken = null
         prefs.edit().clear().apply()
     }
 

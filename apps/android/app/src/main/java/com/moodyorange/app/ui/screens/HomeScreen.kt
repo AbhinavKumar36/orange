@@ -49,9 +49,13 @@ import com.moodyorange.app.ui.theme.MutedGold
 import com.moodyorange.app.ui.theme.WhiteSurface
 import com.moodyorange.app.ui.viewmodel.CatalogViewModel
 import com.moodyorange.app.ui.viewmodel.UiState
-import coil.compose.SubcomposeAsyncImage
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.graphics.Brush
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.runtime.LaunchedEffect
+import kotlinx.coroutines.delay
+import com.moodyorange.app.ui.components.ProductImage
+import com.moodyorange.app.ui.components.ProductPlaceholder
+import com.moodyorange.app.util.CurrencyFormatter
 
 @Composable
 fun HomeScreen(
@@ -134,9 +138,13 @@ fun HomeScreen(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(bottom = 28.dp)
         ) {
-            // 1. Luxury Editorial Hero Section with 3D Centerpiece
+            val loadedProducts = (productsState as? UiState.Success<List<Product>>)?.data ?: emptyList()
+
+            // 1. Editorial Hero Section with Dynamic Auto-Carousel
             item {
                 HeroSection(
+                    products = loadedProducts,
+                    onProductClick = onProductClick,
                     onShopNow = { onNavigateToShop(null) }
                 )
             }
@@ -153,10 +161,12 @@ fun HomeScreen(
                 }
             }
 
-            // 3. Tactile 3D Inspection Studio
+            // 3. Dynamic Retail Highlights Showcase
             item {
                 Spacer(modifier = Modifier.height(28.dp))
                 ProductShowcaseSection(
+                    products = loadedProducts,
+                    onProductClick = onProductClick,
                     onExploreShop = { onNavigateToShop(null) }
                 )
             }
@@ -253,10 +263,23 @@ fun HomeScreen(
 
 @Composable
 private fun HeroSection(
+    products: List<Product>,
+    onProductClick: (Product) -> Unit,
     onShopNow: () -> Unit
 ) {
     val colors = MangalaTheme.colors
-    val isDark = colors.isDark
+    val carouselItems = products.filter { it.isInStock }.take(5).ifEmpty { products.take(5) }
+    val pagerState = rememberPagerState(pageCount = { maxOf(carouselItems.size, 1) })
+
+    LaunchedEffect(carouselItems.size) {
+        if (carouselItems.size > 1) {
+            while (true) {
+                delay(4000)
+                val next = (pagerState.currentPage + 1) % carouselItems.size
+                pagerState.animateScrollToPage(next)
+            }
+        }
+    }
 
     Box(
         modifier = Modifier
@@ -311,44 +334,94 @@ private fun HeroSection(
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            // Boutique In-Store Display Counter Photo
+            // Dynamic Multi-Category Product Auto-Carousel
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(200.dp)
+                    .height(210.dp)
                     .clip(RoundedCornerShape(14.dp))
                     .border(1.dp, colors.border, RoundedCornerShape(14.dp))
             ) {
-                SubcomposeAsyncImage(
-                    model = "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=800&q=80",
-                    contentDescription = "Mangala Enterprises In-Store Display Counter",
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize()
-                )
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(
-                            Brush.verticalGradient(
-                                colors = listOf(Color.Transparent, Color(0xAA040D12))
+                if (carouselItems.isNotEmpty()) {
+                    HorizontalPager(
+                        state = pagerState,
+                        modifier = Modifier.fillMaxSize()
+                    ) { page ->
+                        val item = carouselItems[page]
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .clickable { onProductClick(item) }
+                        ) {
+                            ProductImage(
+                                imageUrl = item.imageUrl,
+                                categorySlug = item.categorySlug,
+                                contentDescription = item.name,
+                                modifier = Modifier.fillMaxSize()
                             )
-                        )
-                )
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.BottomStart)
-                        .padding(10.dp)
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(Color(0xCC040D12))
-                        .border(0.5.dp, colors.gold, RoundedCornerShape(6.dp))
-                        .padding(horizontal = 8.dp, vertical = 4.dp)
-                ) {
-                    Text(
-                        text = "✨ IN-STORE DISPLAY VITRINE • READY TO SELL",
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = colors.gold,
-                        letterSpacing = 0.5.sp
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(
+                                        androidx.compose.ui.graphics.Brush.verticalGradient(
+                                            colors = listOf(Color.Transparent, Color(0xCC0D1B14))
+                                        )
+                                    )
+                            )
+                            Column(
+                                modifier = Modifier
+                                    .align(Alignment.BottomStart)
+                                    .padding(12.dp)
+                            ) {
+                                Text(
+                                    text = item.categoryName.uppercase(),
+                                    fontSize = 9.5.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFFFFA366),
+                                    letterSpacing = 0.8.sp
+                                )
+                                Text(
+                                    text = item.name,
+                                    fontFamily = EditorialSerif,
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = WhiteSurface,
+                                    maxLines = 1
+                                )
+                                Text(
+                                    text = CurrencyFormatter.formatPaiseToInr(item.basePrice, showDecimals = false),
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = WhiteSurface
+                                )
+                            }
+                        }
+                    }
+
+                    if (carouselItems.size > 1) {
+                        Row(
+                            modifier = Modifier
+                                .align(Alignment.BottomEnd)
+                                .padding(12.dp),
+                            horizontalArrangement = Arrangement.spacedBy(5.dp)
+                        ) {
+                            repeat(carouselItems.size) { index ->
+                                Box(
+                                    modifier = Modifier
+                                        .size(if (pagerState.currentPage == index) 16.dp else 6.dp, 6.dp)
+                                        .clip(CircleShape)
+                                        .background(
+                                            if (pagerState.currentPage == index) Color(0xFFD8561C)
+                                            else WhiteSurface.copy(alpha = 0.5f)
+                                        )
+                                )
+                            }
+                        }
+                    }
+                } else {
+                    ProductPlaceholder(
+                        categorySlug = "general",
+                        modifier = Modifier.fillMaxSize()
                     )
                 }
             }

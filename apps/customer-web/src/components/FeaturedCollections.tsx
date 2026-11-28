@@ -4,6 +4,7 @@ import type { ReactElement } from 'react';
 import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
 import type { Category, Product } from '@orange/api-contracts';
+import { ProductIllustration } from './ProductIllustration';
 
 interface FeaturedCollectionsProps {
   categories?: Category[];
@@ -11,33 +12,12 @@ interface FeaturedCollectionsProps {
   onSelectCategory?: (slug: string) => void;
 }
 
-function getCategoryImage(cat: Category, products: Product[]): string {
-  // 1. Prefer product image from real catalog products belonging to this category
+function getCategoryImage(cat: Category, products: Product[]): string | null {
+  // Use real product image from backend catalog products belonging to this category
   const prodWithImg = products.find(
     (p) => p.categorySlug.toLowerCase() === cat.slug.toLowerCase() && p.imageUrl
   );
-  if (prodWithImg?.imageUrl) {
-    return prodWithImg.imageUrl;
-  }
-
-  // 2. Curated visual fallbacks for recognized retail categories
-  const s = cat.slug.toLowerCase();
-  if (s.includes('cake') || s.includes('bake') || s.includes('pastry')) {
-    return 'https://images.unsplash.com/photo-1578985545062-69928b1d9587?auto=format&fit=crop&w=800&q=80';
-  }
-  if (s.includes('juice') || s.includes('drink') || s.includes('beverage')) {
-    return 'https://images.unsplash.com/photo-1613478223719-2ab802602423?auto=format&fit=crop&w=800&q=80';
-  }
-  if (s.includes('choc') || s.includes('praline') || s.includes('confection')) {
-    return 'https://images.unsplash.com/photo-1549007994-cb92caebd54b?auto=format&fit=crop&w=800&q=80';
-  }
-  if (s.includes('snack') || s.includes('savour') || s.includes('crisp')) {
-    return 'https://images.unsplash.com/photo-1599490659213-e2b9527bd087?auto=format&fit=crop&w=800&q=80';
-  }
-  if (s.includes('ice') || s.includes('cream') || s.includes('frozen')) {
-    return 'https://images.unsplash.com/photo-1501443762994-82bd5dace89a?auto=format&fit=crop&w=800&q=80';
-  }
-  return 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=800&q=80';
+  return prodWithImg?.imageUrl ?? null;
 }
 
 function getCategoryAccent(cat: Category, index: number): { tag: string; bgClass: string } {
@@ -106,14 +86,22 @@ export function FeaturedCollections({
                 className={`category-discovery-card ${bgClass}`}
                 aria-label={`Browse ${cat.name} category with ${count} items`}
               >
-                {/* Background Image Container */}
+                {/* Background Image Container (Real Product Image or Coherent Neutral Placeholder) */}
                 <div className="category-card-media">
-                  <img
-                    src={bgImage}
-                    alt={cat.name}
-                    className="category-card-img"
-                    loading="lazy"
-                  />
+                  {bgImage ? (
+                    <img
+                      src={bgImage}
+                      alt={cat.name}
+                      className="category-card-img"
+                      loading="lazy"
+                    />
+                  ) : (
+                    <ProductIllustration
+                      categorySlug={cat.slug}
+                      name={cat.name}
+                      className="category-card-img"
+                    />
+                  )}
                   <div className="category-card-scrim" />
                 </div>
 

@@ -349,6 +349,10 @@ export const paymentsRoutes: FastifyPluginAsync<PaymentsPluginOptions> = async (
       const baseUrl = config.SUPABASE_URL.replace(/\/+$/, '');
       const apiKey = config.SUPABASE_SERVICE_ROLE_KEY || '';
 
+      let authoritativeOrderStatus: VerifyPaymentResponse['orderStatus'] = 'confirmed';
+      let authoritativePaymentStatus: VerifyPaymentResponse['paymentStatus'] = 'captured';
+      let isConfirmed = true;
+
       if (apiKey && !config.ALLOW_MOCK_SERVICES) {
         try {
           const rpcRes = await fetch(`${baseUrl}/rest/v1/rpc/rpc_reconcile_late_payment`, {
@@ -381,6 +385,26 @@ export const paymentsRoutes: FastifyPluginAsync<PaymentsPluginOptions> = async (
                 message: errJson.message || 'Payment reconciliation failed.',
               },
             });
+          }
+
+          const rpcRows = (await rpcRes.json().catch(() => [])) as Array<{
+            out_action?: string;
+            out_order_status?: VerifyPaymentResponse['orderStatus'];
+            out_payment_status?: VerifyPaymentResponse['paymentStatus'];
+          }>;
+          const rpcResult = Array.isArray(rpcRows) && rpcRows.length > 0 ? rpcRows[0] : null;
+          if (rpcResult?.out_order_status) {
+            authoritativeOrderStatus = rpcResult.out_order_status;
+          }
+          if (rpcResult?.out_payment_status) {
+            authoritativePaymentStatus = rpcResult.out_payment_status;
+          }
+          if (
+            rpcResult?.out_action === 'TRIGGER_REFUND' ||
+            authoritativePaymentStatus === 'refund_pending' ||
+            authoritativeOrderStatus === 'cancelled_inventory_depleted'
+          ) {
+            isConfirmed = false;
           }
         } catch (err) {
           app.log.error(err, 'Failed to call rpc_reconcile_late_payment');
@@ -430,11 +454,11 @@ export const paymentsRoutes: FastifyPluginAsync<PaymentsPluginOptions> = async (
       }
 
       const response: VerifyPaymentResponse = {
-        success: true,
+        success: isConfirmed,
         orderId: order.id,
         orderNumber: order.orderNumber,
-        orderStatus: 'confirmed',
-        paymentStatus: 'captured',
+        orderStatus: authoritativeOrderStatus,
+        paymentStatus: authoritativePaymentStatus,
         paymentId: razorpayPaymentId,
       };
 

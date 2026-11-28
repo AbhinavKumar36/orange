@@ -47,6 +47,46 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps): ReactEle
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const idempotencyKeyRef = useRef<string | null>(null);
   const checkoutPayloadRef = useRef<string | null>(null);
+  const CHECKOUT_STORAGE_KEY = 'mangala_active_checkout_v1';
+
+  const clearPersistedReservation = () => {
+    if (typeof window !== 'undefined') {
+      try {
+        sessionStorage.removeItem(CHECKOUT_STORAGE_KEY);
+      } catch {
+        // ignore
+      }
+    }
+  };
+
+  // Restore any active unexpired online reservation across CartDrawer close/reopen
+  useEffect(() => {
+    if (!isOpen || !session?.user?.id || confirmedOrder || typeof window === 'undefined') return;
+    try {
+      const raw = sessionStorage.getItem(CHECKOUT_STORAGE_KEY);
+      if (!raw) return;
+      const saved = JSON.parse(raw) as {
+        customerId: string;
+        order: CheckoutResponse;
+        idempotencyKey: string;
+        fingerprint: string;
+      };
+      if (saved.customerId !== session.user.id) return;
+      if (saved.order.expiresAt && Date.parse(saved.order.expiresAt) <= Date.now()) {
+        clearPersistedReservation();
+        return;
+      }
+      if (!pendingOnlineOrder) {
+        setPendingOnlineOrder(saved.order);
+        idempotencyKeyRef.current = saved.idempotencyKey;
+        checkoutPayloadRef.current = saved.fingerprint;
+        setPaymentMethod('online_razorpay');
+        setPaymentStep('failed');
+      }
+    } catch {
+      // ignore storage errors
+    }
+  }, [isOpen, session, confirmedOrder, pendingOnlineOrder]);
 
   // Sync customer details from authenticated session
   useEffect(() => {
@@ -147,6 +187,7 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps): ReactEle
             });
             setPendingOnlineOrder(null);
             idempotencyKeyRef.current = null;
+            clearPersistedReservation();
             setPaymentStep('idle');
             clearCart();
             setIsSubmitting(false);
@@ -182,6 +223,7 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps): ReactEle
       if (err instanceof ApiError && err.code === 'ORDER_EXPIRED') {
         setPendingOnlineOrder(null);
         idempotencyKeyRef.current = null;
+        clearPersistedReservation();
         setPaymentStep('idle');
       }
       const msg = err instanceof Error ? err.message : 'Failed to launch payment checkout.';
@@ -253,10 +295,26 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps): ReactEle
 
       if (paymentMethod === 'online_razorpay') {
         setPendingOnlineOrder(orderResult);
+        if (typeof window !== 'undefined') {
+          try {
+            sessionStorage.setItem(
+              CHECKOUT_STORAGE_KEY,
+              JSON.stringify({
+                customerId: session.user.id,
+                order: orderResult,
+                idempotencyKey,
+                fingerprint,
+              })
+            );
+          } catch {
+            // ignore
+          }
+        }
         await launchRazorpayCheckout(orderResult);
       } else {
         setConfirmedOrder(orderResult);
         idempotencyKeyRef.current = null;
+        clearPersistedReservation();
         clearCart();
         setIsSubmitting(false);
       }
@@ -292,10 +350,20 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps): ReactEle
               <span className="brand-logo-mark" aria-hidden="true">🌿</span>
               <div>
                 <h2 className="modal-title">
-                  {confirmedOrder ? 'Order Confirmed!' : 'Mangala Enterprises — Counter Checkout'}
+                  {confirmedOrder
+                    ? confirmedOrder.orderStatus === 'cancelled_inventory_depleted' ||
+                      confirmedOrder.paymentStatus === 'refund_pending'
+                      ? 'Stock Depleted — Refund Initiated'
+                      : 'Order Confirmed!'
+                    : 'Mangala Enterprises — Counter Checkout'}
                 </h2>
                 <div className="modal-subtitle">
-                  {confirmedOrder ? 'In-Store Display Stock Reserved' : 'Ready in vitrine for immediate counter collection'}
+                  {confirmedOrder
+                    ? confirmedOrder.orderStatus === 'cancelled_inventory_depleted' ||
+                      confirmedOrder.paymentStatus === 'refund_pending'
+                      ? 'Inventory was claimed before payment completed'
+                      : 'In-Store Stock Reserved'
+                    : 'Ready in store for counter collection'}
                 </div>
               </div>
             </div>
@@ -329,7 +397,10 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps): ReactEle
                 </h3>
 
                 <p className="confirmed-subtitle">
-                  Your order has been confirmed and reserved from our in-store inventory.
+                  {confirmedOrder.orderStatus === 'cancelled_inventory_depleted' ||
+                  confirmedOrder.paymentStatus === 'refund_pending'
+                    ? 'Your payment was received after the reservation expired and another order claimed the remaining stock. Your payment is marked for automatic refund.'
+                    : 'Your order has been confirmed and reserved from our in-store inventory.'}
                 </p>
 
                 <div className="receipt-card">

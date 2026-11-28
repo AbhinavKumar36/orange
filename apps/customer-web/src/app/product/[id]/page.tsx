@@ -342,7 +342,7 @@ export default function ProductDetailPage(): ReactElement {
                   <div className="spec-row">
                     <span className="spec-label">Counter Handover</span>
                     <span className="spec-value">
-                      {product.prepTimeMinutes > 10 && (product.categorySlug.includes('cake') || product.slug.includes('cake'))
+                      {product.prepTimeMinutes > 0
                         ? `Approx. ${product.prepTimeMinutes} mins`
                         : 'Immediate (In-Store Ready)'}
                     </span>
